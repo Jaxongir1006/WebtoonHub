@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
+import { LanguageProvider } from './context/LanguageContext';
 import { AuthProvider } from './context/AuthContext';
 import { DailyBonusProvider } from './context/DailyBonusContext';
 import { Navbar } from './components/common/Navbar';
@@ -63,11 +64,13 @@ const AppLayout: React.FC = () => {
 export const App: React.FC = () => {
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <DailyBonusProvider>
-          <AppLayout />
-        </DailyBonusProvider>
-      </AuthProvider>
+      <LanguageProvider>
+        <AuthProvider>
+          <DailyBonusProvider>
+            <AppLayout />
+          </DailyBonusProvider>
+        </AuthProvider>
+      </LanguageProvider>
     </BrowserRouter>
   );
 };

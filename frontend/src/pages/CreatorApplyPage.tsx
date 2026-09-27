@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { creatorApi } from '../api/creator';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import { CreatorRequest } from '../types';
-import { formatDateUz } from '../utils/date';
+import { formatDate } from '../utils/date';
 import { getApiErrorMessage } from '../api/client';
 import {
   PenTool,
@@ -18,6 +19,7 @@ import {
 
 export const CreatorApplyPage: React.FC = () => {
   const { isAuthenticated, openAuthModal } = useAuth();
+  const { t, language } = useLanguage();
   const [existingRequest, setExistingRequest] = useState<CreatorRequest | null>(null);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
@@ -53,7 +55,7 @@ export const CreatorApplyPage: React.FC = () => {
     if (message.trim().length < 10) {
       setFeedback({
         type: 'error',
-        message: "Ariza matni kamida 10 ta belgidan iborat bo'lishi kerak"
+        message: t('creator.minCharNotice', { count: message.trim().length })
       });
       return;
     }
@@ -64,14 +66,14 @@ export const CreatorApplyPage: React.FC = () => {
       const res = await creatorApi.submitRequest(message.trim());
       setFeedback({
         type: 'success',
-        message: res.message || "Arizangiz muvaffaqiyatli yuborildi!"
+        message: res.message || t('creator.successTitle')
       });
       setMessage('');
       await fetchMyRequest();
     } catch (err) {
       setFeedback({
         type: 'error',
-        message: getApiErrorMessage(err, "Ariza yuborishda xatolik yuz berdi")
+        message: getApiErrorMessage(err, t('common.error'))
       });
     } finally {
       setSubmitting(false);
@@ -84,15 +86,15 @@ export const CreatorApplyPage: React.FC = () => {
         <div className="w-16 h-16 rounded-3xl bg-brand-500/10 border border-brand-500/20 flex items-center justify-center text-brand-400 mb-4 shadow-glow-brand">
           <PenTool className="w-8 h-8" />
         </div>
-        <h2 className="text-2xl font-black text-white mb-2">Muallif / Tarjimon Bo'lish</h2>
+        <h2 className="text-2xl font-black text-white mb-2">{t('creator.title')}</h2>
         <p className="text-xs text-studio-400 max-w-sm mb-6">
-          WebtoonHub platformasida o'z ijodingiz yoki tarjimalaringizni nashr qilish uchun avval hisobingizga kiring.
+          {t('creator.loginRequired')}
         </p>
         <button
           onClick={() => openAuthModal('login')}
           className="px-6 py-3 rounded-xl bg-brand-500 text-studio-950 font-bold text-xs hover:bg-brand-400 shadow-glow-brand"
         >
-          Kirish / Ro'yxatdan o'tish
+          {t('library.loginBtn')}
         </button>
       </div>
     );
@@ -108,14 +110,13 @@ export const CreatorApplyPage: React.FC = () => {
           <div className="relative z-10 space-y-3">
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-brand-500/10 text-brand-400 border border-brand-500/20">
               <Sparkles className="w-3.5 h-3.5" />
-              <span>Tarjimonlar va Mualliflar dasturi</span>
+              <span>{t('creator.programTitle')}</span>
             </div>
             <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight">
-              WebtoonHub Muallifiga Aylaning
+              {t('creator.programHeroTitle')}
             </h1>
             <p className="text-xs sm:text-sm text-studio-400 leading-relaxed max-w-xl">
-              Sevimli manhvalaringizni o'zbek tiliga tarjima qilasizmi yoki o'z komikslaringiz bormi?
-              Bizning jamoaga qo'shiling, Creator roliga ega bo'ling va Studio panel orqali asarlarni nashr qiling.
+              {t('creator.programHeroDesc')}
             </p>
           </div>
         </div>
@@ -124,12 +125,12 @@ export const CreatorApplyPage: React.FC = () => {
         {loading ? (
           <div className="py-12 flex justify-center items-center text-studio-400 gap-2">
             <Loader2 className="w-5 h-5 animate-spin text-brand-500" />
-            <span className="text-sm">Ariza holati tekshirilmoqda...</span>
+            <span className="text-sm">{t('common.loading')}</span>
           </div>
         ) : existingRequest ? (
           <div className="bg-studio-900 border border-studio-800 rounded-3xl p-6 sm:p-8 shadow-xl">
             <div className="flex items-center justify-between pb-4 border-b border-studio-800 mb-6">
-              <h2 className="text-lg font-bold text-white">Mening Arizam</h2>
+              <h2 className="text-lg font-bold text-white">{t('creator.myRequest')}</h2>
               <span
                 className={`px-3 py-1 rounded-full text-xs font-bold border flex items-center gap-1.5 ${
                   existingRequest.status === 'approved'
@@ -144,10 +145,10 @@ export const CreatorApplyPage: React.FC = () => {
                 {existingRequest.status === 'pending' && <Clock className="w-3.5 h-3.5" />}
                 <span>
                   {existingRequest.status === 'approved'
-                    ? 'Tasdiqlangan'
+                    ? t('creator.approved')
                     : existingRequest.status === 'rejected'
-                    ? 'Rad etilgan'
-                    : 'Kutilmoqda'}
+                    ? t('creator.rejected')
+                    : t('creator.pending')}
                 </span>
               </span>
             </div>
@@ -155,7 +156,7 @@ export const CreatorApplyPage: React.FC = () => {
             <div className="space-y-4">
               <div>
                 <span className="text-xs font-semibold text-studio-400 block mb-1">
-                  Yuborilgan ariza matni:
+                  {t('creator.experienceLabel')}:
                 </span>
                 <div className="p-4 rounded-2xl bg-studio-800/80 border border-studio-700/60 text-xs sm:text-sm text-studio-200 whitespace-pre-wrap leading-relaxed">
                   {existingRequest.message}
@@ -163,14 +164,14 @@ export const CreatorApplyPage: React.FC = () => {
               </div>
 
               <div className="text-[11px] text-studio-500">
-                Yuborilgan sana: {formatDateUz(existingRequest.created_at)}
+                {t('creator.submittedDate', { date: formatDate(existingRequest.created_at, language) })}
               </div>
 
               {/* Admin feedback if approved or rejected */}
               {existingRequest.admin_feedback && (
                 <div className="p-4 rounded-2xl bg-studio-850 border border-studio-700/80">
                   <span className="text-xs font-bold text-brand-400 block mb-1">
-                    Moderator javobi:
+                    {t('creator.moderatorResponse')}
                   </span>
                   <p className="text-xs text-studio-200 italic">
                     "{existingRequest.admin_feedback}"
@@ -187,7 +188,7 @@ export const CreatorApplyPage: React.FC = () => {
                     rel="noreferrer"
                     className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-brand-500 text-studio-950 font-bold text-xs hover:bg-brand-400 shadow-glow-brand transition-all"
                   >
-                    <span>Creator / Admin Studio Portaliga O'tish</span>
+                    <span>{t('creator.goToStudio')}</span>
                     <ExternalLink className="w-4 h-4" />
                   </a>
                 </div>
@@ -201,7 +202,7 @@ export const CreatorApplyPage: React.FC = () => {
           <div className="bg-studio-900 border border-studio-800 rounded-3xl p-6 sm:p-8 shadow-xl">
             <div className="flex items-center gap-2 pb-4 border-b border-studio-800 mb-6">
               <PenTool className="w-5 h-5 text-brand-400" />
-              <h2 className="text-lg font-bold text-white">Yangi Ariza Yuborish</h2>
+              <h2 className="text-lg font-bold text-white">{t('creator.newRequestTitle')}</h2>
             </div>
 
             {feedback && (
@@ -224,26 +225,25 @@ export const CreatorApplyPage: React.FC = () => {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-studio-300 mb-1.5">
-                  Tarjima tajribangiz va faoliyatingiz haqida ma'lumot
+                  {t('creator.experienceFieldLabel')}
                 </label>
                 <textarea
                   required
                   rows={5}
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
-                  placeholder="Qaysi tillardan tarjima qilasiz? Qanday manhvalarni yuklamoqchisiz? Tajribangiz va portfolio havolalarini yozing..."
+                  placeholder={t('creator.experienceFieldPlaceholder')}
                   className="w-full p-3.5 bg-studio-800 border border-studio-700 rounded-2xl text-xs sm:text-sm text-white placeholder-studio-500 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all resize-y"
                 />
                 <span className="text-[11px] text-studio-500 mt-1 block">
-                  Kamida 10 ta belgi (kiritildi: {message.length})
+                  {t('creator.minCharNotice', { count: message.length })}
                 </span>
               </div>
 
               <div className="p-4 rounded-2xl bg-studio-800/40 border border-studio-700/40 flex items-start gap-3">
                 <ShieldCheck className="w-5 h-5 text-brand-400 shrink-0 mt-0.5" />
                 <p className="text-xs text-studio-400 leading-relaxed">
-                  Arizangiz WebtoonHub boshqaruvchilari tomonidan ko'rib chiqiladi.
-                  Tasdiqlangach, profilingiz avtomatik ravishda <b>Creator</b> roliga o'tkaziladi va manhva yuklash ruxsati ochiladi.
+                  {t('creator.programNotice')}
                 </p>
               </div>
 
@@ -257,7 +257,7 @@ export const CreatorApplyPage: React.FC = () => {
                 ) : (
                   <Send className="w-4 h-4" />
                 )}
-                <span>Arizani moderatorlarga yuborish</span>
+                <span>{t('creator.submitToModerators')}</span>
               </button>
             </form>
           </div>

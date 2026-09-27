@@ -8,11 +8,28 @@ export const formatNumber = (num: number): string => {
   return num.toLocaleString('uz-UZ');
 };
 
-export const getStatusLabel = (status: 'ongoing' | 'completed'): string => {
+export const getStatusLabel = (status: 'ongoing' | 'completed' | string, t?: (key: string) => string): string => {
+  if (t) {
+    return status === 'ongoing' ? t('common.ongoing') : t('common.completed');
+  }
   return status === 'ongoing' ? "Davom etmoqda" : "Tugallangan";
 };
 
-export const getBookmarkStatusLabel = (status: string): string => {
+export const getBookmarkStatusLabel = (status: string, t?: (key: string) => string): string => {
+  if (t) {
+    switch (status) {
+      case 'reading':
+        return t('details.bookmarkReading');
+      case 'plan_to_read':
+        return t('details.bookmarkPlanned');
+      case 'completed':
+        return t('details.bookmarkCompleted');
+      case 'dropped':
+        return t('details.bookmarkDropped');
+      default:
+        return status;
+    }
+  }
   switch (status) {
     case 'reading':
       return "O'qilmoqda";

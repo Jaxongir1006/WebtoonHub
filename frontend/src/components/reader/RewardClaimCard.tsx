@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { rewardsApi } from '../../api/rewards';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { Zap, CheckCircle2, AlertCircle, Loader2, Sparkles } from 'lucide-react';
 import { getApiErrorMessage } from '../../api/client';
 
@@ -18,6 +19,7 @@ export const RewardClaimCard: React.FC<RewardClaimCardProps> = ({
   onClaimSuccess
 }) => {
   const { isAuthenticated, updateCoinsLocally, openAuthModal } = useAuth();
+  const { t } = useLanguage();
   const [isClaimed, setIsClaimed] = useState(initialClaimed);
   const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -45,11 +47,11 @@ export const RewardClaimCard: React.FC<RewardClaimCardProps> = ({
       }
       setFeedback({
         type: 'success',
-        message: res.message || `+${rewardAmount} Chaqmoq hisobingizga qo'shildi!`
+        message: res.message || t('reader.rewardClaimed')
       });
       onClaimSuccess?.();
     } catch (err) {
-      const msg = getApiErrorMessage(err, "Chaqmoqni olishda xatolik yuz berdi");
+      const msg = getApiErrorMessage(err, t('common.error'));
       setFeedback({ type: 'error', message: msg });
     } finally {
       setLoading(false);
@@ -67,9 +69,9 @@ export const RewardClaimCard: React.FC<RewardClaimCardProps> = ({
             <CheckCircle2 className="w-8 h-8 text-emerald-400" />
           </div>
           <div>
-            <h4 className="font-bold text-white text-base">Bob mutolaasi yakunlandi!</h4>
+            <h4 className="font-bold text-white text-base">{t('reader.rewardClaimed')}</h4>
             <p className="text-xs text-studio-400 mt-0.5">
-              Ushbu bob uchun berilgan <b>+{rewardAmount} ⚡ Chaqmoq</b> balansingizga qo'shilgan.
+              {t('reader.rewardClaimedDesc')}
             </p>
           </div>
         </div>
@@ -81,11 +83,11 @@ export const RewardClaimCard: React.FC<RewardClaimCardProps> = ({
 
           <div>
             <h4 className="font-black text-white text-lg flex items-center justify-center gap-2">
-              <span>Mutolaa bonusi: +{rewardAmount} ⚡ Chaqmoq</span>
+              <span>{t('reader.readingBonusTitle', { coins: rewardAmount })}</span>
               <Sparkles className="w-4 h-4 text-brand-400" />
             </h4>
             <p className="text-xs text-studio-300 mt-1 max-w-sm mx-auto">
-              Bobni o'qib tugatdingiz! Chaqmoqlarni hisobingizga qo'shish uchun quyidagi tugmani bosing:
+              {t('reader.readingBonusDesc')}
             </p>
           </div>
 
@@ -114,15 +116,15 @@ export const RewardClaimCard: React.FC<RewardClaimCardProps> = ({
             {loading ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Olinmoqda...</span>
+                <span>{t('reader.claiming')}</span>
               </>
             ) : isAuthenticated ? (
               <>
                 <Zap className="w-4 h-4 fill-studio-950" />
-                <span>+{rewardAmount} ⚡ Chaqmoqni olish</span>
+                <span>{t('reader.claimReadingBonus', { coins: rewardAmount })}</span>
               </>
             ) : (
-              <span>Kirish va +{rewardAmount} ⚡ Chaqmoqni olish</span>
+              <span>{t('reader.loginToClaimBonus', { coins: rewardAmount })}</span>
             )}
           </button>
         </div>

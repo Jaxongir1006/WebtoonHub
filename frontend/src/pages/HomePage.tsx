@@ -6,6 +6,7 @@ import { HeroBanner } from '../components/home/HeroBanner';
 import { WebtoonCard } from '../components/webtoons/WebtoonCard';
 import { GenreFilter } from '../components/webtoons/GenreFilter';
 import { useDailyBonus } from '../context/DailyBonusContext';
+import { useLanguage } from '../context/LanguageContext';
 import {
   Zap,
   TrendingUp,
@@ -19,7 +20,8 @@ import {
 } from 'lucide-react';
 
 export const HomePage: React.FC = () => {
-  const { openModal: openDailyBonusModal } = useDailyBonus();
+  const { openModal: openDailyBonusModal, isClaimedToday } = useDailyBonus();
+  const { t } = useLanguage();
   const [webtoons, setWebtoons] = useState<WebtoonSummary[]>([]);
   const [genres, setGenres] = useState<Genre[]>([]);
   const [selectedGenre, setSelectedGenre] = useState<string | undefined>();
@@ -60,31 +62,33 @@ export const HomePage: React.FC = () => {
           <HeroBanner webtoons={webtoons.slice(0, 3)} />
         )}
 
-        {/* Daily Bonus Callout Strip */}
-        <div className="mb-12 p-4 sm:p-6 rounded-2xl bg-gradient-to-r from-brand-600/20 via-amber-500/10 to-studio-900 border border-brand-500/30 shadow-glow-brand flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-4 text-center sm:text-left">
-            <div className="w-12 h-12 rounded-2xl bg-brand-500 flex items-center justify-center shrink-0 shadow-glow-brand">
-              <Zap className="w-6 h-6 text-studio-950 fill-studio-950" />
+        {/* Daily Bonus Callout Strip (Faqat bugun olinmagan bo'lsa ko'rinadi) */}
+        {!isClaimedToday && (
+          <div className="mb-12 p-4 sm:p-6 rounded-2xl bg-gradient-to-r from-brand-600/20 via-amber-500/10 to-studio-900 border border-brand-500/30 shadow-glow-brand flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-4 text-center sm:text-left">
+              <div className="w-12 h-12 rounded-2xl bg-brand-500 flex items-center justify-center shrink-0 shadow-glow-brand">
+                <Zap className="w-6 h-6 text-studio-950 fill-studio-950" />
+              </div>
+              <div>
+                <h3 className="font-bold text-white text-base flex items-center gap-1.5 justify-center sm:justify-start">
+                  <span>{t('dailyBonus.modalTitle')} — {t('dailyBonus.amount')}</span>
+                  <Sparkles className="w-4 h-4 text-brand-400" />
+                </h3>
+                <p className="text-xs text-studio-300 mt-0.5">
+                  {t('dailyBonus.modalSubtitle')}
+                </p>
+              </div>
             </div>
-            <div>
-              <h3 className="font-bold text-white text-base flex items-center gap-1.5 justify-center sm:justify-start">
-                <span>Kunlik Kirish Bonusi — Bepul +15 ⚡ Chaqmoq</span>
-                <Sparkles className="w-4 h-4 text-brand-400" />
-              </h3>
-              <p className="text-xs text-studio-300 mt-0.5">
-                Har kuni platformaga tashrif buyuring va eksklyuziv avatar ramkalarini bepul xarid qiling!
-              </p>
-            </div>
-          </div>
 
-          <button
-            onClick={openDailyBonusModal}
-            className="px-5 py-2.5 rounded-xl font-bold bg-brand-500 text-studio-950 hover:bg-brand-400 active:scale-95 shadow-glow-brand transition-all text-xs shrink-0 flex items-center gap-1.5"
-          >
-            <Gift className="w-4 h-4" />
-            <span>Bonusni olish</span>
-          </button>
-        </div>
+            <button
+              onClick={openDailyBonusModal}
+              className="px-5 py-2.5 rounded-xl font-bold bg-brand-500 text-studio-950 hover:bg-brand-400 active:scale-95 shadow-glow-brand transition-all text-xs shrink-0 flex items-center gap-1.5"
+            >
+              <Gift className="w-4 h-4" />
+              <span>{t('dailyBonus.claimBtn')}</span>
+            </button>
+          </div>
+        )}
 
         {/* Trending Section */}
         <div className="mb-12">
@@ -92,14 +96,14 @@ export const HomePage: React.FC = () => {
             <div className="flex items-center gap-2">
               <TrendingUp className="w-5 h-5 text-brand-500" />
               <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
-                Mashhur Manhvalar
+                {t('home.popularToday')}
               </h2>
             </div>
             <Link
               to="/catalog"
               className="text-xs font-bold text-brand-400 hover:text-brand-300 flex items-center gap-1 transition-colors"
             >
-              <span>Barchasini ko'rish</span>
+              <span>{t('home.viewAll')}</span>
               <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
@@ -124,7 +128,7 @@ export const HomePage: React.FC = () => {
           ) : filteredWebtoons.length === 0 ? (
             <div className="py-16 text-center text-studio-400">
               <BookOpen className="w-10 h-10 mx-auto text-studio-600 mb-2" />
-              <p className="text-sm font-semibold">Ushbu janrda hozircha komikslar mavjud emas</p>
+              <p className="text-sm font-semibold">{t('home.emptyGenre')}</p>
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
@@ -139,10 +143,10 @@ export const HomePage: React.FC = () => {
         <div className="mt-20 pt-12 border-t border-studio-800">
           <div className="text-center max-w-xl mx-auto mb-10">
             <h2 className="text-2xl font-black text-white tracking-tight">
-              Nega aynan Webtoon<span className="text-brand-500">Hub</span>?
+              {t('home.whyWebtoonHub')}
             </h2>
             <p className="text-xs text-studio-400 mt-1.5">
-              O'zbek kitobxonlari va manhva ixlosmandlari uchun maxsus ishlab chiqilgan qulay raqamli muhit.
+              {t('home.whySubtitle')}
             </p>
           </div>
 
@@ -152,10 +156,10 @@ export const HomePage: React.FC = () => {
                 <Zap className="w-6 h-6 fill-current" />
               </div>
               <h3 className="font-bold text-white text-base mb-2">
-                ⚡ Chaqmoq Iqtisodiyoti
+                {t('home.featureCoinsTitle')}
               </h3>
               <p className="text-xs text-studio-400 leading-relaxed">
-                Hech qanday real pul sarflamaysiz. Ro'yxatdan o'tishda +50, har bir bob mutolaasida +5 va kunlik kirishda +15 Chaqmoq to'plab do'kondan ramkalar oling.
+                {t('home.featureCoinsDesc')}
               </p>
             </div>
 
@@ -164,10 +168,10 @@ export const HomePage: React.FC = () => {
                 <Smartphone className="w-6 h-6" />
               </div>
               <h3 className="font-bold text-white text-base mb-2">
-                📱 Vertikal Qulay Mutolaa
+                {t('home.featureReaderTitle')}
               </h3>
               <p className="text-xs text-studio-400 leading-relaxed">
-                Webtoon va manhvalar uchun moslashtirilgan choksiz vertikal o'quvchi. Telefon va kompyuter ekranlariga to'liq moslashadi.
+                {t('home.featureReaderDesc')}
               </p>
             </div>
 
@@ -176,10 +180,10 @@ export const HomePage: React.FC = () => {
                 <ShieldCheck className="w-6 h-6" />
               </div>
               <h3 className="font-bold text-white text-base mb-2">
-                🇺🇿 100% O'zbek Tilida
+                {t('home.featureUzTitle')}
               </h3>
               <p className="text-xs text-studio-400 leading-relaxed">
-                Barcha manhvalar, janrlar, boblar va sharhlar o'zbek tilida (Lotin alifbosi). Do'stona tarjimonlar hamjamiyati.
+                {t('home.featureUzDesc')}
               </p>
             </div>
           </div>

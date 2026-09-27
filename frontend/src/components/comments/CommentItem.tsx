@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { CommentAuthor } from '../../types';
 import { AvatarFrame } from '../common/AvatarFrame';
-import { formatRelativeTimeUz } from '../../utils/date';
+import { formatRelativeTime } from '../../utils/date';
 import { Reply, Trash2, Send, Loader2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
 
 interface CommentItemProps {
   id: number;
@@ -31,6 +32,7 @@ export const CommentItem: React.FC<CommentItemProps> = ({
   onDelete
 }) => {
   const { user: currentUser, isAuthenticated, openAuthModal } = useAuth();
+  const { t, language } = useLanguage();
   const [replyOpen, setReplyOpen] = useState(false);
   const [replyText, setReplyText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -57,7 +59,7 @@ export const CommentItem: React.FC<CommentItemProps> = ({
 
   const handleDelete = async (targetId: number) => {
     if (!onDelete) return;
-    if (!window.confirm("Rostdan ham ushbu sharhni o'chirmoqchimisiz?")) return;
+    if (!window.confirm(t('comments.confirmDelete'))) return;
     setIsDeleting(true);
     await onDelete(targetId);
     setIsDeleting(false);
@@ -81,7 +83,7 @@ export const CommentItem: React.FC<CommentItemProps> = ({
               {user.username}
             </span>
             <span className="text-[11px] text-studio-500">
-              {formatRelativeTimeUz(createdAt)}
+              {formatRelativeTime(createdAt, language)}
             </span>
           </div>
 
@@ -90,7 +92,7 @@ export const CommentItem: React.FC<CommentItemProps> = ({
               onClick={() => handleDelete(id)}
               disabled={isDeleting}
               className="text-studio-500 hover:text-rose-400 p-1 rounded transition-colors"
-              title="Sharhni o'chirish"
+              title="Delete"
             >
               <Trash2 className="w-3.5 h-3.5" />
             </button>
@@ -115,7 +117,7 @@ export const CommentItem: React.FC<CommentItemProps> = ({
             className="text-xs font-semibold text-studio-400 hover:text-brand-400 flex items-center gap-1 transition-colors"
           >
             <Reply className="w-3.5 h-3.5" />
-            <span>Javob qaytarish</span>
+            <span>{t('comments.replyBtn')}</span>
           </button>
         </div>
 
@@ -127,7 +129,7 @@ export const CommentItem: React.FC<CommentItemProps> = ({
               required
               value={replyText}
               onChange={(e) => setReplyText(e.target.value)}
-              placeholder={`@${user.username} ga javob...`}
+              placeholder={`@${user.username}...`}
               className="flex-1 bg-studio-800 border border-studio-700 rounded-xl px-3 py-1.5 text-xs text-white placeholder-studio-500 focus:outline-none focus:border-brand-500"
             />
             <button
@@ -140,7 +142,7 @@ export const CommentItem: React.FC<CommentItemProps> = ({
               ) : (
                 <Send className="w-3.5 h-3.5" />
               )}
-              <span>Yuborish</span>
+              <span>{t('comments.sendBtn')}</span>
             </button>
           </form>
         )}
@@ -165,14 +167,14 @@ export const CommentItem: React.FC<CommentItemProps> = ({
                           {reply.user.username}
                         </span>
                         <span className="text-[10px] text-studio-500">
-                          {formatRelativeTimeUz(reply.created_at)}
+                          {formatRelativeTime(reply.created_at, language)}
                         </span>
                       </div>
                       {isReplyAuthor && onDelete && (
                         <button
                           onClick={() => handleDelete(reply.id)}
                           className="text-studio-500 hover:text-rose-400 p-1 rounded transition-colors"
-                          title="O'chirish"
+                          title="Delete"
                         >
                           <Trash2 className="w-3 h-3" />
                         </button>

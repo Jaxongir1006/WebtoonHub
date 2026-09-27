@@ -4,9 +4,11 @@ import { webtoonsApi } from '../api/webtoons';
 import { Genre, WebtoonSummary } from '../types';
 import { WebtoonCard } from '../components/webtoons/WebtoonCard';
 import { GenreFilter } from '../components/webtoons/GenreFilter';
+import { useLanguage } from '../context/LanguageContext';
 import { Search, Compass, BookOpen, ChevronLeft, ChevronRight, Loader2, X } from 'lucide-react';
 
 export const CatalogPage: React.FC = () => {
+  const { t } = useLanguage();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const searchParam = searchParams.get('search') || '';
@@ -87,10 +89,10 @@ export const CatalogPage: React.FC = () => {
           <div>
             <h1 className="text-3xl font-black text-white flex items-center gap-2.5">
               <Compass className="w-8 h-8 text-brand-500" />
-              <span>Manhvalar Katalogi</span>
+              <span>{t('catalog.title')}</span>
             </h1>
             <p className="text-xs text-studio-400 mt-1">
-              Barcha ommabop vertikal veb-komikslar, janrlar va davom etayotgan seriyalar
+              {t('catalog.subtitle')}
             </p>
           </div>
 
@@ -101,7 +103,7 @@ export const CatalogPage: React.FC = () => {
               type="text"
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              placeholder="Qidirish (masalan, Solo Leveling)..."
+              placeholder={t('catalog.searchPlaceholder')}
               className="w-full pl-10 pr-10 py-2.5 bg-studio-900 border border-studio-800 rounded-2xl text-xs text-white placeholder-studio-500 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all"
             />
             {searchInput && (
@@ -123,7 +125,7 @@ export const CatalogPage: React.FC = () => {
         <div className="bg-studio-900/60 border border-studio-800 rounded-3xl p-5 mb-8 space-y-4">
           {/* Genre list */}
           <div>
-            <div className="text-xs font-semibold text-studio-400 mb-2">Janrlar:</div>
+            <div className="text-xs font-semibold text-studio-400 mb-2">{t('common.genres')}:</div>
             <GenreFilter
               genres={genres}
               selectedSlug={genreParam || undefined}
@@ -134,11 +136,11 @@ export const CatalogPage: React.FC = () => {
           {/* Status filters & Clear */}
           <div className="flex flex-wrap items-center justify-between gap-4 pt-3 border-t border-studio-800/80">
             <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold text-studio-400 mr-1">Holati:</span>
+              <span className="text-xs font-semibold text-studio-400 mr-1">{t('common.status')}:</span>
               {[
-                { label: 'Barchasi', value: '' },
-                { label: 'Davom etmoqda', value: 'ongoing' },
-                { label: 'Tugallangan', value: 'completed' },
+                { label: t('catalog.statusAll'), value: '' },
+                { label: t('catalog.statusOngoing'), value: 'ongoing' },
+                { label: t('catalog.statusCompleted'), value: 'completed' },
               ].map((st) => {
                 const isSelected = statusParam === st.value;
                 return (
@@ -165,7 +167,7 @@ export const CatalogPage: React.FC = () => {
                 className="text-xs font-semibold text-rose-400 hover:text-rose-300 flex items-center gap-1 transition-colors"
               >
                 <X className="w-3.5 h-3.5" />
-                <span>Filtrlarni tozalash</span>
+                <span>{t('catalog.clearFilters')}</span>
               </button>
             )}
           </div>
@@ -173,9 +175,9 @@ export const CatalogPage: React.FC = () => {
 
         {/* Results Counter */}
         <div className="flex items-center justify-between mb-6 text-xs text-studio-400 font-semibold">
-          <span>Jami topildi: <b className="text-white">{total}</b> ta manhva</span>
+          <span>{t('common.all')}: <b className="text-white">{total}</b></span>
           {totalPages > 1 && (
-            <span>Sahifa: <b className="text-white">{pageParam}</b> / {totalPages}</span>
+            <span>{pageParam} / {totalPages}</span>
           )}
         </div>
 
@@ -183,21 +185,21 @@ export const CatalogPage: React.FC = () => {
         {loading ? (
           <div className="py-24 flex flex-col items-center justify-center text-studio-400 gap-3">
             <Loader2 className="w-8 h-8 animate-spin text-brand-500" />
-            <span className="text-sm">Manhvalar yuklanmoqda...</span>
+            <span className="text-sm">{t('common.loading')}</span>
           </div>
         ) : webtoons.length === 0 ? (
           <div className="py-20 text-center bg-studio-900/40 border border-studio-800 rounded-3xl p-8 max-w-md mx-auto">
             <BookOpen className="w-12 h-12 mx-auto text-studio-600 mb-3" />
-            <h3 className="font-bold text-white text-base mb-1">Manhvalar topilmadi</h3>
+            <h3 className="font-bold text-white text-base mb-1">{t('catalog.emptyTitle')}</h3>
             <p className="text-xs text-studio-400 mb-4">
-              Qidiruv so'rovi yoki tanlangan filtrlar bo'yicha hech qanday natija chiqmadi.
+              {t('catalog.emptyDesc')}
             </p>
             {hasActiveFilters && (
               <button
                 onClick={handleClearFilters}
                 className="px-4 py-2 rounded-xl bg-brand-500 text-studio-950 font-bold text-xs hover:bg-brand-400 shadow-glow-brand"
               >
-                Barcha manhvalarni ko'rish
+                {t('catalog.clearFilters')}
               </button>
             )}
           </div>

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { WebtoonSummary } from '../../types';
 import { SafeImage } from '../common/SafeImage';
+import { useLanguage } from '../../context/LanguageContext';
 import { Zap, BookOpen, Eye, ChevronRight, ChevronLeft } from 'lucide-react';
 import { formatNumber, getStatusLabel } from '../../utils/format';
 
@@ -10,6 +11,7 @@ interface HeroBannerProps {
 }
 
 export const HeroBanner: React.FC<HeroBannerProps> = ({ webtoons }) => {
+  const { t } = useLanguage();
   const [currentIndex, setCurrentIndex] = useState(0);
 
   // Auto rotate banner every 7 seconds
@@ -54,7 +56,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ webtoons }) => {
           <div className="flex flex-wrap items-center gap-2">
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-brand-500 text-studio-950 shadow-glow-brand">
               <Zap className="w-3.5 h-3.5 fill-studio-950" />
-              <span>Hafta Trendi #1</span>
+              <span>{t('home.popularToday')} #1</span>
             </span>
 
             <span
@@ -69,7 +71,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ webtoons }) => {
 
             <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-studio-800/80 backdrop-blur-md text-studio-300 border border-studio-700">
               <Eye className="w-3.5 h-3.5 text-studio-400" />
-              <span>{formatNumber(current.view_count)} ko'rildi</span>
+              <span>{formatNumber(current.view_count)} {t('common.views').toLowerCase()}</span>
             </span>
           </div>
 
@@ -82,7 +84,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ webtoons }) => {
           <div className="flex flex-wrap items-center gap-3 text-sm text-studio-400">
             {current.author_name && (
               <span className="text-studio-300 font-medium">
-                Muallif: <b className="text-white">{current.author_name}</b>
+                {t('common.author')}: <b className="text-white">{current.author_name}</b>
               </span>
             )}
             {current.genres && current.genres.length > 0 && (
@@ -99,7 +101,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ webtoons }) => {
 
           {/* Short description */}
           <p className="text-sm sm:text-base text-studio-300 line-clamp-3 leading-relaxed max-w-xl">
-            Tizim orqali eng kuchsiz ovchidan yer yuzining eng qudratli monarxiga aylangan yigitning hayratlanarli sarguzashtlari. O'zbek tilidagi rasmiy vertikal sifatli tarjima.
+            {current.description || current.synopsis || "Webtoon & manhwa rasmiy vertikal sifatli tarjima."}
           </p>
 
           {/* Actions */}
@@ -109,14 +111,14 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ webtoons }) => {
               className="px-6 py-3.5 rounded-xl font-bold bg-gradient-to-r from-brand-500 to-amber-400 text-studio-950 hover:from-brand-400 hover:to-amber-300 active:scale-98 shadow-glow-brand transition-all flex items-center gap-2 text-sm sm:text-base"
             >
               <BookOpen className="w-5 h-5 fill-studio-950" />
-              <span>Mutolaani boshlash</span>
+              <span>{t('details.startReading')}</span>
             </Link>
 
             <Link
               to={`/webtoons/${current.slug || current.id}`}
               className="px-5 py-3.5 rounded-xl font-semibold bg-studio-800/90 text-white hover:bg-studio-700 active:scale-98 border border-studio-700 transition-all text-sm"
             >
-              Batafsil ma'lumot
+              {t('details.detailsTitle')}
             </Link>
           </div>
         </div>
@@ -132,7 +134,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ webtoons }) => {
           {current.latest_chapter && (
             <div className="absolute bottom-3 left-3 right-3 bg-studio-950/80 backdrop-blur-md rounded-xl p-2 text-center border border-studio-800">
               <span className="text-xs font-bold text-brand-400">
-                So'nggi: {current.latest_chapter.chapter_number}-bob
+                {t('details.chapterNum', { number: current.latest_chapter.chapter_number })}
               </span>
             </div>
           )}

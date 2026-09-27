@@ -5,11 +5,13 @@ import { ChapterReaderData, ChapterSummary, ChapterImage } from '../types';
 import { ReaderNav } from '../components/reader/ReaderNav';
 import { RewardClaimCard } from '../components/reader/RewardClaimCard';
 import { ChapterComments } from '../components/comments/ChapterComments';
+import { useLanguage } from '../context/LanguageContext';
 import { Loader2, AlertCircle, ChevronLeft, ChevronRight, BookOpen } from 'lucide-react';
 
 export const ReaderPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { t } = useLanguage();
 
   const [data, setData] = useState<ChapterReaderData | null>(null);
   const [allChapters, setAllChapters] = useState<ChapterSummary[]>([]);
@@ -40,11 +42,11 @@ export const ReaderPage: React.FC = () => {
       window.scrollTo(0, 0);
     } catch (err) {
       console.error(err);
-      setError("Bob rasmlarini yuklashda xatolik yuz berdi");
+      setError(t('common.error'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (id) {
@@ -84,7 +86,7 @@ export const ReaderPage: React.FC = () => {
     return (
       <div className="min-h-screen bg-black flex flex-col items-center justify-center text-studio-400 gap-3">
         <Loader2 className="w-10 h-10 animate-spin text-brand-500" />
-        <span className="text-sm font-semibold">Bob sahifalari yuklanmoqda...</span>
+        <span className="text-sm font-semibold">{t('common.loading')}</span>
       </div>
     );
   }
@@ -95,13 +97,13 @@ export const ReaderPage: React.FC = () => {
         <div className="p-4 rounded-full bg-rose-500/10 text-rose-400 mb-4">
           <AlertCircle className="w-10 h-10" />
         </div>
-        <h2 className="text-xl font-bold text-white mb-2">{error || "Bob topilmadi"}</h2>
-        <p className="text-xs text-studio-400 mb-6">Ushbu bob mavjud emas yoki o'chirilgan bo'lishi mumkin.</p>
+        <h2 className="text-xl font-bold text-white mb-2">{error || t('common.notFound')}</h2>
+        <p className="text-xs text-studio-400 mb-6">{t('reader.pagesNotFoundDesc')}</p>
         <button
           onClick={() => navigate(-1)}
           className="px-5 py-2.5 rounded-xl bg-brand-500 text-studio-950 font-bold text-xs hover:bg-brand-400 shadow-glow-brand"
         >
-          Orqaga qaytish
+          {t('common.back')}
         </button>
       </div>
     );
@@ -130,7 +132,7 @@ export const ReaderPage: React.FC = () => {
               <img
                 key={img.id || img.order_index}
                 src={img.image_url}
-                alt={`Sahifa ${img.order_index}`}
+                alt={`Page ${img.order_index}`}
                 className="w-full h-auto block select-none pointer-events-none"
                 loading="lazy"
                 onError={(e) => {
@@ -139,7 +141,7 @@ export const ReaderPage: React.FC = () => {
                   target.style.display = 'none';
                   const fallbackDiv = document.createElement('div');
                   fallbackDiv.className = 'w-full py-16 px-4 bg-studio-900 border border-studio-800 text-center text-xs text-studio-400 my-1';
-                  fallbackDiv.innerHTML = `<span class="text-amber-400 font-bold block mb-1">Sahifa ${img.order_index} yuklanmadi</span><span class="text-studio-500 text-[11px]">Rasm formati yoki tarmoq uzilishi</span>`;
+                  fallbackDiv.innerHTML = `<span class="text-amber-400 font-bold block mb-1">${t('reader.pageLoadError', { order: img.order_index })}</span><span class="text-studio-500 text-[11px]">${t('reader.pageNetworkError')}</span>`;
                   target.parentNode?.insertBefore(fallbackDiv, target);
                 }}
               />
@@ -147,8 +149,8 @@ export const ReaderPage: React.FC = () => {
         ) : (
           <div className="py-32 px-4 text-center text-studio-400">
             <BookOpen className="w-12 h-12 mx-auto text-studio-600 mb-3" />
-            <p className="font-semibold text-base text-white">Bob sahifalari topilmadi</p>
-            <p className="text-xs text-studio-500 mt-1">Ushbu bob rasmlari hali to'liq yuklanmagan bo'lishi mumkin.</p>
+            <p className="font-semibold text-base text-white">{t('reader.pagesNotFound')}</p>
+            <p className="text-xs text-studio-500 mt-1">{t('reader.pagesNotFoundDesc')}</p>
           </div>
         )}
       </main>
@@ -157,7 +159,7 @@ export const ReaderPage: React.FC = () => {
       <div className="bg-studio-950 border-t border-studio-800 px-4 py-12">
         <div className="max-w-2xl mx-auto text-center space-y-6">
           <div className="inline-block p-1 px-4 rounded-full bg-studio-900 border border-studio-800 text-xs font-semibold text-studio-300">
-            {data.webtoon_title} — {data.chapter_number}-bob yakunlandi
+            {t('reader.chapterCompleted', { webtoon: data.webtoon_title, chapter: data.chapter_number })}
           </div>
 
           {/* Chapter Navigation Buttons */}
@@ -168,7 +170,7 @@ export const ReaderPage: React.FC = () => {
                 className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-studio-900 border border-studio-800 text-studio-200 text-xs font-bold hover:text-white hover:bg-studio-800 transition-colors"
               >
                 <ChevronLeft className="w-4 h-4" />
-                <span>Oldingi bob</span>
+                <span>{t('reader.prevChapter')}</span>
               </Link>
             )}
 
@@ -176,7 +178,7 @@ export const ReaderPage: React.FC = () => {
               to={`/webtoons/${data.webtoon_id}`}
               className="px-4 py-2.5 rounded-xl bg-studio-900 border border-studio-800 text-studio-300 text-xs font-bold hover:text-white transition-colors"
             >
-              Boblar ro'yxati
+              {t('reader.chaptersList')}
             </Link>
 
             {data.next_chapter_id && (
@@ -184,7 +186,7 @@ export const ReaderPage: React.FC = () => {
                 to={`/chapters/${data.next_chapter_id}`}
                 className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-brand-500 text-studio-950 text-xs font-bold hover:bg-brand-400 shadow-glow-brand transition-all"
               >
-                <span>Keyingi bob</span>
+                <span>{t('reader.nextChapter')}</span>
                 <ChevronRight className="w-4 h-4" />
               </Link>
             )}

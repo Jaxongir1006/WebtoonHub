@@ -3,6 +3,7 @@ import { CommentItemData } from '../../types';
 import { commentsApi } from '../../api/comments';
 import { CommentItem } from './CommentItem';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { MessageSquare, Send, Loader2, Sparkles } from 'lucide-react';
 import { AvatarFrame } from '../common/AvatarFrame';
 
@@ -12,6 +13,7 @@ interface ChapterCommentsProps {
 
 export const ChapterComments: React.FC<ChapterCommentsProps> = ({ chapterId }) => {
   const { user, isAuthenticated, openAuthModal } = useAuth();
+  const { t } = useLanguage();
   const [comments, setComments] = useState<CommentItemData[]>([]);
   const [loading, setLoading] = useState(true);
   const [commentText, setCommentText] = useState('');
@@ -82,7 +84,7 @@ export const ChapterComments: React.FC<ChapterCommentsProps> = ({ chapterId }) =
       <div className="flex items-center justify-between pb-4 border-b border-studio-800 mb-6">
         <div className="flex items-center gap-2">
           <MessageSquare className="w-5 h-5 text-brand-400" />
-          <h3 className="font-bold text-lg text-white">Sharhlar va Fikrlar</h3>
+          <h3 className="font-bold text-lg text-white">{t('comments.title')}</h3>
           <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-studio-800 text-brand-400">
             {totalCount}
           </span>
@@ -103,7 +105,7 @@ export const ChapterComments: React.FC<ChapterCommentsProps> = ({ chapterId }) =
                 rows={2}
                 value={commentText}
                 onChange={(e) => setCommentText(e.target.value)}
-                placeholder="Bob haqida o'z fikringizni qoldiring..."
+                placeholder={t('comments.placeholder')}
                 className="w-full p-3 bg-studio-800 border border-studio-700 rounded-2xl text-sm text-white placeholder-studio-500 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 resize-none transition-all"
               />
               <div className="flex justify-end">
@@ -117,7 +119,7 @@ export const ChapterComments: React.FC<ChapterCommentsProps> = ({ chapterId }) =
                   ) : (
                     <Send className="w-4 h-4" />
                   )}
-                  <span>Fikr bildirish</span>
+                  <span>{t('comments.sendBtn')}</span>
                 </button>
               </div>
             </div>
@@ -125,13 +127,13 @@ export const ChapterComments: React.FC<ChapterCommentsProps> = ({ chapterId }) =
         ) : (
           <div className="p-4 rounded-2xl bg-studio-800/60 border border-studio-700/60 text-center">
             <p className="text-xs text-studio-300 mb-2">
-              Sharh yozish va muhokamalarda qatnashish uchun tizimga kiring:
+              {t('comments.loginToComment')}
             </p>
             <button
               onClick={() => openAuthModal('login')}
               className="px-4 py-1.5 rounded-xl bg-brand-500 text-studio-950 font-bold text-xs hover:bg-brand-400 transition-all shadow-glow-brand"
             >
-              Kirish / Ro'yxatdan o'tish
+              {t('shop.loginOrRegister')}
             </button>
           </div>
         )}
@@ -141,12 +143,12 @@ export const ChapterComments: React.FC<ChapterCommentsProps> = ({ chapterId }) =
       {loading ? (
         <div className="py-8 flex justify-center items-center text-studio-400 gap-2">
           <Loader2 className="w-5 h-5 animate-spin text-brand-400" />
-          <span className="text-sm">Sharhlar yuklanmoqda...</span>
+          <span className="text-sm">{t('common.loading')}</span>
         </div>
       ) : comments.length === 0 ? (
         <div className="py-8 text-center text-studio-500 text-xs">
           <Sparkles className="w-8 h-8 mx-auto text-studio-600 mb-2" />
-          Birinchi bo'lib ushbu bobga sharh qoldiring!
+          {t('comments.empty')}
         </div>
       ) : (
         <div className="space-y-1">

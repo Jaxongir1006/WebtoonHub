@@ -2,8 +2,10 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useDailyBonus } from '../../context/DailyBonusContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { CoinBadge } from './CoinBadge';
 import { AvatarFrame } from './AvatarFrame';
+import { LanguageSwitcher } from './LanguageSwitcher';
 import {
   Zap,
   Search,
@@ -22,6 +24,7 @@ import {
 export const Navbar: React.FC = () => {
   const { user, isAuthenticated, logout, openAuthModal } = useAuth();
   const { openModal: openDailyBonusModal, isClaimedToday } = useDailyBonus();
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -57,11 +60,11 @@ export const Navbar: React.FC = () => {
   };
 
   const navLinks = [
-    { label: 'Bosh sahifa', path: '/' },
-    { label: 'Katalog', path: '/catalog', icon: <Compass className="w-4 h-4" /> },
-    { label: 'Kutubxona', path: '/library', icon: <BookOpen className="w-4 h-4" /> },
-    { label: "Do'kon", path: '/shop', icon: <ShoppingBag className="w-4 h-4" /> },
-    { label: 'Mualliflik', path: '/become-creator', icon: <PenTool className="w-4 h-4" /> },
+    { label: t('nav.home'), path: '/' },
+    { label: t('nav.catalog'), path: '/catalog', icon: <Compass className="w-4 h-4" /> },
+    { label: t('nav.library'), path: '/library', icon: <BookOpen className="w-4 h-4" /> },
+    { label: t('nav.shop'), path: '/shop', icon: <ShoppingBag className="w-4 h-4" /> },
+    { label: t('nav.creator'), path: '/become-creator', icon: <PenTool className="w-4 h-4" /> },
   ];
 
   return (
@@ -78,7 +81,7 @@ export const Navbar: React.FC = () => {
                 Webtoon<span className="text-brand-500">Hub</span>
               </span>
               <span className="text-[9px] font-semibold text-brand-400/80 tracking-wider uppercase -mt-1">
-                O'zbekcha manhvalar
+                Webtoon & Manhwa
               </span>
             </div>
           </Link>
@@ -115,22 +118,25 @@ export const Navbar: React.FC = () => {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Manhvalar bo'yicha qidiruv..."
+              placeholder={t('nav.searchPlaceholder')}
               className="w-full pl-9 pr-3 py-1.5 bg-studio-900 border border-studio-800 rounded-full text-xs text-white placeholder-studio-500 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all"
             />
           </form>
 
           {/* Right Action Items */}
-          <div className="flex items-center gap-2.5 sm:gap-3">
+          <div className="flex items-center gap-2 sm:gap-2.5">
+            {/* Language Switcher */}
+            <LanguageSwitcher />
+
             {/* Daily Bonus Trigger Button (Olingan bo'lsa butkul yashiriladi) */}
             {!isClaimedToday && (
               <button
                 onClick={openDailyBonusModal}
                 className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-brand-500/10 to-amber-500/20 border border-brand-500/30 text-brand-300 hover:border-brand-400 hover:text-white text-xs font-bold transition-all shadow-glow-brand shrink-0"
-                title="Kunlik kirish bonusi (+15 ⚡)"
+                title={`${t('nav.dailyBonus')} (+15 ⚡)`}
               >
                 <Sparkles className="w-3.5 h-3.5 text-brand-400 animate-spin" style={{ animationDuration: '8s' }} />
-                <span className="hidden sm:inline">Kunlik bonus</span>
+                <span className="hidden sm:inline">{t('nav.dailyBonus')}</span>
                 <span className="bg-brand-500 text-studio-950 px-1.5 py-0.2 rounded-full text-[10px] font-black">
                   +15 ⚡
                 </span>
@@ -179,7 +185,7 @@ export const Navbar: React.FC = () => {
                       className="flex items-center gap-2.5 px-3 py-2 text-sm text-studio-200 hover:text-white hover:bg-studio-800 rounded-xl transition-colors"
                     >
                       <UserIcon className="w-4 h-4 text-studio-400" />
-                      <span>Mening profilim</span>
+                      <span>{t('nav.profile')}</span>
                     </Link>
 
                     <Link
@@ -187,7 +193,7 @@ export const Navbar: React.FC = () => {
                       className="flex items-center gap-2.5 px-3 py-2 text-sm text-studio-200 hover:text-white hover:bg-studio-800 rounded-xl transition-colors"
                     >
                       <BookOpen className="w-4 h-4 text-studio-400" />
-                      <span>Kutubxonam</span>
+                      <span>{t('nav.library')}</span>
                     </Link>
 
                     <Link
@@ -195,7 +201,7 @@ export const Navbar: React.FC = () => {
                       className="flex items-center gap-2.5 px-3 py-2 text-sm text-studio-200 hover:text-white hover:bg-studio-800 rounded-xl transition-colors"
                     >
                       <ShoppingBag className="w-4 h-4 text-studio-400" />
-                      <span>Do'kon & Ramkalar</span>
+                      <span>{t('nav.shop')}</span>
                     </Link>
 
                     <div className="my-1 border-t border-studio-800" />
@@ -208,7 +214,7 @@ export const Navbar: React.FC = () => {
                       className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-rose-400 hover:bg-rose-500/10 rounded-xl transition-colors"
                     >
                       <LogOut className="w-4 h-4" />
-                      <span>Chiqish</span>
+                      <span>{t('nav.logout')}</span>
                     </button>
                   </div>
                 )}
@@ -219,13 +225,13 @@ export const Navbar: React.FC = () => {
                   onClick={() => openAuthModal('login')}
                   className="px-3 py-1.5 text-xs font-semibold text-studio-200 hover:text-white transition-colors"
                 >
-                  Kirish
+                  {t('nav.login')}
                 </button>
                 <button
                   onClick={() => openAuthModal('register')}
                   className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-brand-500 text-studio-950 hover:bg-brand-400 active:scale-95 transition-all shadow-glow-brand"
                 >
-                  Ro'yxatdan o'tish
+                  {t('nav.register')}
                 </button>
               </div>
             )}
@@ -250,7 +256,7 @@ export const Navbar: React.FC = () => {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Manhvalar qidirish..."
+                placeholder={t('nav.searchPlaceholder')}
                 className="w-full pl-9 pr-3 py-2 bg-studio-900 border border-studio-800 rounded-xl text-xs text-white placeholder-studio-500 focus:outline-none focus:border-brand-500"
               />
             </form>
@@ -275,14 +281,14 @@ export const Navbar: React.FC = () => {
                   className="flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-semibold text-studio-200 hover:text-white hover:bg-studio-800"
                 >
                   <UserIcon className="w-4 h-4" />
-                  <span>Profil sozlamalari</span>
+                  <span>{t('nav.profile')}</span>
                 </Link>
                 <button
                   onClick={logout}
                   className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-semibold text-rose-400 hover:bg-rose-500/10"
                 >
                   <LogOut className="w-4 h-4" />
-                  <span>Tizimdan chiqish</span>
+                  <span>{t('nav.logout')}</span>
                 </button>
               </div>
             )}

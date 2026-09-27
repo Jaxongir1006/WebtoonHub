@@ -3,11 +3,12 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { webtoonsApi } from '../api/webtoons';
 import { libraryApi } from '../api/library';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import { WebtoonDetail, BookmarkStatus, BookmarkItem } from '../types';
 import { SafeImage } from '../components/common/SafeImage';
 import { BookmarkButton } from '../components/webtoons/BookmarkButton';
 import { formatNumber, getStatusLabel } from '../utils/format';
-import { formatDateUz } from '../utils/date';
+import { formatDate } from '../utils/date';
 import {
   BookOpen,
   Eye,
@@ -23,6 +24,7 @@ import {
 export const WebtoonDetailPage: React.FC = () => {
   const { idOrSlug } = useParams<{ idOrSlug: string }>();
   const { isAuthenticated } = useAuth();
+  const { t, language } = useLanguage();
   const navigate = useNavigate();
 
   const [webtoon, setWebtoon] = useState<WebtoonDetail | null>(null);
@@ -53,20 +55,20 @@ export const WebtoonDetailPage: React.FC = () => {
           }
         }
       } catch (err) {
-        setError("Manhwa ma'lumotlarini yuklashda xatolik yuz berdi");
+        setError(t('common.error'));
         console.error(err);
       } finally {
         setLoading(false);
       }
     };
     fetchDetail();
-  }, [idOrSlug, isAuthenticated]);
+  }, [idOrSlug, isAuthenticated, t]);
 
   if (loading) {
     return (
       <div className="min-h-screen py-32 flex flex-col items-center justify-center text-studio-400 gap-3">
         <Loader2 className="w-10 h-10 animate-spin text-brand-500" />
-        <span className="text-sm font-semibold">Yuklanmoqda...</span>
+        <span className="text-sm font-semibold">{t('common.loading')}</span>
       </div>
     );
   }
@@ -77,13 +79,13 @@ export const WebtoonDetailPage: React.FC = () => {
         <div className="p-4 rounded-full bg-rose-500/10 text-rose-400 mb-4">
           <AlertCircle className="w-10 h-10" />
         </div>
-        <h2 className="text-xl font-bold text-white mb-2">{error || "Manhwa topilmadi"}</h2>
-        <p className="text-xs text-studio-400 mb-6">Ushbu sahifa mavjud emas yoki o'chirilgan bo'lishi mumkin.</p>
+        <h2 className="text-xl font-bold text-white mb-2">{error || t('common.notFound')}</h2>
+        <p className="text-xs text-studio-400 mb-6">{t('catalog.emptyDesc')}</p>
         <Link
           to="/catalog"
           className="px-5 py-2.5 rounded-xl bg-brand-500 text-studio-950 font-bold text-xs hover:bg-brand-400 shadow-glow-brand"
         >
-          Katalogga qaytish
+          {t('library.exploreCatalog')}
         </Link>
       </div>
     );
@@ -139,16 +141,16 @@ export const WebtoonDetailPage: React.FC = () => {
                       : 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
                   }`}
                 >
-                  {getStatusLabel(webtoon.status)}
+                  {getStatusLabel(webtoon.status, t)}
                 </span>
 
                 <span className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-studio-900 border border-studio-800 text-studio-300">
                   <Eye className="w-3.5 h-3.5 text-studio-400" />
-                  <span>{formatNumber(webtoon.view_count)} ko'rishlar</span>
+                  <span>{formatNumber(webtoon.view_count)} {t('common.views')}</span>
                 </span>
 
                 <span className="px-3 py-1 rounded-full text-xs font-semibold bg-brand-500/10 border border-brand-500/30 text-brand-400">
-                  {webtoon.chapters.length} ta bob
+                  {webtoon.chapters.length} {t('common.chapters')}
                 </span>
               </div>
 
@@ -161,7 +163,7 @@ export const WebtoonDetailPage: React.FC = () => {
               <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 text-sm text-studio-300">
                 {webtoon.author_name && (
                   <div>
-                    Muallif: <b className="text-white">{webtoon.author_name}</b>
+                    {t('common.author')}: <b className="text-white">{webtoon.author_name}</b>
                   </div>
                 )}
                 {webtoon.genres && webtoon.genres.length > 0 && (
@@ -183,7 +185,7 @@ export const WebtoonDetailPage: React.FC = () => {
               {webtoon.description && (
                 <div className="pt-2">
                   <h3 className="text-xs font-bold text-studio-400 uppercase tracking-wider mb-1">
-                    Tavsif / Mazmun
+                    {t('details.synopsis')}
                   </h3>
                   <p className="text-xs sm:text-sm text-studio-200 leading-relaxed max-w-3xl whitespace-pre-line">
                     {webtoon.description}
@@ -199,7 +201,7 @@ export const WebtoonDetailPage: React.FC = () => {
                     className="px-6 py-3 rounded-xl font-bold bg-brand-500 text-studio-950 hover:bg-brand-400 active:scale-95 shadow-glow-brand transition-all flex items-center gap-2 text-sm"
                   >
                     <BookOpen className="w-4 h-4 fill-studio-950" />
-                    <span>1-bobni o'qish</span>
+                    <span>{t('details.firstChapter')}</span>
                   </button>
                 )}
 
@@ -208,7 +210,7 @@ export const WebtoonDetailPage: React.FC = () => {
                     onClick={() => navigate(`/chapters/${lastChapter.id}`)}
                     className="px-5 py-3 rounded-xl font-semibold bg-studio-800 text-white hover:bg-studio-700 active:scale-95 border border-studio-700 transition-all text-sm"
                   >
-                    So'nggi bob ({lastChapter.chapter_number})
+                    {t('details.latestChapter', { number: lastChapter.chapter_number })}
                   </button>
                 )}
 
@@ -229,7 +231,7 @@ export const WebtoonDetailPage: React.FC = () => {
         <div className="flex items-center justify-between pb-4 border-b border-studio-800 mb-6">
           <div className="flex items-center gap-2">
             <BookOpen className="w-5 h-5 text-brand-500" />
-            <h2 className="text-xl font-black text-white">Boblar Ro'yxati</h2>
+            <h2 className="text-xl font-black text-white">{t('details.chaptersList')}</h2>
             <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-studio-800 text-studio-300">
               {webtoon.chapters.length}
             </span>
@@ -240,15 +242,14 @@ export const WebtoonDetailPage: React.FC = () => {
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-studio-900 border border-studio-800 text-xs font-semibold text-studio-300 hover:text-white transition-colors"
           >
             <ArrowUpDown className="w-3.5 h-3.5" />
-            <span>{sortAsc ? "Boshidan tartiblash" : "Oxiridan tartiblash"}</span>
+            <span>{sortAsc ? t('details.sortOldest') : t('details.sortNewest')}</span>
           </button>
         </div>
 
         {webtoon.chapters.length === 0 ? (
           <div className="py-16 text-center bg-studio-900/40 rounded-3xl border border-studio-800 p-8">
             <BookOpen className="w-10 h-10 mx-auto text-studio-600 mb-2" />
-            <p className="text-sm font-semibold text-studio-300">Hozircha boblar yuklanmagan</p>
-            <p className="text-xs text-studio-500 mt-1">Tarjimon tez kunda yangi boblarni joylaydi.</p>
+            <p className="text-sm font-semibold text-studio-300">{t('details.noChapters')}</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -264,11 +265,11 @@ export const WebtoonDetailPage: React.FC = () => {
                   </div>
                   <div>
                     <div className="font-bold text-sm text-white group-hover:text-brand-400 transition-colors">
-                      {ch.chapter_number}-bob {ch.title && `— ${ch.title}`}
+                      {t('details.chapterNum', { number: ch.chapter_number })} {ch.title && `— ${ch.title}`}
                     </div>
                     <div className="flex items-center gap-2 text-[11px] text-studio-500 mt-0.5">
                       <Calendar className="w-3 h-3" />
-                      <span>{formatDateUz(ch.created_at)}</span>
+                      <span>{formatDate(ch.created_at, language)}</span>
                     </div>
                   </div>
                 </div>
@@ -285,7 +286,7 @@ export const WebtoonDetailPage: React.FC = () => {
                     {ch.is_claimed ? (
                       <>
                         <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-                        <span>Olingan</span>
+                        <span>{t('details.claimed')}</span>
                       </>
                     ) : (
                       <>

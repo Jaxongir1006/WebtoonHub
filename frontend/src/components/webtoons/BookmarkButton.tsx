@@ -1,7 +1,8 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { BookmarkStatus } from '../../types';
 import { libraryApi } from '../../api/library';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { Bookmark, ChevronDown, Check, Trash2, Loader2 } from 'lucide-react';
 
 interface BookmarkButtonProps {
@@ -12,13 +13,6 @@ interface BookmarkButtonProps {
   size?: 'sm' | 'md' | 'lg';
 }
 
-const statusOptions: { value: BookmarkStatus; label: string; icon: string; color: string }[] = [
-  { value: 'reading', label: "O'qilmoqda", icon: '📖', color: 'text-amber-400' },
-  { value: 'plan_to_read', label: 'Rejada', icon: '📌', color: 'text-blue-400' },
-  { value: 'completed', label: "O'qib bo'lindi", icon: '✅', color: 'text-emerald-400' },
-  { value: 'dropped', label: 'Tashlab ketildi', icon: '🛑', color: 'text-rose-400' },
-];
-
 export const BookmarkButton: React.FC<BookmarkButtonProps> = ({
   webtoonId,
   currentStatus: initialStatus,
@@ -27,10 +21,18 @@ export const BookmarkButton: React.FC<BookmarkButtonProps> = ({
   size = 'md'
 }) => {
   const { isAuthenticated, openAuthModal } = useAuth();
+  const { t } = useLanguage();
   const [currentStatus, setCurrentStatus] = useState<BookmarkStatus | null>(initialStatus || null);
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const statusOptions = useMemo<{ value: BookmarkStatus; label: string; icon: string; color: string }[]>(() => [
+    { value: 'reading', label: t('details.bookmarkReading'), icon: '📖', color: 'text-amber-400' },
+    { value: 'plan_to_read', label: t('details.bookmarkPlanned'), icon: '📌', color: 'text-blue-400' },
+    { value: 'completed', label: t('details.bookmarkCompleted'), icon: '✅', color: 'text-emerald-400' },
+    { value: 'dropped', label: t('details.bookmarkDropped'), icon: '🛑', color: 'text-rose-400' },
+  ], [t]);
 
   useEffect(() => {
     if (initialStatus !== undefined) {
@@ -122,7 +124,7 @@ export const BookmarkButton: React.FC<BookmarkButtonProps> = ({
             />
           )}
           <span>
-            {currentOption ? `${currentOption.icon} ${currentOption.label}` : "Kutubxonaga qo'shish"}
+            {currentOption ? `${currentOption.icon} ${currentOption.label}` : t('details.bookmarkStatus')}
           </span>
         </span>
         <ChevronDown
@@ -135,7 +137,7 @@ export const BookmarkButton: React.FC<BookmarkButtonProps> = ({
       {isOpen && (
         <div className="absolute right-0 mt-2 w-52 bg-studio-900 border border-studio-800 rounded-2xl shadow-2xl p-2 z-30 animate-in fade-in zoom-in-95 duration-150">
           <div className="px-2 py-1 text-[11px] font-semibold text-studio-400 uppercase tracking-wider mb-1">
-            Statusni tanlang
+            {t('common.status')}
           </div>
           <div className="space-y-1">
             {statusOptions.map((opt) => {
@@ -169,7 +171,7 @@ export const BookmarkButton: React.FC<BookmarkButtonProps> = ({
                 className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-rose-400 hover:bg-rose-500/10 transition-colors"
               >
                 <Trash2 className="w-3.5 h-3.5" />
-                <span>Kutubxonadan o'chirish</span>
+                <span>{t('details.removeBookmark')}</span>
               </button>
             </div>
           )}

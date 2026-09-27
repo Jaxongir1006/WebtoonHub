@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { shopApi } from '../api/shop';
 import { useAuth } from '../context/AuthContext';
 import { useDailyBonus } from '../context/DailyBonusContext';
+import { useLanguage } from '../context/LanguageContext';
 import { ShopItem } from '../types';
 import { ShopItemCard } from '../components/shop/ShopItemCard';
 import { AvatarFrame } from '../components/common/AvatarFrame';
@@ -11,6 +12,7 @@ import { getApiErrorMessage } from '../api/client';
 export const ShopPage: React.FC = () => {
   const { user, isAuthenticated, refreshProfile, updateCoinsLocally, openAuthModal } = useAuth();
   const { openModal: openDailyBonusModal, isClaimedToday } = useDailyBonus();
+  const { t } = useLanguage();
 
   const [items, setItems] = useState<ShopItem[]>([]);
   const [filterType, setFilterType] = useState<'all' | 'frame' | 'background'>('all');
@@ -45,12 +47,12 @@ export const ShopPage: React.FC = () => {
       if (res.data) {
         updateCoinsLocally(res.data.remaining_coins);
       }
-      showToast('success', res.message || "Xarid muvaffaqiyatli amalga oshirildi!");
+      showToast('success', res.message || t('shop.buySuccess'));
       await fetchItems();
       await refreshProfile();
       return true;
     } catch (err) {
-      showToast('error', getApiErrorMessage(err, "Xarid qilishda xatolik yuz berdi"));
+      showToast('error', getApiErrorMessage(err, t('common.error')));
       return false;
     }
   };
@@ -58,11 +60,11 @@ export const ShopPage: React.FC = () => {
   const handleEquip = async (itemId: number): Promise<boolean> => {
     try {
       const res = await shopApi.equipItem(itemId);
-      showToast('success', res.message || "Buyum profilingizga o'rnatildi!");
+      showToast('success', res.message || t('shop.equipSuccess'));
       await refreshProfile();
       return true;
     } catch (err) {
-      showToast('error', getApiErrorMessage(err, "O'rnatishda xatolik yuz berdi"));
+      showToast('error', getApiErrorMessage(err, t('common.error')));
       return false;
     }
   };
@@ -70,11 +72,11 @@ export const ShopPage: React.FC = () => {
   const handleUnequip = async (itemId: number): Promise<boolean> => {
     try {
       const res = await shopApi.unequipItem(itemId);
-      showToast('success', res.message || "Buyum profildan yechildi");
+      showToast('success', res.message || t('shop.unequipSuccess'));
       await refreshProfile();
       return true;
     } catch (err) {
-      showToast('error', getApiErrorMessage(err, "Yechishda xatolik yuz berdi"));
+      showToast('error', getApiErrorMessage(err, t('common.error')));
       return false;
     }
   };
@@ -111,14 +113,13 @@ export const ShopPage: React.FC = () => {
             <div className="space-y-3 text-center md:text-left">
               <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-brand-500/10 text-brand-400 border border-brand-500/20">
                 <Sparkles className="w-3.5 h-3.5" />
-                <span>Chaqmoq Gamifikatsiya Do'koni</span>
+                <span>{t('shop.title')}</span>
               </div>
               <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight">
-                Avatar Ramkalari & Fonlar
+                {t('shop.tabFrames')} &amp; {t('shop.tabBackgrounds')}
               </h1>
               <p className="text-xs sm:text-sm text-studio-400 max-w-lg leading-relaxed">
-                Yig'ilgan chaqmoqlaringiz evaziga unikal ramkalarni xarid qiling va
-                har bir bob sharhlarida boshqalardan ajralib turing!
+                {t('shop.subtitle')}
               </p>
             </div>
 
@@ -133,11 +134,11 @@ export const ShopPage: React.FC = () => {
                       size="lg"
                     />
                     <div>
-                      <div className="text-xs text-studio-400">Joriy balansingiz:</div>
+                      <div className="text-xs text-studio-400">{t('shop.currentBalance')}:</div>
                       <div className="text-2xl font-black text-white flex items-center gap-1.5">
                         <Zap className="w-6 h-6 text-brand-400 fill-brand-400" />
                         <span>{user.lightning_coins}</span>
-                        <span className="text-xs font-semibold text-brand-400">⚡ Chaqmoq</span>
+                        <span className="text-xs font-semibold text-brand-400">⚡ {t('common.coins')}</span>
                       </div>
                     </div>
                   </div>
@@ -150,23 +151,23 @@ export const ShopPage: React.FC = () => {
                       className="w-full sm:w-auto px-4 py-2.5 rounded-xl font-bold bg-gradient-to-r from-brand-500 to-amber-400 text-studio-950 text-xs hover:from-brand-400 hover:to-amber-300 shadow-glow-brand transition-all flex items-center justify-center gap-1.5 shrink-0"
                     >
                       <Gift className="w-4 h-4" />
-                      <span>Kunlik bonus (+15 ⚡)</span>
+                      <span>{t('shop.dailyBonusBtn')}</span>
                     </button>
                   ) : (
                     <div className="w-full sm:w-auto px-3.5 py-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold flex items-center justify-center gap-1.5 shrink-0">
                       <CheckCircle2 className="w-4 h-4" />
-                      <span>Kunlik bonus olingan</span>
+                      <span>{t('shop.dailyBonusClaimed')}</span>
                     </div>
                   )}
                 </>
               ) : (
                 <div className="text-center py-2 px-4">
-                  <div className="text-sm font-bold text-white mb-2">Balansni ko'rish uchun kiring</div>
+                  <div className="text-sm font-bold text-white mb-2">{t('shop.loginToView')}</div>
                   <button
                     onClick={() => openAuthModal('login')}
                     className="px-5 py-2 rounded-xl font-bold bg-brand-500 text-studio-950 text-xs hover:bg-brand-400 shadow-glow-brand"
                   >
-                    Kirish / Ro'yxatdan o'tish
+                    {t('shop.loginOrRegister')}
                   </button>
                 </div>
               )}
@@ -177,9 +178,9 @@ export const ShopPage: React.FC = () => {
         {/* Filter Tabs */}
         <div className="flex items-center gap-2 mb-8 select-none">
           {[
-            { label: 'Barchasi', value: 'all' },
-            { label: 'Avatar Ramkalari', value: 'frame' },
-            { label: 'Profil Fonlari', value: 'background' },
+            { label: t('shop.tabAll'), value: 'all' },
+            { label: t('shop.tabFrames'), value: 'frame' },
+            { label: t('shop.tabBackgrounds'), value: 'background' },
           ].map((tab) => (
             <button
               key={tab.value}
@@ -199,14 +200,14 @@ export const ShopPage: React.FC = () => {
         {loading ? (
           <div className="py-24 flex flex-col items-center justify-center text-studio-400 gap-3">
             <Loader2 className="w-8 h-8 animate-spin text-brand-500" />
-            <span className="text-sm">Do'kon buyumlari yuklanmoqda...</span>
+            <span className="text-sm">{t('common.loading')}</span>
           </div>
         ) : items.length === 0 ? (
           <div className="py-20 text-center bg-studio-900/40 border border-studio-800 rounded-3xl p-8 max-w-md mx-auto">
             <ShoppingBag className="w-12 h-12 mx-auto text-studio-600 mb-3" />
-            <h3 className="font-bold text-white text-base mb-1">Buyumlar topilmadi</h3>
+            <h3 className="font-bold text-white text-base mb-1">{t('catalog.emptyTitle')}</h3>
             <p className="text-xs text-studio-400">
-              Ushbu bo'limda hozircha xarid qilish mumkin bo'lgan buyumlar mavjud emas.
+              {t('shop.empty')}
             </p>
           </div>
         ) : (

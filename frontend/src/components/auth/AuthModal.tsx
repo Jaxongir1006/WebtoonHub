@@ -1,10 +1,12 @@
 import React, { useState, useCallback } from 'react';
 import { Modal } from '../common/Modal';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { Zap, Mail, Lock, User as UserIcon, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
 
 export const AuthModal: React.FC = () => {
   const { authModalOpen, authModalTab, closeAuthModal, openAuthModal, login, register } = useAuth();
+  const { t } = useLanguage();
 
   const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
@@ -78,7 +80,7 @@ export const AuthModal: React.FC = () => {
           <div className="p-1.5 rounded-lg bg-brand-500/20 text-brand-400">
             <Zap className="w-5 h-5 fill-brand-400" />
           </div>
-          <span>{isRegister ? "Ro'yxatdan o'tish" : "Tizimga kirish"}</span>
+          <span>{isRegister ? t('auth.registerTab') : t('auth.loginTab')}</span>
         </div>
       }
     >
@@ -89,9 +91,9 @@ export const AuthModal: React.FC = () => {
             <Zap className="w-5 h-5 text-brand-400 fill-brand-400" />
           </div>
           <div>
-            <div className="font-bold text-white text-sm">Xush kelibsiz bonusi!</div>
+            <div className="font-bold text-white text-sm">{t('auth.welcomeBonus')}</div>
             <div className="text-xs text-brand-300">
-              Ro'yxatdan o'tganingizda hisobingizga darhol <b>+50 ⚡ Chaqmoq</b> sovg'a qilinadi!
+              {t('auth.welcomeBonusDesc')}
             </div>
           </div>
         </div>
@@ -111,7 +113,7 @@ export const AuthModal: React.FC = () => {
               : 'text-studio-400 hover:text-white'
           }`}
         >
-          Kirish
+          {t('auth.loginTab')}
         </button>
         <button
           type="button"
@@ -125,7 +127,7 @@ export const AuthModal: React.FC = () => {
               : 'text-studio-400 hover:text-white'
           }`}
         >
-          Ro'yxatdan o'tish (+50 ⚡)
+          {t('auth.registerTab')} (+50 ⚡)
         </button>
       </div>
 
@@ -150,7 +152,7 @@ export const AuthModal: React.FC = () => {
         {isRegister && (
           <div>
             <label className="block text-xs font-semibold text-studio-300 mb-1.5">
-              Foydalanuvchi nomi
+              {t('auth.usernameLabel')}
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-studio-400">
@@ -161,7 +163,7 @@ export const AuthModal: React.FC = () => {
                 required
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="masalan, solo_hunter"
+                placeholder={t('auth.usernamePlaceholder')}
                 className="w-full pl-10 pr-4 py-2.5 bg-studio-800 border border-studio-700 rounded-xl text-white placeholder-studio-500 text-sm focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-colors"
               />
             </div>
@@ -170,7 +172,7 @@ export const AuthModal: React.FC = () => {
 
         <div>
           <label className="block text-xs font-semibold text-studio-300 mb-1.5">
-            Email manzili
+            {t('auth.emailLabel')}
           </label>
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-studio-400">
@@ -181,7 +183,7 @@ export const AuthModal: React.FC = () => {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="ismingiz@example.uz"
+              placeholder={t('auth.emailPlaceholder')}
               className="w-full pl-10 pr-4 py-2.5 bg-studio-800 border border-studio-700 rounded-xl text-white placeholder-studio-500 text-sm focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-colors"
             />
           </div>
@@ -189,7 +191,7 @@ export const AuthModal: React.FC = () => {
 
         <div>
           <label className="block text-xs font-semibold text-studio-300 mb-1.5">
-            Parol {isRegister && <span className="text-studio-500">(kamida 8 ta belgi)</span>}
+            {t('auth.passwordLabel')}
           </label>
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-studio-400">
@@ -200,7 +202,7 @@ export const AuthModal: React.FC = () => {
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
+              placeholder={t('auth.passwordPlaceholder')}
               className="w-full pl-10 pr-4 py-2.5 bg-studio-800 border border-studio-700 rounded-xl text-white placeholder-studio-500 text-sm focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-colors"
             />
           </div>
@@ -214,15 +216,15 @@ export const AuthModal: React.FC = () => {
           {loading ? (
             <>
               <Loader2 className="w-4 h-4 animate-spin" />
-              <span>Kutilmoqda...</span>
+              <span>{isRegister ? t('auth.registering') : t('auth.loggingIn')}</span>
             </>
           ) : isRegister ? (
             <>
               <Zap className="w-4 h-4 fill-studio-950" />
-              <span>Ro'yxatdan o'tish (+50 ⚡)</span>
+              <span>{t('auth.registerBtn')} (+50 ⚡)</span>
             </>
           ) : (
-            <span>Tizimga kirish</span>
+            <span>{t('auth.loginBtn')}</span>
           )}
         </button>
       </form>
@@ -231,24 +233,24 @@ export const AuthModal: React.FC = () => {
       <div className="mt-5 text-center text-xs text-studio-400">
         {isRegister ? (
           <span>
-            Hisobingiz bormi?{' '}
+            {t('auth.hasAccount')}{' '}
             <button
               type="button"
               onClick={() => openAuthModal('login')}
               className="text-brand-400 hover:underline font-semibold"
             >
-              Kirish
+              {t('auth.switchToLogin')}
             </button>
           </span>
         ) : (
           <span>
-            Yangi foydalanuvchimisiz?{' '}
+            {t('auth.noAccount')}{' '}
             <button
               type="button"
               onClick={() => openAuthModal('register')}
               className="text-brand-400 hover:underline font-semibold"
             >
-              Ro'yxatdan o'ting (+50 ⚡ oling)
+              {t('auth.switchToRegister')} (+50 ⚡)
             </button>
           </span>
         )}

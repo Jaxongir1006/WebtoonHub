@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ChapterReaderData } from '../../types';
+import { useLanguage } from '../../context/LanguageContext';
 import { ChevronLeft, ChevronRight, Menu, Zap, ArrowLeft, Check } from 'lucide-react';
 
 interface ReaderNavProps {
@@ -19,6 +20,7 @@ export const ReaderNav: React.FC<ReaderNavProps> = ({
   onSelectChapter
 }) => {
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const [drawerOpen, setDrawerOpen] = React.useState(false);
 
   return (
@@ -42,7 +44,7 @@ export const ReaderNav: React.FC<ReaderNavProps> = ({
             <Link
               to={`/webtoons/${data.webtoon_id}`}
               className="p-1.5 rounded-lg text-studio-400 hover:text-white hover:bg-studio-800 transition-colors shrink-0"
-              title="Manhvaga qaytish"
+              title={t('reader.backToManhwa')}
             >
               <ArrowLeft className="w-5 h-5" />
             </Link>
@@ -52,7 +54,7 @@ export const ReaderNav: React.FC<ReaderNavProps> = ({
                 {data.webtoon_title}
               </span>
               <span className="text-[11px] text-brand-400 font-semibold truncate">
-                {data.chapter_number}-bob {data.title && `— ${data.title}`}
+                {t('reader.chapter', { number: data.chapter_number })} {data.title && `— ${data.title}`}
               </span>
             </div>
           </div>
@@ -67,7 +69,11 @@ export const ReaderNav: React.FC<ReaderNavProps> = ({
               }`}
             >
               <Zap className="w-3.5 h-3.5 fill-current" />
-              <span>{data.is_reward_claimed ? "+5 ⚡ Olingan" : "+5 ⚡ Bonus"}</span>
+              <span>
+                {data.is_reward_claimed
+                  ? t('reader.coinsClaimedPill', { coins: 5 })
+                  : t('reader.bonusPill', { coins: 5 })}
+              </span>
             </span>
 
             {/* Chapter drawer toggle */}
@@ -75,7 +81,7 @@ export const ReaderNav: React.FC<ReaderNavProps> = ({
               <button
                 onClick={() => setDrawerOpen(true)}
                 className="p-2 rounded-xl bg-studio-900 border border-studio-800 text-studio-300 hover:text-white transition-colors"
-                title="Boblar ro'yxati"
+                title={t('reader.chaptersList')}
               >
                 <Menu className="w-4 h-4" />
               </button>
@@ -98,7 +104,7 @@ export const ReaderNav: React.FC<ReaderNavProps> = ({
             className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-studio-900 border border-studio-800 text-studio-200 text-xs font-bold hover:bg-studio-800 hover:text-white transition-colors disabled:opacity-30 disabled:pointer-events-none"
           >
             <ChevronLeft className="w-4 h-4" />
-            <span>Oldingi bob</span>
+            <span>{t('reader.prevChapter')}</span>
           </button>
 
           {/* Progress Percent */}
@@ -112,7 +118,7 @@ export const ReaderNav: React.FC<ReaderNavProps> = ({
             onClick={() => data.next_chapter_id && navigate(`/chapters/${data.next_chapter_id}`)}
             className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-brand-500 text-studio-950 text-xs font-bold hover:bg-brand-400 transition-colors shadow-glow-brand disabled:opacity-30 disabled:pointer-events-none"
           >
-            <span>Keyingi bob</span>
+            <span>{t('reader.nextChapter')}</span>
             <ChevronRight className="w-4 h-4" />
           </button>
         </div>
@@ -127,7 +133,7 @@ export const ReaderNav: React.FC<ReaderNavProps> = ({
           />
           <div className="relative w-80 max-w-full bg-studio-900 border-l border-studio-800 h-full p-5 flex flex-col z-10 animate-in slide-in-from-right duration-200">
             <div className="flex items-center justify-between pb-4 border-b border-studio-800 mb-3">
-              <h3 className="font-bold text-white text-base">Boblar ro'yxati</h3>
+              <h3 className="font-bold text-white text-base">{t('reader.chaptersList')}</h3>
               <button
                 onClick={() => setDrawerOpen(false)}
                 className="text-studio-400 hover:text-white p-1 rounded-lg hover:bg-studio-800"
@@ -157,7 +163,7 @@ export const ReaderNav: React.FC<ReaderNavProps> = ({
                     }`}
                   >
                     <span>
-                      {ch.chapter_number}-bob {ch.title && `— ${ch.title}`}
+                      {t('reader.chapter', { number: ch.chapter_number })} {ch.title && `— ${ch.title}`}
                     </span>
                     {isCurrent && <Check className="w-4 h-4 shrink-0" />}
                   </button>

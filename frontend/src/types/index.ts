@@ -52,6 +52,8 @@ export interface WebtoonSummary {
   id: number;
   title: string;
   slug: string;
+  description?: string | null;
+  synopsis?: string | null;
   cover_image_url: string;
   author_name?: string | null;
   status: 'ongoing' | 'completed';

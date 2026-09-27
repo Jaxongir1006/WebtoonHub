@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { WebtoonSummary } from '../../types';
 import { SafeImage } from '../common/SafeImage';
+import { useLanguage } from '../../context/LanguageContext';
 import { formatNumber, getStatusLabel } from '../../utils/format';
 import { Eye, BookOpen } from 'lucide-react';
 
@@ -11,6 +12,7 @@ interface WebtoonCardProps {
 }
 
 export const WebtoonCard: React.FC<WebtoonCardProps> = ({ webtoon, className = '' }) => {
+  const { t } = useLanguage();
   const isOngoing = webtoon.status === 'ongoing';
 
   return (
@@ -39,7 +41,7 @@ export const WebtoonCard: React.FC<WebtoonCardProps> = ({ webtoon, className = '
                 : 'bg-indigo-500/90 text-white shadow-sm'
             }`}
           >
-            {getStatusLabel(webtoon.status)}
+            {getStatusLabel(webtoon.status, t)}
           </span>
 
           <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-studio-950/80 backdrop-blur-md text-studio-300 border border-studio-800/80">
@@ -53,11 +55,11 @@ export const WebtoonCard: React.FC<WebtoonCardProps> = ({ webtoon, className = '
           {webtoon.latest_chapter ? (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-brand-500/90 backdrop-blur-sm text-studio-950 font-bold text-[11px] shadow-sm">
               <BookOpen className="w-3 h-3" />
-              <span>{webtoon.latest_chapter.chapter_number}-bob</span>
+              <span>{t('details.chapterNum', { number: webtoon.latest_chapter.chapter_number })}</span>
             </span>
           ) : (
             <span className="px-2 py-0.5 rounded-lg bg-studio-800/80 backdrop-blur-sm text-studio-400 text-[10px]">
-              Tez kunda
+              Coming soon
             </span>
           )}
         </div>
