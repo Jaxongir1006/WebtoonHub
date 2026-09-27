@@ -19,7 +19,10 @@ from app.modules.webtoons.router import (
     client_router as webtoons_client_router,
     staff_router as webtoons_staff_router,
 )
-from app.modules.rewards.router import router as rewards_router
+from app.modules.rewards.router import (
+    client_router as rewards_client_router,
+    staff_router as rewards_staff_router,
+)
 from app.modules.shop.router import (
     client_router as shop_client_router,
     staff_router as shop_staff_router,
@@ -118,7 +121,8 @@ app.include_router(creator_requests_client_router, prefix=settings.API_V1_STR)
 app.include_router(creator_requests_staff_router, prefix=settings.API_V1_STR)
 app.include_router(webtoons_client_router, prefix=settings.API_V1_STR)
 app.include_router(webtoons_staff_router, prefix=settings.API_V1_STR)
-app.include_router(rewards_router, prefix=settings.API_V1_STR)
+app.include_router(rewards_client_router, prefix=settings.API_V1_STR)
+app.include_router(rewards_staff_router, prefix=settings.API_V1_STR)
 app.include_router(shop_client_router, prefix=settings.API_V1_STR)
 app.include_router(shop_staff_router, prefix=settings.API_V1_STR)
 app.include_router(library_router, prefix=settings.API_V1_STR)

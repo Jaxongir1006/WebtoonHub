@@ -9,7 +9,7 @@ from sqlalchemy.orm import selectinload
 from app.core.database import get_db
 from app.core.security import decode_token
 from app.modules.auth.dependencies import get_current_user
-from app.modules.comments.schemas import CommentCreate
+from app.modules.comments.schemas import CommentCreate, CommentStaffUpdateRequest
 from app.modules.comments.service import CommentsService
 from app.modules.staff.dependencies import require_permission
 from app.modules.staff.models import Role, StaffSession, StaffUser
@@ -176,3 +176,22 @@ async def list_staff_comments(
         "success": True,
         "data": res
     }
+
+
+@router.patch("/staff/comments/{id}", status_code=status.HTTP_200_OK)
+async def update_staff_comment(
+    id: int,
+    data: CommentStaffUpdateRequest,
+    _staff: StaffUser = Depends(require_permission("comments:moderate")),
+    db: AsyncSession = Depends(get_db)
+):
+    comment = await CommentsService.update_comment(db, comment_id=id, content=data.content)
+    return {
+        "success": True,
+        "data": {
+            "id": comment.id,
+            "content": comment.content
+        },
+        "message": "Sharh muvaffaqiyatli tahrirlandi"
+    }
+

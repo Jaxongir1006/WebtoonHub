@@ -20,7 +20,11 @@ from app.modules.staff.schemas import (
     StaffSummary,
     StaffTokenResponse,
     StaffUserCreate,
-    StaffUserResponse
+    StaffUserResponse,
+    RoleUpdateRequest,
+    StaffUserUpdate,
+    SystemSettingItem,
+    UpdateSystemSettingsRequest
 )
 from app.modules.staff.service import StaffService
 
@@ -121,6 +125,40 @@ async def create_role(
     }
 
 
+@router.patch("/roles/{id}", status_code=status.HTTP_200_OK)
+async def update_role(
+    id: int,
+    data: RoleUpdateRequest,
+    _staff: StaffUser = Depends(require_permission("roles:manage")),
+    db: AsyncSession = Depends(get_db)
+):
+    role = await StaffService.update_role(db, id, data)
+    return {
+        "success": True,
+        "data": RoleItem(
+            id=role.id,
+            name=role.name,
+            description=role.description,
+            permissions=[PermissionItem.model_validate(p) for p in role.permissions]
+        ),
+        "message": "Rol muvaffaqiyatli yangilandi"
+    }
+
+
+@router.delete("/roles/{id}", status_code=status.HTTP_200_OK)
+async def delete_role(
+    id: int,
+    _staff: StaffUser = Depends(require_permission("roles:manage")),
+    db: AsyncSession = Depends(get_db)
+):
+    await StaffService.delete_role(db, id)
+    return {
+        "success": True,
+        "data": None,
+        "message": "Rol muvaffaqiyatli o'chirildi"
+    }
+
+
 # 5. Permissions Catalog
 @router.get("/permissions", status_code=status.HTTP_200_OK)
 async def list_permissions(
@@ -177,6 +215,47 @@ async def create_staff_user(
     }
 
 
+@router.patch("/users/{id}", status_code=status.HTTP_200_OK)
+async def update_staff_user(
+    id: int,
+    data: StaffUserUpdate,
+    _staff: StaffUser = Depends(require_permission("staff:manage")),
+    db: AsyncSession = Depends(get_db)
+):
+    staff_obj = await StaffService.update_staff_user(db, id, data)
+    return {
+        "success": True,
+        "data": StaffUserResponse(
+            id=staff_obj.id,
+            username=staff_obj.username,
+            email=staff_obj.email,
+            role=RoleItem(
+                id=staff_obj.role.id,
+                name=staff_obj.role.name,
+                description=staff_obj.role.description,
+                permissions=[PermissionItem.model_validate(p) for p in staff_obj.role.permissions]
+            ),
+            is_active=staff_obj.is_active,
+            created_at=staff_obj.created_at
+        ),
+        "message": "Xodim ma'lumotlari muvaffaqiyatli yangilandi"
+    }
+
+
+@router.delete("/users/{id}", status_code=status.HTTP_200_OK)
+async def delete_staff_user(
+    id: int,
+    staff: StaffUser = Depends(require_permission("staff:manage")),
+    db: AsyncSession = Depends(get_db)
+):
+    await StaffService.delete_staff_user(db, staff.id, id)
+    return {
+        "success": True,
+        "data": None,
+        "message": "Xodim muvaffaqiyatli o'chirildi"
+    }
+
+
 # 8. Readers (Users) Management
 @router.get("/readers", status_code=status.HTTP_200_OK)
 async def list_readers(
@@ -211,6 +290,20 @@ async def update_reader(
             "is_active": user.is_active
         },
         "message": "Foydalanuvchi ma'lumotlari muvaffaqiyatli yangilandi"
+    }
+
+
+@router.delete("/readers/{id}/sessions", status_code=status.HTTP_200_OK)
+async def terminate_reader_sessions(
+    id: int,
+    _staff: StaffUser = Depends(require_permission("users:manage")),
+    db: AsyncSession = Depends(get_db)
+):
+    await StaffService.terminate_reader_sessions(db, id)
+    return {
+        "success": True,
+        "data": None,
+        "message": "Foydalanuvchining barcha faol seanslari to'xtatildi"
     }
 
 
@@ -312,4 +405,32 @@ async def get_economy_transactions(
             "total": len(items)
         }
     }
+
+
+# 11. System Global Settings
+@router.get("/settings", status_code=status.HTTP_200_OK)
+async def get_system_settings(
+    _staff: StaffUser = Depends(require_permission("settings:manage")),
+    db: AsyncSession = Depends(get_db)
+):
+    settings_list = await StaffService.get_settings(db)
+    return {
+        "success": True,
+        "data": [SystemSettingItem.model_validate(s) for s in settings_list]
+    }
+
+
+@router.patch("/settings", status_code=status.HTTP_200_OK)
+async def update_system_settings(
+    data: UpdateSystemSettingsRequest,
+    _staff: StaffUser = Depends(require_permission("settings:manage")),
+    db: AsyncSession = Depends(get_db)
+):
+    settings_list = await StaffService.update_settings(db, data.settings)
+    return {
+        "success": True,
+        "data": [SystemSettingItem.model_validate(s) for s in settings_list],
+        "message": "Tizim sozlamalari muvaffaqiyatli saqlandi"
+    }
+
 

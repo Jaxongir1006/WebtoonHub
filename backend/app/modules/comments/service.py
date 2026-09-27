@@ -243,3 +243,17 @@ class CommentsService:
             page=page,
             limit=limit
         )
+
+    @staticmethod
+    async def update_comment(db: AsyncSession, comment_id: int, content: str) -> Comment:
+        stmt = select(Comment).where(Comment.id == comment_id)
+        res = await db.execute(stmt)
+        comment = res.scalar_one_or_none()
+        if not comment:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sharh topilmadi")
+
+        comment.content = content.strip()
+        await db.commit()
+        await db.refresh(comment)
+        return comment
+

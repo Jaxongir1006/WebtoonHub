@@ -10,6 +10,10 @@ from app.modules.staff.models import StaffUser
 from app.modules.users.models import User
 from app.modules.webtoons.schemas import (
     ChapterStatusUpdate,
+    ChapterUpdateRequest,
+    GenreCreateRequest,
+    GenreItem,
+    GenreUpdateRequest,
     WebtoonCatalogResponse,
     WebtoonDetailResponse
 )
@@ -272,3 +276,102 @@ async def list_staff_genres(db: AsyncSession = Depends(get_db)):
         "success": True,
         "data": genres
     }
+
+
+# 12. Create Genre (Staff)
+@staff_router.post("/genres", status_code=status.HTTP_201_CREATED)
+async def create_genre(
+    data: GenreCreateRequest,
+    _staff: StaffUser = Depends(require_permission("genres:manage")),
+    db: AsyncSession = Depends(get_db)
+):
+    genre = await WebtoonService.create_genre(db, name=data.name, slug=data.slug)
+    return {
+        "success": True,
+        "data": GenreItem.model_validate(genre),
+        "message": "Yangi janr muvaffaqiyatli yaratildi"
+    }
+
+
+# 13. Update Genre (Staff)
+@staff_router.patch("/genres/{id}", status_code=status.HTTP_200_OK)
+async def update_genre(
+    id: int,
+    data: GenreUpdateRequest,
+    _staff: StaffUser = Depends(require_permission("genres:manage")),
+    db: AsyncSession = Depends(get_db)
+):
+    genre = await WebtoonService.update_genre(db, genre_id=id, name=data.name, slug=data.slug)
+    return {
+        "success": True,
+        "data": GenreItem.model_validate(genre),
+        "message": "Janr ma'lumotlari muvaffaqiyatli yangilandi"
+    }
+
+
+# 14. Delete Genre (Staff)
+@staff_router.delete("/genres/{id}", status_code=status.HTTP_200_OK)
+async def delete_genre(
+    id: int,
+    _staff: StaffUser = Depends(require_permission("genres:manage")),
+    db: AsyncSession = Depends(get_db)
+):
+    await WebtoonService.delete_genre(db, genre_id=id)
+    return {
+        "success": True,
+        "data": None,
+        "message": "Janr muvaffaqiyatli o'chirildi"
+    }
+
+
+# 15. List Webtoon Chapters (Staff)
+@staff_router.get("/webtoons/{id}/chapters", status_code=status.HTTP_200_OK)
+async def list_webtoon_chapters(
+    id: int,
+    status: Optional[str] = Query(None, description="Bob statusi filtri"),
+    _staff: StaffUser = Depends(require_permission("webtoons:create")),
+    db: AsyncSession = Depends(get_db)
+):
+    chapters = await WebtoonService.list_webtoon_chapters_staff(db, webtoon_id=id, status_filter=status)
+    return {
+        "success": True,
+        "data": chapters
+    }
+
+
+# 16. Update Chapter (Staff)
+@staff_router.patch("/chapters/{id}", status_code=status.HTTP_200_OK)
+async def update_chapter(
+    id: int,
+    data: ChapterUpdateRequest,
+    _staff: StaffUser = Depends(require_permission("chapters:edit")),
+    db: AsyncSession = Depends(get_db)
+):
+    chapter = await WebtoonService.update_chapter(db, chapter_id=id, data=data)
+    return {
+        "success": True,
+        "data": {
+            "id": chapter.id,
+            "chapter_number": chapter.chapter_number,
+            "title": chapter.title,
+            "reward_coins": chapter.reward_coins,
+            "status": chapter.status
+        },
+        "message": "Bob ma'lumotlari muvaffaqiyatli yangilandi"
+    }
+
+
+# 17. Delete Chapter (Staff)
+@staff_router.delete("/chapters/{id}", status_code=status.HTTP_200_OK)
+async def delete_chapter(
+    id: int,
+    _staff: StaffUser = Depends(require_permission("chapters:delete")),
+    db: AsyncSession = Depends(get_db)
+):
+    await WebtoonService.delete_chapter(db, chapter_id=id)
+    return {
+        "success": True,
+        "data": None,
+        "message": "Bob muvaffaqiyatli o'chirildi"
+    }
+

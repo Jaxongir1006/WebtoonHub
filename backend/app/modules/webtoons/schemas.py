@@ -95,3 +95,32 @@ class PendingChapterItem(BaseModel):
     status: str
     images_count: int
     created_at: datetime
+
+
+class GenreCreateRequest(BaseModel):
+    name: str = Field(min_length=2, max_length=50)
+    slug: Optional[str] = None
+
+
+class GenreUpdateRequest(BaseModel):
+    name: Optional[str] = Field(None, min_length=2, max_length=50)
+    slug: Optional[str] = None
+
+
+class StaffChapterItem(BaseModel):
+    id: int
+    webtoon_id: int
+    chapter_number: float
+    title: Optional[str] = None
+    reward_coins: int = 5
+    status: str
+    images_count: int = 0
+    created_at: datetime
+
+
+class ChapterUpdateRequest(BaseModel):
+    chapter_number: Optional[float] = None
+    title: Optional[str] = None
+    reward_coins: Optional[int] = Field(None, ge=0)
+    status: Optional[str] = Field(None, pattern=r"^(draft|pending|published|rejected)$")
+

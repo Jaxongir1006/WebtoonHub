@@ -493,3 +493,131 @@ class WebtoonService:
         await db.delete(webtoon)
         await db.commit()
         await CacheService.delete_pattern("webtoons:catalog:*")
+
+    @staticmethod
+    async def create_genre(db: AsyncSession, name: str, slug: Optional[str] = None) -> Genre:
+        from slugify import slugify
+        clean_name = name.strip()
+        final_slug = slug.strip() if slug and slug.strip() else slugify(clean_name)
+
+        # Check unique
+        stmt = select(Genre).where((Genre.name == clean_name) | (Genre.slug == final_slug))
+        existing = (await db.execute(stmt)).scalar_one_or_none()
+        if existing:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Bunday nom yoki slug bilan janr mavjud")
+
+        genre = Genre(name=clean_name, slug=final_slug)
+        db.add(genre)
+        await db.commit()
+        await db.refresh(genre)
+        await CacheService.delete("genres:all")
+        return genre
+
+    @staticmethod
+    async def update_genre(db: AsyncSession, genre_id: int, name: Optional[str] = None, slug: Optional[str] = None) -> Genre:
+        from slugify import slugify
+        stmt = select(Genre).where(Genre.id == genre_id)
+        genre = (await db.execute(stmt)).scalar_one_or_none()
+        if not genre:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Janr topilmadi")
+
+        if name is not None and name.strip():
+            genre.name = name.strip()
+        if slug is not None and slug.strip():
+            target_slug = slug.strip()
+            # check uniqueness
+            s_stmt = select(Genre).where(Genre.slug == target_slug, Genre.id != genre_id)
+            if (await db.execute(s_stmt)).scalar_one_or_none():
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Ushbu slug band")
+            genre.slug = target_slug
+
+        await db.commit()
+        await db.refresh(genre)
+        await CacheService.delete("genres:all")
+        return genre
+
+    @staticmethod
+    async def delete_genre(db: AsyncSession, genre_id: int) -> None:
+        stmt = select(Genre).where(Genre.id == genre_id)
+        genre = (await db.execute(stmt)).scalar_one_or_none()
+        if not genre:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Janr topilmadi")
+
+        await db.delete(genre)
+        await db.commit()
+        await CacheService.delete("genres:all")
+
+    @staticmethod
+    async def list_webtoon_chapters_staff(db: AsyncSession, webtoon_id: int, status_filter: Optional[str] = None):
+        from app.modules.webtoons.schemas import StaffChapterItem
+        w_stmt = select(Webtoon).where(Webtoon.id == webtoon_id)
+        webtoon = (await db.execute(w_stmt)).scalar_one_or_none()
+        if not webtoon:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manhwa topilmadi")
+
+        query = select(Chapter).options(selectinload(Chapter.images)).where(Chapter.webtoon_id == webtoon_id)
+        if status_filter:
+            query = query.where(Chapter.status == status_filter)
+        query = query.order_by(Chapter.chapter_number.desc())
+
+        res = await db.execute(query)
+        chapters = res.scalars().all()
+
+        return [
+            StaffChapterItem(
+                id=c.id,
+                webtoon_id=c.webtoon_id,
+                chapter_number=c.chapter_number,
+                title=c.title,
+                reward_coins=c.reward_coins,
+                status=c.status,
+                images_count=len(c.images),
+                created_at=c.created_at
+            )
+            for c in chapters
+        ]
+
+    @staticmethod
+    async def update_chapter(db: AsyncSession, chapter_id: int, data) -> Chapter:
+        stmt = select(Chapter).options(selectinload(Chapter.webtoon)).where(Chapter.id == chapter_id)
+        chapter = (await db.execute(stmt)).scalar_one_or_none()
+        if not chapter:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Bob topilmadi")
+
+        if data.chapter_number is not None:
+            chapter.chapter_number = data.chapter_number
+        if data.title is not None:
+            chapter.title = data.title
+        if data.reward_coins is not None:
+            chapter.reward_coins = data.reward_coins
+        if data.status is not None:
+            chapter.status = data.status
+
+        await db.commit()
+        await db.refresh(chapter)
+
+        # Invalidate caches
+        await CacheService.delete(f"chapters:{chapter_id}:reader")
+        if chapter.webtoon:
+            await CacheService.delete(f"webtoons:{chapter.webtoon.slug}")
+        await CacheService.delete_pattern("webtoons:catalog:*")
+
+        return chapter
+
+    @staticmethod
+    async def delete_chapter(db: AsyncSession, chapter_id: int) -> None:
+        stmt = select(Chapter).options(selectinload(Chapter.webtoon), selectinload(Chapter.images)).where(Chapter.id == chapter_id)
+        chapter = (await db.execute(stmt)).scalar_one_or_none()
+        if not chapter:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Bob topilmadi")
+
+        webtoon_slug = chapter.webtoon.slug if chapter.webtoon else None
+
+        await db.delete(chapter)
+        await db.commit()
+
+        await CacheService.delete(f"chapters:{chapter_id}:reader")
+        if webtoon_slug:
+            await CacheService.delete(f"webtoons:{webtoon_slug}")
+        await CacheService.delete_pattern("webtoons:catalog:*")
+

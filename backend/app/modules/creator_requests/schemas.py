@@ -10,6 +10,7 @@ class CreatorRequestCreate(BaseModel):
 
 class CreatorRequestReview(BaseModel):
     status: str = Field(pattern=r"^(approved|rejected)$")
+    admin_feedback: Optional[str] = Field(None, max_length=1000)
 
 
 class CreatorRequestItem(BaseModel):
@@ -18,6 +19,7 @@ class CreatorRequestItem(BaseModel):
     user: Optional[UserSummary] = None
     message: str
     status: str
+    admin_feedback: Optional[str] = None
     reviewed_at: Optional[datetime] = None
     created_at: datetime
 

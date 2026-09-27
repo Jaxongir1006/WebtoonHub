@@ -120,3 +120,37 @@ class DashboardStatsResponse(BaseModel):
     pending_creator_requests: int
     total_comments: int
     total_coins_in_circulation: int
+
+
+class SystemSettingItem(BaseModel):
+    key: str
+    value: str
+    description: Optional[str] = None
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class SystemSettingUpdateEntry(BaseModel):
+    key: str
+    value: str
+
+
+class UpdateSystemSettingsRequest(BaseModel):
+    settings: List[SystemSettingUpdateEntry]
+
+
+class RoleUpdateRequest(BaseModel):
+    name: Optional[str] = Field(None, min_length=2, max_length=50)
+    description: Optional[str] = None
+    permission_ids: Optional[List[int]] = None
+
+
+class StaffUserUpdate(BaseModel):
+    username: Optional[str] = Field(None, min_length=3, max_length=50)
+    email: Optional[EmailStr] = None
+    role_id: Optional[int] = None
+    is_active: Optional[bool] = None
+    password: Optional[str] = Field(None, min_length=6)
+

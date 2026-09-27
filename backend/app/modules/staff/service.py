@@ -371,3 +371,167 @@ class StaffService:
             total_comments=comm_count,
             total_coins_in_circulation=coins_circ
         )
+
+    @staticmethod
+    async def get_settings(db: AsyncSession):
+        from app.modules.staff.models import SystemSetting
+        stmt = select(SystemSetting).order_by(SystemSetting.key.asc())
+        res = await db.execute(stmt)
+        return res.scalars().all()
+
+    @staticmethod
+    async def update_settings(db: AsyncSession, settings_data):
+        from app.modules.staff.models import SystemSetting
+        for entry in settings_data:
+            stmt = select(SystemSetting).where(SystemSetting.key == entry.key)
+            res = await db.execute(stmt)
+            obj = res.scalar_one_or_none()
+            if obj:
+                obj.value = entry.value
+            else:
+                obj = SystemSetting(key=entry.key, value=entry.value)
+                db.add(obj)
+
+            if entry.key == "register_bonus_coins":
+                try:
+                    settings.INITIAL_COINS = int(entry.value)
+                except ValueError:
+                    pass
+            elif entry.key == "daily_checkin_coins":
+                try:
+                    settings.DAILY_LOGIN_COINS = int(entry.value)
+                except ValueError:
+                    pass
+            elif entry.key == "chapter_read_coins":
+                try:
+                    settings.CHAPTER_READ_COINS = int(entry.value)
+                except ValueError:
+                    pass
+
+        await db.commit()
+        stmt = select(SystemSetting).order_by(SystemSetting.key.asc())
+        res = await db.execute(stmt)
+        return res.scalars().all()
+
+    @staticmethod
+    async def update_role(db: AsyncSession, role_id: int, data):
+        from app.modules.staff.models import Role, Permission
+        stmt = select(Role).options(selectinload(Role.permissions)).where(Role.id == role_id)
+        res = await db.execute(stmt)
+        role = res.scalar_one_or_none()
+        if not role:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rol topilmadi")
+
+        if data.name is not None and data.name.strip():
+            if data.name.strip() != role.name:
+                name_stmt = select(Role).where(Role.name == data.name.strip())
+                existing = (await db.execute(name_stmt)).scalar_one_or_none()
+                if existing:
+                    raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Bunday nomli rol allaqachon mavjud")
+                role.name = data.name.strip()
+
+        if data.description is not None:
+            role.description = data.description
+
+        if data.permission_ids is not None:
+            p_stmt = select(Permission).where(Permission.id.in_(data.permission_ids))
+            p_res = await db.execute(p_stmt)
+            perms = p_res.scalars().all()
+            role.permissions = list(perms)
+
+        await db.commit()
+        await db.refresh(role)
+        return role
+
+    @staticmethod
+    async def delete_role(db: AsyncSession, role_id: int):
+        from app.modules.staff.models import Role, StaffUser
+        stmt = select(Role).where(Role.id == role_id)
+        res = await db.execute(stmt)
+        role = res.scalar_one_or_none()
+        if not role:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rol topilmadi")
+
+        if role.name == "superadmin":
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Superadmin rolini o'chirib bo'lmaydi")
+
+        st_check = select(StaffUser).where(StaffUser.role_id == role_id)
+        assigned_staff = (await db.execute(st_check)).scalar_one_or_none()
+        if assigned_staff:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Ushbu rolga biriktirilgan xodimlar mavjud. Avval xodimlarning rolini o'zgartiring"
+            )
+
+        await db.delete(role)
+        await db.commit()
+
+    @staticmethod
+    async def update_staff_user(db: AsyncSession, staff_id: int, data):
+        from app.modules.staff.models import StaffUser, Role
+        from app.core.security import hash_password
+        stmt = select(StaffUser).options(selectinload(StaffUser.role).selectinload(Role.permissions)).where(StaffUser.id == staff_id)
+        res = await db.execute(stmt)
+        staff = res.scalar_one_or_none()
+        if not staff:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Xodim topilmadi")
+
+        if data.username is not None and data.username.strip():
+            u_check = select(StaffUser).where(StaffUser.username == data.username.strip(), StaffUser.id != staff_id)
+            if (await db.execute(u_check)).scalar_one_or_none():
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Ushbu username boshqa xodim tomonidan band qilingan")
+            staff.username = data.username.strip()
+
+        if data.email is not None and data.email.strip():
+            e_check = select(StaffUser).where(StaffUser.email == data.email.strip(), StaffUser.id != staff_id)
+            if (await db.execute(e_check)).scalar_one_or_none():
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Ushbu email boshqa xodim tomonidan band qilingan")
+            staff.email = data.email.strip()
+
+        if data.role_id is not None:
+            r_check = select(Role).where(Role.id == data.role_id)
+            if not (await db.execute(r_check)).scalar_one_or_none():
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Belgilangan rol topilmadi")
+            staff.role_id = data.role_id
+
+        if data.is_active is not None:
+            staff.is_active = data.is_active
+
+        if data.password is not None and len(data.password) >= 6:
+            staff.hashed_password = hash_password(data.password)
+
+        await db.commit()
+        stmt = select(StaffUser).options(selectinload(StaffUser.role).selectinload(Role.permissions)).where(StaffUser.id == staff_id)
+        res = await db.execute(stmt)
+        return res.scalar_one()
+
+    @staticmethod
+    async def delete_staff_user(db: AsyncSession, current_staff_id: int, staff_id: int):
+        from app.modules.staff.models import StaffUser
+        if current_staff_id == staff_id:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="O'zingizning hisobingizni o'chira olmaysiz")
+
+        stmt = select(StaffUser).where(StaffUser.id == staff_id)
+        res = await db.execute(stmt)
+        staff = res.scalar_one_or_none()
+        if not staff:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Xodim topilmadi")
+
+        await db.delete(staff)
+        await db.commit()
+
+    @staticmethod
+    async def terminate_reader_sessions(db: AsyncSession, user_id: int):
+        from app.modules.users.models import User, UserSession
+        u_check = select(User).where(User.id == user_id)
+        if not (await db.execute(u_check)).scalar_one_or_none():
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Foydalanuvchi topilmadi")
+
+        term_stmt = (
+            update(UserSession)
+            .where(UserSession.user_id == user_id, UserSession.is_active.is_(True))
+            .values(is_active=False)
+        )
+        await db.execute(term_stmt)
+        await db.commit()
+

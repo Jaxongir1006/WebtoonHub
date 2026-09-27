@@ -2,6 +2,7 @@ import asyncio
 import logging
 import app.models  # Ensure all SQLAlchemy models are registered
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from app.core.database import AsyncSessionLocal
 from app.core.security import hash_password
 from app.modules.staff.models import Permission, Role, StaffUser
@@ -14,11 +15,18 @@ DEFAULT_PERMISSIONS = [
     {"code": "webtoons:edit", "description": "Mavjud manhvalarni tahrirlash"},
     {"code": "webtoons:delete", "description": "Manhvalarni o'chirish"},
     {"code": "chapters:create", "description": "Bob ochish va rasmlarni yuklash"},
+    {"code": "chapters:edit", "description": "Bob ma'lumotlarini tahrirlash"},
+    {"code": "chapters:delete", "description": "Bobni tizimdan o'chirish"},
     {"code": "chapters:approve", "description": "Bob moderatsiyasidan o'tkazish"},
+    {"code": "genres:manage", "description": "Janrlarni boshqarish"},
     {"code": "shop:manage", "description": "Shop buyumlarini kiritish va tahrirlash"},
     {"code": "users:manage", "description": "Foydalanuvchilar chaqmoq balansi va arizalari"},
+    {"code": "coins:view", "description": "Chaqmoq tranzaksiyalari va statistikasini ko'rish"},
+    {"code": "coins:adjust", "description": "Foydalanuvchi chaqmoq balansini o'zgartirish"},
+    {"code": "coins:distribute", "description": "Ommaviy chaqmoq ulashish"},
     {"code": "roles:manage", "description": "Rollar va ruxsatlarni boshqarish"},
     {"code": "staff:manage", "description": "Xodimlarni boshqarish va rol tayinlash"},
+    {"code": "settings:manage", "description": "Tizim sozlamalarini boshqarish"},
     {"code": "comments:moderate", "description": "Nomaqbul sharhlarni o'chirish"},
     {"code": "analytics:view", "description": "Statistika va hisobotlarni ko'rish"}
 ]
@@ -74,13 +82,15 @@ async def seed_data():
 
         superadmin_role = None
         for rc in roles_config:
-            stmt = select(Role).where(Role.name == rc["name"])
+            stmt = select(Role).options(selectinload(Role.permissions)).where(Role.name == rc["name"])
             res = await db.execute(stmt)
             r_obj = res.scalar_one_or_none()
             if not r_obj:
                 r_obj = Role(name=rc["name"], description=rc["description"], permissions=rc["perms"])
                 db.add(r_obj)
                 await db.flush()
+            elif rc["name"] == "superadmin":
+                r_obj.permissions = rc["perms"]
             if rc["name"] == "superadmin":
                 superadmin_role = r_obj
 

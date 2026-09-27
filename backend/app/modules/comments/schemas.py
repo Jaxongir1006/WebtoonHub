@@ -53,3 +53,8 @@ class StaffCommentListResponse(BaseModel):
     total: int
     page: int
     limit: int
+
+
+class CommentStaffUpdateRequest(BaseModel):
+    content: str = Field(..., min_length=1, max_length=500)
+

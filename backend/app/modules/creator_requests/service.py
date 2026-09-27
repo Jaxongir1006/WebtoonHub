@@ -78,8 +78,9 @@ class CreatorRequestService:
         db: AsyncSession,
         request_id: int,
         reviewer_id: int,
-        new_status: str
-    ) -> None:
+        new_status: str,
+        admin_feedback: Optional[str] = None
+    ) -> CreatorRequest:
         stmt = (
             select(CreatorRequest)
             .options(selectinload(CreatorRequest.user))
@@ -93,6 +94,8 @@ class CreatorRequestService:
         req.status = new_status
         req.reviewed_by = reviewer_id
         req.reviewed_at = datetime.now(timezone.utc)
+        if admin_feedback is not None:
+            req.admin_feedback = admin_feedback
 
         # If approved, grant Creator role in staff_users table
         if new_status == "approved" and req.user:
@@ -122,3 +125,5 @@ class CreatorRequestService:
                 staff_user.is_active = True
 
         await db.commit()
+        await db.refresh(req)
+        return req

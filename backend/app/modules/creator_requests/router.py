@@ -71,13 +71,20 @@ async def review_request(
     staff: StaffUser = Depends(require_permission("users:manage")),
     db: AsyncSession = Depends(get_db)
 ):
-    await CreatorRequestService.review_request(db, id, staff.id, data.status)
+    req = await CreatorRequestService.review_request(
+        db=db,
+        request_id=id,
+        reviewer_id=staff.id,
+        new_status=data.status,
+        admin_feedback=data.admin_feedback
+    )
     msg = "Foydalanuvchi muvaffaqiyatli Creator etib tayinlandi!" if data.status == "approved" else "Ariza rad etildi"
     return {
         "success": True,
         "data": {
             "id": id,
-            "status": data.status
+            "status": req.status,
+            "admin_feedback": req.admin_feedback
         },
         "message": msg
     }
