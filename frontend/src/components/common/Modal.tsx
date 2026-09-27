@@ -1,4 +1,5 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 
 interface ModalProps {
@@ -16,23 +17,29 @@ export const Modal: React.FC<ModalProps> = ({
   children,
   maxWidth = 'md'
 }) => {
+  const onCloseRef = useRef(onClose);
   useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) {
-        onClose();
+      if (e.key === 'Escape') {
+        onCloseRef.current();
       }
     };
-    if (isOpen) {
-      document.body.style.overflow = 'hidden';
-      window.addEventListener('keydown', handleKeyDown);
-    } else {
-      document.body.style.overflow = 'unset';
-    }
+
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', handleKeyDown);
+
     return () => {
-      document.body.style.overflow = 'unset';
+      document.body.style.overflow = originalOverflow;
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isOpen, onClose]);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -44,17 +51,17 @@ export const Modal: React.FC<ModalProps> = ({
     '2xl': 'max-w-2xl'
   }[maxWidth];
 
-  return (
+  const modalContent = (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/80 backdrop-blur-sm transition-opacity animate-in fade-in duration-200"
-        onClick={onClose}
+        className="fixed inset-0 bg-black/80 backdrop-blur-sm transition-opacity"
+        onClick={() => onCloseRef.current()}
       />
 
       {/* Dialog */}
       <div
-        className={`relative w-full ${maxWidthClass} bg-studio-900 border border-studio-800 rounded-2xl shadow-2xl p-6 z-10 animate-in zoom-in-95 duration-200 text-studio-100 max-h-[90vh] flex flex-col`}
+        className={`relative w-full ${maxWidthClass} bg-studio-900 border border-studio-800 rounded-2xl shadow-2xl p-6 z-10 text-studio-100 max-h-[90vh] flex flex-col`}
       >
         {/* Header */}
         <div className="flex items-center justify-between pb-4 border-b border-studio-800/80 mb-4 shrink-0">
@@ -62,7 +69,8 @@ export const Modal: React.FC<ModalProps> = ({
             {title}
           </div>
           <button
-            onClick={onClose}
+            type="button"
+            onClick={() => onCloseRef.current()}
             className="p-1.5 text-studio-400 hover:text-white rounded-lg hover:bg-studio-800 transition-colors"
           >
             <X className="w-5 h-5" />
@@ -76,4 +84,6 @@ export const Modal: React.FC<ModalProps> = ({
       </div>
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 };

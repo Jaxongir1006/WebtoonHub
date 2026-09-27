@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Modal } from '../common/Modal';
 import { useAuth } from '../../context/AuthContext';
 import { Zap, Mail, Lock, User as UserIcon, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
@@ -15,18 +15,18 @@ export const AuthModal: React.FC = () => {
 
   const isRegister = authModalTab === 'register';
 
-  const resetForm = () => {
+  const resetForm = useCallback(() => {
     setEmail('');
     setUsername('');
     setPassword('');
     setError(null);
     setSuccessMsg(null);
-  };
+  }, []);
 
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     resetForm();
     closeAuthModal();
-  };
+  }, [closeAuthModal, resetForm]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -162,7 +162,7 @@ export const AuthModal: React.FC = () => {
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="masalan, solo_hunter"
-                className="w-full pl-10 pr-4 py-2.5 bg-studio-800 border border-studio-700 rounded-xl text-white placeholder-studio-500 text-sm focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all"
+                className="w-full pl-10 pr-4 py-2.5 bg-studio-800 border border-studio-700 rounded-xl text-white placeholder-studio-500 text-sm focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-colors"
               />
             </div>
           </div>
@@ -182,7 +182,7 @@ export const AuthModal: React.FC = () => {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="ismingiz@example.uz"
-              className="w-full pl-10 pr-4 py-2.5 bg-studio-800 border border-studio-700 rounded-xl text-white placeholder-studio-500 text-sm focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all"
+              className="w-full pl-10 pr-4 py-2.5 bg-studio-800 border border-studio-700 rounded-xl text-white placeholder-studio-500 text-sm focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-colors"
             />
           </div>
         </div>
@@ -201,7 +201,7 @@ export const AuthModal: React.FC = () => {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
-              className="w-full pl-10 pr-4 py-2.5 bg-studio-800 border border-studio-700 rounded-xl text-white placeholder-studio-500 text-sm focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all"
+              className="w-full pl-10 pr-4 py-2.5 bg-studio-800 border border-studio-700 rounded-xl text-white placeholder-studio-500 text-sm focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-colors"
             />
           </div>
         </div>
