@@ -18,13 +18,30 @@ WebtoonHub/
 │   │   ├── 02_DATABASE_SCHEMA.md
 │   │   ├── 03_API_STANDARDS.md
 │   │   └── modules/
-│   │       ├── auth.md            # Sayt foydalanuvchilari auth va sessiyalari
-│   │       ├── staff_rbac.md      # Admin/Xodimlar auth, rollar va ruxsatlar
-│   │       ├── webtoons.md        # Manhvalar, boblar va MinIO rasmlar
-│   │       ├── rewards.md         # Chaqmoq gamifikatsiyasi va kunlik bonus
-│   │       ├── shop.md            # Do'kon va inventar
-│   │       ├── comments.md        # Sharhlar va ierarxik javoblar
-│   │       └── creator_requests.md# Creatorlik so'rovlari va tasdiqlash
+│   │       ├── auth/
+│   │       │   ├── auth.md        # Modul tavsifi va biznes qoidalari
+│   │       │   └── api/           # register.md, login.md, me.md, sessions.md, ...
+│   │       ├── staff_rbac/
+│   │       │   ├── staff_rbac.md  # Adminlar va RBAC tizimi
+│   │       │   └── api/           # login.md, list_roles.md, create_role.md, ...
+│   │       ├── webtoons/
+│   │       │   ├── webtoons.md    # Manhvalar va boblar
+│   │       │   └── api/           # catalog.md, get_webtoon.md, read_chapter.md, ...
+│   │       ├── rewards/
+│   │       │   ├── rewards.md     # Chaqmoq gamifikatsiyasi
+│   │       │   └── api/           # daily_checkin.md, chapter_reward.md
+│   │       ├── shop/
+│   │       │   ├── shop.md        # Do'kon va inventar
+│   │       │   └── api/           # list_items.md, buy.md, equip.md, ...
+│   │       ├── comments/
+│   │       │   ├── comments.md    # Sharhlar va ierarxik javoblar
+│   │       │   └── api/           # list_comments.md, create_comment.md, ...
+│   │       ├── library/
+│   │       │   ├── library.md     # O'qish statuslari (kutubxona)
+│   │       │   └── api/           # get_library.md, update_bookmark.md, ...
+│   │       └── creator_requests/
+│   │           ├── creator_requests.md # Creatorlik so'rovlari
+│   │           └── api/           # submit_request.md, review_request.md, ...
 │   ├── app/
 │   │   ├── core/                  # Global infratuzilma poydevori
 │   │   │   ├── config.py          # Sozlamalar (Pydantic Settings)
