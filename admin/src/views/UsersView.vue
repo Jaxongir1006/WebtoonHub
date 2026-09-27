@@ -136,6 +136,15 @@
                   >
                     {{ user.is_active ? $t('users.btn_block') : $t('users.btn_unblock') }}
                   </button>
+
+                  <!-- TERMINATE SESSIONS BUTTON -->
+                  <button
+                    class="p-1.5 rounded-lg text-xs transition-colors font-medium text-slate-500 dark:text-studio-400 hover:text-amber-500 dark:hover:text-amber-400 hover:bg-amber-500/10"
+                    title="Barcha seanslarni to'xtatish"
+                    @click="terminateUserSessions(user)"
+                  >
+                    🔒 Seanslar
+                  </button>
                 </div>
               </td>
             </tr>
@@ -244,6 +253,26 @@ async function toggleUserActive(user) {
   } catch {
     user.is_active = !user.is_active
     mockDb.save('users')
+  }
+}
+
+async function terminateUserSessions(user) {
+  if (!confirm(`"${user.username}" foydalanuvchisining barcha qurilmalardagi seanslarini to'xtatmoqchimisiz?`)) {
+    return
+  }
+  try {
+    await usersApi.terminateReaderSessions(user.id)
+    systemStore.addToast({
+      type: 'success',
+      title: 'Seanslar bekor qilindi',
+      message: `${user.username} seanslari muvaffaqiyatli to'xtatildi`
+    })
+  } catch (err) {
+    systemStore.addToast({
+      type: 'error',
+      title: 'Xatolik',
+      message: err.message || 'Seanslarni to\'xtatishda xatolik'
+    })
   }
 }
 </script>

@@ -258,6 +258,21 @@ class StaffService:
         await db.commit()
 
     @staticmethod
+    async def revoke_other_sessions(db: AsyncSession, staff_id: int, current_session_id: str) -> None:
+        curr_uuid = uuid.UUID(str(current_session_id))
+        stmt = (
+            update(StaffSession)
+            .where(
+                StaffSession.staff_id == staff_id,
+                StaffSession.id != curr_uuid,
+                StaffSession.is_active.is_(True)
+            )
+            .values(is_active=False)
+        )
+        await db.execute(stmt)
+        await db.commit()
+
+    @staticmethod
     async def list_staff_users(db: AsyncSession):
         stmt = (
             select(StaffUser)

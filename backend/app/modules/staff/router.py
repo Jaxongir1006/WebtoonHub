@@ -98,6 +98,20 @@ async def revoke_staff_session(
     }
 
 
+@router.delete("/auth/sessions/other", status_code=status.HTTP_200_OK)
+async def revoke_other_staff_sessions(
+    auth_data: Tuple[StaffUser, str] = Depends(get_current_staff_and_session),
+    db: AsyncSession = Depends(get_db)
+):
+    staff, current_session_id = auth_data
+    await StaffService.revoke_other_sessions(db, staff.id, current_session_id)
+    return {
+        "success": True,
+        "data": None,
+        "message": "Boshqa barcha seanslar muvaffaqiyatli yakunlandi"
+    }
+
+
 # 4. Roles Management
 @router.get("/roles", status_code=status.HTTP_200_OK)
 async def list_roles(

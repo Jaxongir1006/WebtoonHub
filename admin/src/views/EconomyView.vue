@@ -15,6 +15,16 @@
       </div>
 
       <div class="flex items-center gap-2.5">
+        <Button
+          variant="primary"
+          size="sm"
+          class="flex items-center gap-1.5 shadow-sm shadow-brand-500/20"
+          @click="showDistributeModal = true"
+        >
+          <span>🎁</span>
+          <span>Ommaviy Chaqmoq Tarqatish</span>
+        </Button>
+
         <div class="px-3.5 py-1.5 rounded-xl bg-slate-100 dark:bg-studio-900 border border-slate-200 dark:border-white/10 text-xs font-mono text-slate-600 dark:text-studio-300 flex items-center gap-2">
           <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
           <span>{{ settings.reset_timezone }} ({{ settings.reset_time }})</span>
@@ -436,6 +446,12 @@
         </table>
       </div>
     </div>
+
+    <!-- Mass Coins Distribution Modal -->
+    <DistributeCoinsModal
+      v-model="showDistributeModal"
+      @distributed="onDistributed"
+    />
   </div>
 </template>
 
@@ -447,13 +463,23 @@ import { mockDb } from '../api/client'
 import { economyApi } from '../api/economy'
 import Badge from '../components/common/Badge.vue'
 import Button from '../components/common/Button.vue'
+import DistributeCoinsModal from '../components/economy/DistributeCoinsModal.vue'
 
 const { t } = useI18n()
 const systemStore = useSystemStore()
 
 const isSaving = ref(false)
+const showDistributeModal = ref(false)
 const settings = computed(() => mockDb.economySettings)
 const transactions = computed(() => mockDb.rewardTransactions)
+
+function onDistributed(data) {
+  systemStore.addToast({
+    type: 'success',
+    title: 'Muvaffaqiyatli tarqatildi',
+    message: `${data.count} ta faol foydalanuvchiga jami ${data.total} ⚡ Chaqmoq ulashildi`
+  })
+}
 
 const form = reactive({
   chapter_read_reward: settings.value.chapter_read_reward,

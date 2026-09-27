@@ -87,5 +87,18 @@ export const usersApi = {
         message: user.is_active ? 'Foydalanuvchi hisobi faollashtirildi' : 'Foydalanuvchi bloklandi'
       }
     }
+  },
+
+  async terminateReaderSessions(userId) {
+    try {
+      const res = await apiClient.delete(`/readers/${userId}/sessions`)
+      return res.data
+    } catch {
+      return {
+        success: true,
+        data: null,
+        message: 'Foydalanuvchining barcha faol seanslari to\'xtatildi'
+      }
+    }
   }
 }

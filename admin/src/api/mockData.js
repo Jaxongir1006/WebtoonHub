@@ -2,12 +2,22 @@
 export const initialPermissions = [
   { id: 1, code: 'webtoons:create', description: 'Yangi manhwa kartochkasi yaratish' },
   { id: 2, code: 'webtoons:edit', description: 'Mavjud manhvalarni tahrirlash' },
-  { id: 3, code: 'chapters:create', description: 'Bob ochish va rasmlarni yuklash' },
-  { id: 4, code: 'chapters:approve', description: 'Bob moderatsiyasidan o\'tkazish' },
-  { id: 5, code: 'shop:manage', description: 'Shop buyumlarini kiritish va tahrirlash' },
-  { id: 6, code: 'users:manage', description: 'Foydalanuvchilar chaqmoq balansi va bloklash' },
-  { id: 7, code: 'roles:manage', description: 'Rollar va xodimlarni boshqarish' },
-  { id: 8, code: 'comments:moderate', description: 'Nomaqbul sharhlarni o\'chirish' }
+  { id: 3, code: 'webtoons:delete', description: 'Manhvalarni tizimdan o\'chirish' },
+  { id: 4, code: 'chapters:create', description: 'Bob ochish va rasmlarni yuklash' },
+  { id: 5, code: 'chapters:edit', description: 'Bob ma\'lumotlarini tahrirlash' },
+  { id: 6, code: 'chapters:delete', description: 'Bobni tizimdan o\'chirish' },
+  { id: 7, code: 'chapters:approve', description: 'Bob moderatsiyasidan o\'tkazish' },
+  { id: 8, code: 'genres:manage', description: 'Janrlarni boshqarish' },
+  { id: 9, code: 'shop:manage', description: 'Shop buyumlarini kiritish va tahrirlash' },
+  { id: 10, code: 'users:manage', description: 'Foydalanuvchilar chaqmoq balansi va bloklash' },
+  { id: 11, code: 'coins:view', description: 'Chaqmoq tranzaksiyalari va statistikasini ko\'rish' },
+  { id: 12, code: 'coins:adjust', description: 'Foydalanuvchi chaqmoq balansini o\'zgartirish' },
+  { id: 13, code: 'coins:distribute', description: 'Ommaviy chaqmoq ulashish' },
+  { id: 14, code: 'roles:manage', description: 'Rollar va ruxsatlarni boshqarish' },
+  { id: 15, code: 'staff:manage', description: 'Xodimlarni boshqarish va rol tayinlash' },
+  { id: 16, code: 'settings:manage', description: 'Tizim sozlamalarini boshqarish' },
+  { id: 17, code: 'comments:moderate', description: 'Nomaqbul sharhlarni o\'chirish' },
+  { id: 18, code: 'analytics:view', description: 'Statistika va hisobotlarni ko\'rish' }
 ]
 
 export const initialRoles = [
@@ -15,29 +25,29 @@ export const initialRoles = [
     id: 1,
     name: 'superadmin',
     description: 'To\'liq boshqaruv huquqiga ega tizim rahbari',
-    permission_ids: [1, 2, 3, 4, 5, 6, 7, 8],
-    permissions_count: 8
+    permission_ids: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18],
+    permissions_count: 18
   },
   {
     id: 2,
     name: 'creator',
     description: 'Komiks yuklovchi tarjimon talaba',
-    permission_ids: [1, 2, 3],
-    permissions_count: 3
+    permission_ids: [1, 2, 4, 5],
+    permissions_count: 4
   },
   {
     id: 3,
     name: 'moderator',
     description: 'Boblar va sharhlarni tekshiruvchi mas\'ul',
-    permission_ids: [4, 8],
-    permissions_count: 2
+    permission_ids: [7, 10, 17],
+    permissions_count: 3
   },
   {
     id: 4,
     name: 'viewer',
     description: 'Faqat statistikani kuzatuvchi mehmon',
-    permission_ids: [],
-    permissions_count: 0
+    permission_ids: [11, 18],
+    permissions_count: 2
   }
 ]
 

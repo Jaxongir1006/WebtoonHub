@@ -16,6 +16,16 @@
 
       <div class="flex items-center gap-3">
         <Button
+          v-if="authStore.hasPermission('genres:manage')"
+          variant="ghost"
+          size="md"
+          class="border border-slate-200 dark:border-white/10"
+          @click="showGenreModal = true"
+        >
+          🏷 Janrlar
+        </Button>
+
+        <Button
           v-if="authStore.hasPermission('chapters:create')"
           variant="secondary"
           size="md"
@@ -266,6 +276,10 @@
       v-model="showChapterUpload"
       @upload-success="onChapterUploaded"
     />
+
+    <GenreManageModal
+      v-model="showGenreModal"
+    />
   </div>
 </template>
 
@@ -279,6 +293,7 @@ import Button from '../components/common/Button.vue'
 import SearchInput from '../components/common/SearchInput.vue'
 import WebtoonFormModal from '../components/webtoons/WebtoonFormModal.vue'
 import ChapterUploadModal from '../components/webtoons/ChapterUploadModal.vue'
+import GenreManageModal from '../components/webtoons/GenreManageModal.vue'
 
 const authStore = useAuthStore()
 const systemStore = useSystemStore()
@@ -290,6 +305,7 @@ const selectedGenre = ref('all')
 
 const showCreateModal = ref(false)
 const showChapterUpload = ref(false)
+const showGenreModal = ref(false)
 const selectedWebtoon = ref(null)
 
 const webtoons = computed(() => mockDb.webtoons)

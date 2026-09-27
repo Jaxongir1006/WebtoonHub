@@ -13,6 +13,61 @@ export const webtoonsApi = {
     }
   },
 
+  async createGenre(data) {
+    try {
+      const res = await apiClient.post('/genres', data)
+      return res.data
+    } catch {
+      const newId = (mockDb.genres[mockDb.genres.length - 1]?.id || 0) + 1
+      const slug = data.slug || data.name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-')
+      const newGenre = {
+        id: newId,
+        name: data.name,
+        slug
+      }
+      mockDb.genres.push(newGenre)
+      mockDb.save('genres')
+      return {
+        success: true,
+        data: newGenre,
+        message: 'Yangi janr muvaffaqiyatli yaratildi'
+      }
+    }
+  },
+
+  async updateGenre(id, data) {
+    try {
+      const res = await apiClient.patch(`/genres/${id}`, data)
+      return res.data
+    } catch {
+      const genre = mockDb.genres.find((g) => g.id === Number(id))
+      if (!genre) throw new Error('Janr topilmadi')
+      if (data.name) genre.name = data.name
+      if (data.slug) genre.slug = data.slug
+      mockDb.save('genres')
+      return {
+        success: true,
+        data: genre,
+        message: 'Janr muvaffaqiyatli yangilandi'
+      }
+    }
+  },
+
+  async deleteGenre(id) {
+    try {
+      const res = await apiClient.delete(`/genres/${id}`)
+      return res.data
+    } catch {
+      mockDb.genres = mockDb.genres.filter((g) => g.id !== Number(id))
+      mockDb.save('genres')
+      return {
+        success: true,
+        data: null,
+        message: 'Janr muvaffaqiyatli o\'chirildi'
+      }
+    }
+  },
+
   async getWebtoons(params = {}) {
     try {
       const res = await apiClient.get('/webtoons', { params })

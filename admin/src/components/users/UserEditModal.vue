@@ -168,6 +168,27 @@
         </div>
       </div>
 
+      <!-- Security / Sessions Termination -->
+      <div class="p-3.5 rounded-2xl bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <span class="text-xs font-bold text-rose-700 dark:text-rose-400 flex items-center gap-1.5">
+            <span>🛡️</span> Xavfsizlik: Seanslarni boshqarish
+          </span>
+          <p class="text-[11px] text-slate-500 dark:text-studio-400 mt-0.5">
+            O'quvchining barcha qurilmalardagi faol seanslarini bekor qilish
+          </p>
+        </div>
+        <Button
+          type="button"
+          variant="danger"
+          size="xs"
+          :loading="isTerminating"
+          @click="terminateSessions"
+        >
+          Seanslarni To'xtatish
+        </Button>
+      </div>
+
       <!-- Actions -->
       <div class="flex items-center justify-end gap-3 pt-3 border-t border-slate-200 dark:border-white/5">
         <Button variant="ghost" size="sm" @click="$emit('update:modelValue', false)">
@@ -185,10 +206,13 @@
 import { reactive, ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { mockDb } from '../../api/client'
+import { usersApi } from '../../api/users'
+import { useSystemStore } from '../../stores/system'
 import Modal from '../common/Modal.vue'
 import Button from '../common/Button.vue'
 
 const { t } = useI18n()
+const systemStore = useSystemStore()
 
 const props = defineProps({
   modelValue: Boolean,
@@ -200,6 +224,7 @@ const props = defineProps({
 
 const emit = defineEmits(['update:modelValue', 'save'])
 const isSubmitting = ref(false)
+const isTerminating = ref(false)
 
 const form = reactive({
   username: '',
@@ -238,6 +263,31 @@ watch(
   },
   { immediate: true }
 )
+
+async function terminateSessions() {
+  if (!props.user?.id) return
+  if (!confirm(`Haqiqatan ham "${props.user.username}" foydalanuvchisining barcha seanslarini to'xtatmoqchimisiz?`)) {
+    return
+  }
+
+  isTerminating.value = true
+  try {
+    await usersApi.terminateReaderSessions(props.user.id)
+    systemStore.addToast({
+      type: 'success',
+      title: 'Seanslar bekor qilindi',
+      message: `${props.user.username} foydalanuvchisining barcha faol seanslari muvaffaqiyatli to'xtatildi`
+    })
+  } catch (err) {
+    systemStore.addToast({
+      type: 'error',
+      title: 'Xatolik',
+      message: err.message || 'Seanslarni to\'xtatishda xatolik yuz berdi'
+    })
+  } finally {
+    isTerminating.value = false
+  }
+}
 
 function handleSubmit() {
   isSubmitting.value = true
