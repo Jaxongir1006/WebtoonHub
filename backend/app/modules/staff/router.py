@@ -403,41 +403,6 @@ async def update_economy_settings(
     }
 
 
-@router.get("/economy/transactions", status_code=status.HTTP_200_OK)
-async def get_economy_transactions(
-    limit: int = Query(20, ge=1, le=100),
-    _staff: StaffUser = Depends(require_permission("users:manage")),
-    db: AsyncSession = Depends(get_db)
-):
-    from app.modules.rewards.models import ReadReward
-    from app.modules.users.models import User
-    stmt = (
-        select(ReadReward, User.username)
-        .join(User, ReadReward.user_id == User.id)
-        .order_by(ReadReward.created_at.desc())
-        .limit(limit)
-    )
-    result = await db.execute(stmt)
-    rows = result.all()
-    items = []
-    for r, username in rows:
-        items.append({
-            "id": r.id,
-            "user_id": r.user_id,
-            "username": username,
-            "type": "chapter_reward",
-            "title": f"Bob #{r.chapter_id} mutolaasi uchun mukofot",
-            "amount": r.coins_earned,
-            "created_at": r.created_at.isoformat() if r.created_at else None
-        })
-    return {
-        "success": True,
-        "data": {
-            "items": items,
-            "total": len(items)
-        }
-    }
-
 
 # 11. System Global Settings
 @router.get("/settings", status_code=status.HTTP_200_OK)

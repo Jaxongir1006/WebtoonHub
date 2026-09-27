@@ -172,6 +172,8 @@ class RewardService:
                     username=t.user.username if t.user else "Noma'lum",
                     amount=t.amount,
                     transaction_type=t.transaction_type,
+                    type=t.transaction_type,
+                    title=t.description or t.transaction_type,
                     description=t.description,
                     created_by_staff_id=t.created_by_staff_id,
                     created_at=t.created_at

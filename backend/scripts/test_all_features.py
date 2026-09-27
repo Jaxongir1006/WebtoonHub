@@ -395,8 +395,71 @@ async def run_tests():
             assert creator_staff_role == "creator"
             print(f"✓ Promoted User1 successfully logged into Staff Panel as role='{creator_staff_role}': OK")
 
-            # 17. Cleanup Chapter & Webtoon
-            print("\n--- 17. Testing Chapter & Webtoon Deletion ---")
+            # 17. Admin Portal Compatibility Verification (8 Key Fixes)
+            print("\n--- 17. Testing Admin Portal Compatibility Endpoints ---")
+            # 17a. GET /staff/webtoons & GET /staff/webtoons/{id}
+            res = await client.get("/staff/webtoons", headers=staff_headers)
+            assert res.status_code == 200, f"Staff webtoons list failed: {res.text}"
+            assert "items" in res.json()["data"]
+            print("✓ GET /staff/webtoons: OK")
+
+            res = await client.get(f"/staff/webtoons/{webtoon_id}", headers=staff_headers)
+            assert res.status_code == 200, f"Staff webtoon detail failed: {res.text}"
+            assert res.json()["data"]["id"] == webtoon_id
+            print(f"✓ GET /staff/webtoons/{webtoon_id}: OK")
+
+            # 17b. GET /staff/chapters & GET /staff/chapters/{id}
+            res = await client.get("/staff/chapters", headers=staff_headers)
+            assert res.status_code == 200, f"Staff chapters list failed: {res.text}"
+            assert "items" in res.json()["data"]
+            print("✓ GET /staff/chapters: OK")
+
+            res = await client.get(f"/staff/chapters/{chapter_id}", headers=staff_headers)
+            assert res.status_code == 200, f"Staff chapter detail failed: {res.text}"
+            assert res.json()["data"]["id"] == chapter_id
+            print(f"✓ GET /staff/chapters/{chapter_id}: OK")
+
+            # 17c. DELETE /staff/comments/{id}
+            res = await client.delete(f"/staff/comments/{mod_comm_id}", headers=staff_headers)
+            assert res.status_code == 200, f"Staff delete comment failed: {res.text}"
+            print(f"✓ DELETE /staff/comments/{mod_comm_id}: OK")
+
+            # 17d. GET /staff/economy/transactions
+            res = await client.get("/staff/economy/transactions?type=all", headers=staff_headers)
+            assert res.status_code == 200, f"Staff economy transactions failed: {res.text}"
+            assert "items" in res.json()["data"]
+            print("✓ GET /staff/economy/transactions (with type=all): OK")
+
+            # 17e. POST /staff/readers/{id}/coins (with amount and amount_delta)
+            res = await client.post(
+                f"/staff/readers/{u2_id}/coins",
+                headers=staff_headers,
+                json={"amount": 25, "reason": "Bonus via amount"}
+            )
+            assert res.status_code == 200, f"Adjust coins with amount failed: {res.text}"
+            print("✓ POST /staff/readers/{id}/coins (amount=25): OK")
+
+            res = await client.post(
+                f"/staff/readers/{u2_id}/coins",
+                headers=staff_headers,
+                json={"amount_delta": -10, "reason": "Penalty via amount_delta"}
+            )
+            assert res.status_code == 200, f"Adjust coins with amount_delta failed: {res.text}"
+            print("✓ POST /staff/readers/{id}/coins (amount_delta=-10): OK")
+
+            # 17f. PATCH /staff/readers/{id}/status
+            res = await client.patch(f"/staff/readers/{u2_id}/status", headers=staff_headers)
+            assert res.status_code == 200, f"Toggle reader status failed: {res.text}"
+            assert res.json()["data"]["is_active"] is False
+            print("✓ PATCH /staff/readers/{id}/status (deactivated): OK")
+
+            res = await client.patch(f"/staff/readers/{u2_id}/status", headers=staff_headers)
+            assert res.status_code == 200, f"Toggle reader status re-enable failed: {res.text}"
+            assert res.json()["data"]["is_active"] is True
+            print("✓ PATCH /staff/readers/{id}/status (re-activated): OK")
+
+            # 18. Cleanup Chapter & Webtoon
+            print("\n--- 18. Testing Chapter & Webtoon Deletion ---")
             res = await client.delete(f"/staff/chapters/{chapter_id}", headers=staff_headers)
             assert res.status_code == 200, f"Delete chapter failed: {res.text}"
             print("✓ Staff deleted chapter: OK")
@@ -406,7 +469,7 @@ async def run_tests():
             print("✓ Staff deleted webtoon: OK")
 
             print("\n===========================================================")
-            print("ALL 17 COMPREHENSIVE END-TO-END INTEGRATION TESTS PASSED! 🚀")
+            print("ALL 18 COMPREHENSIVE END-TO-END INTEGRATION TESTS PASSED! 🚀")
             print("===========================================================")
 
 

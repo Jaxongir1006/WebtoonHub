@@ -17,12 +17,16 @@ Ushbu modul manhvalar katalogi, janrlar bo‘yicha filtrlash, jonli qidiruv, uzl
 * [GET /api/v1/webtoons](file:///home/jahongir/KIUT/PBL/WebtoonHub/backend/docs/modules/webtoons/api/catalog.md) — Manhvalar katalogi va qidiruv (filtrlar bilan)
 * [GET /api/v1/webtoons/{id_or_slug}](file:///home/jahongir/KIUT/PBL/WebtoonHub/backend/docs/modules/webtoons/api/get_webtoon.md) — Manhvaning to‘liq kartochkasi va boblar ro‘yxati
 * [GET /api/v1/chapters/{id}](file:///home/jahongir/KIUT/PBL/WebtoonHub/backend/docs/modules/webtoons/api/read_chapter.md) — Vertikal Webtoon Reader (bob rasmlari)
+* [GET /api/v1/staff/webtoons](file:///home/jahongir/KIUT/PBL/WebtoonHub/backend/docs/modules/webtoons/api/list_staff_webtoons.md) — Manhvalar ro'yxatini olish (Admin)
+* [GET /api/v1/staff/webtoons/{id_or_slug}](file:///home/jahongir/KIUT/PBL/WebtoonHub/backend/docs/modules/webtoons/api/get_staff_webtoon.md) — Manhva tafsilotlarini olish (Admin)
 * [POST /api/v1/staff/webtoons](file:///home/jahongir/KIUT/PBL/WebtoonHub/backend/docs/modules/webtoons/api/create_webtoon.md) — Yangi manhva yaratish (muqova yuklash)
 * [PATCH /api/v1/staff/webtoons/{id}](file:///home/jahongir/KIUT/PBL/WebtoonHub/backend/docs/modules/webtoons/api/update_webtoon.md) — Manhvani tahrirlash
 * [DELETE /api/v1/staff/webtoons/{id}](file:///home/jahongir/KIUT/PBL/WebtoonHub/backend/docs/modules/webtoons/api/delete_webtoon.md) — Manhvani o'chirish
 * [POST /api/v1/staff/genres](file:///home/jahongir/KIUT/PBL/WebtoonHub/backend/docs/modules/webtoons/api/create_genre.md) — Yangi janr yaratish
 * [PATCH /api/v1/staff/genres/{id}](file:///home/jahongir/KIUT/PBL/WebtoonHub/backend/docs/modules/webtoons/api/update_genre.md) — Janrni tahrirlash
 * [DELETE /api/v1/staff/genres/{id}](file:///home/jahongir/KIUT/PBL/WebtoonHub/backend/docs/modules/webtoons/api/delete_genre.md) — Janrni o'chirish
+* [GET /api/v1/staff/chapters](file:///home/jahongir/KIUT/PBL/WebtoonHub/backend/docs/modules/webtoons/api/list_staff_all_chapters.md) — Barcha boblarni moderatsiya navbatida ko'rish (Admin)
+* [GET /api/v1/staff/chapters/{id}](file:///home/jahongir/KIUT/PBL/WebtoonHub/backend/docs/modules/webtoons/api/get_staff_chapter.md) — Bob tafsilotlari va rasmlari (Admin)
 * [POST /api/v1/staff/chapters](file:///home/jahongir/KIUT/PBL/WebtoonHub/backend/docs/modules/webtoons/api/upload_chapter.md) — Bob yaratish va rasmlarni MinIO ga yuklash (`pending`)
 * [GET /api/v1/staff/chapters/pending](file:///home/jahongir/KIUT/PBL/WebtoonHub/backend/docs/modules/webtoons/api/list_pending_chapters.md) — Moderatorlar uchun kutilayotgan boblar ro'yxati
 * [GET /api/v1/staff/webtoons/{id}/chapters](file:///home/jahongir/KIUT/PBL/WebtoonHub/backend/docs/modules/webtoons/api/list_webtoon_chapters.md) — Manhvaning barcha boblarini ko'rish (Admin)

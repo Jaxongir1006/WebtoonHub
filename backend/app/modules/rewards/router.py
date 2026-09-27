@@ -11,7 +11,7 @@ from app.modules.rewards.schemas import (
     DistributeCoinsRequest
 )
 from app.modules.rewards.service import RewardService
-from app.modules.staff.dependencies import require_permission
+from app.modules.staff.dependencies import require_any_permission, require_permission
 from app.modules.staff.models import StaffUser
 from app.modules.users.models import User
 
@@ -100,15 +100,19 @@ async def adjust_reader_coins(
 async def list_economy_transactions_alias(
     user_id: Optional[int] = Query(None, description="Foydalanuvchi ID"),
     transaction_type: Optional[str] = Query(None, description="Tranzaksiya turi"),
+    type: Optional[str] = Query(None, description="Tranzaksiya turi (alias)"),
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100),
-    _staff: StaffUser = Depends(require_permission("coins:view")),
+    _staff: StaffUser = Depends(require_any_permission("coins:view", "users:manage")),
     db: AsyncSession = Depends(get_db)
 ):
+    actual_type = transaction_type or type
+    if actual_type == "all":
+        actual_type = None
     result = await RewardService.list_transactions(
         db=db,
         user_id=user_id,
-        transaction_type=transaction_type,
+        transaction_type=actual_type,
         page=page,
         limit=limit
     )

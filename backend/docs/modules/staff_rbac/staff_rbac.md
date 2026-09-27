@@ -28,6 +28,7 @@ Ushbu modul Admin / Studio boshqaruv paneliga kiruvchi xodimlarning hisoblari (`
 * [PATCH /api/v1/staff/users/{id}/role](file:///home/jahongir/KIUT/PBL/WebtoonHub/backend/docs/modules/staff_rbac/api/update_staff_role.md) — Xodimning rolini o‘zgartirish
 * [GET /api/v1/staff/readers](file:///home/jahongir/KIUT/PBL/WebtoonHub/backend/docs/modules/staff_rbac/api/list_readers.md) — O'quvchilar ro'yxati va qidiruv
 * [PATCH /api/v1/staff/readers/{id}](file:///home/jahongir/KIUT/PBL/WebtoonHub/backend/docs/modules/staff_rbac/api/update_reader.md) — O'quvchi hisobini boshqarish va balansini to'g'irlash
+* [PATCH /api/v1/staff/readers/{id}/status](file:///home/jahongir/KIUT/PBL/WebtoonHub/backend/docs/modules/staff_rbac/api/toggle_reader_status.md) — O'quvchini bloklash / faollashtirish (Quick toggle)
 * [DELETE /api/v1/staff/readers/{id}/sessions](file:///home/jahongir/KIUT/PBL/WebtoonHub/backend/docs/modules/staff_rbac/api/terminate_reader_sessions.md) — O'quvchi seanslarini majburiy yopish
 * [GET /api/v1/staff/settings](file:///home/jahongir/KIUT/PBL/WebtoonHub/backend/docs/modules/staff_rbac/api/get_settings.md) — Tizim iqtisodiy va platforma sozlamalari
 * [PATCH /api/v1/staff/settings](file:///home/jahongir/KIUT/PBL/WebtoonHub/backend/docs/modules/staff_rbac/api/update_settings.md) — Tizim parametrlarini o'zgartirish

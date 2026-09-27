@@ -21,9 +21,12 @@ class CoinTransactionItem(BaseModel):
     username: str
     amount: int
     transaction_type: str
+    type: Optional[str] = None
+    title: Optional[str] = None
     description: Optional[str] = None
     created_by_staff_id: Optional[int] = None
     created_at: datetime
+
 
 
 class CoinTransactionListResponse(BaseModel):

@@ -15,23 +15,26 @@ minio_client = Minio(
 
 def ensure_bucket_exists(bucket_name: str, public: bool = True) -> None:
     """Ensure bucket exists and optionally make it publicly readable for images"""
-    if not minio_client.bucket_exists(bucket_name):
-        minio_client.make_bucket(bucket_name)
+    try:
+        if not minio_client.bucket_exists(bucket_name):
+            minio_client.make_bucket(bucket_name)
 
-    if public:
-        # Set public read policy so browser can display images without pre-signed URLs
-        policy = {
-            "Version": "2012-10-17",
-            "Statement": [
-                {
-                    "Effect": "Allow",
-                    "Principal": {"AWS": ["*"]},
-                    "Action": ["s3:GetObject"],
-                    "Resource": [f"arn:aws:s3:::{bucket_name}/*"]
-                }
-            ]
-        }
-        minio_client.set_bucket_policy(bucket_name, json.dumps(policy))
+        if public:
+            # Set public read policy so browser can display images without pre-signed URLs
+            policy = {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Principal": {"AWS": ["*"]},
+                        "Action": ["s3:GetObject"],
+                        "Resource": [f"arn:aws:s3:::{bucket_name}/*"]
+                    }
+                ]
+            }
+            minio_client.set_bucket_policy(bucket_name, json.dumps(policy))
+    except Exception as e:
+        print(f"[Storage Warning] Could not ensure bucket '{bucket_name}': {e}")
 
 
 def init_storage() -> None:
@@ -76,4 +79,7 @@ class StorageService:
     @staticmethod
     def delete_file(bucket_name: str, object_name: str) -> None:
         """Delete an object from MinIO"""
-        minio_client.remove_object(bucket_name, object_name)
+        try:
+            minio_client.remove_object(bucket_name, object_name)
+        except Exception as e:
+            print(f"[Storage Warning] Could not delete '{object_name}' from '{bucket_name}': {e}")

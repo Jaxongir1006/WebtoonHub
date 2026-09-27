@@ -94,3 +94,23 @@ def require_permission(permission_code: str) -> Callable:
         return staff
 
     return permission_checker
+
+
+def require_any_permission(*permission_codes: str) -> Callable:
+    async def permission_checker(
+        staff: StaffUser = Depends(get_current_staff)
+    ) -> StaffUser:
+        if staff.role.name == "superadmin":
+            return staff
+
+        staff_permissions = [p.code for p in staff.role.permissions]
+        if not any(code in staff_permissions for code in permission_codes):
+            codes_str = ", ".join(permission_codes)
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Sizda ushbu amalni bajarish uchun ruxsat mavjud emas ({codes_str})"
+            )
+        return staff
+
+    return permission_checker
+
