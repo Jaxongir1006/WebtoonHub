@@ -59,6 +59,17 @@ class AuthService:
             is_active=True
         )
         db.add(new_user)
+        await db.flush()
+
+        from app.modules.rewards.service import RewardService
+        await RewardService.record_transaction(
+            db=db,
+            user_id=new_user.id,
+            amount=settings.INITIAL_COINS,
+            transaction_type="register_bonus",
+            description="Ro'yxatdan o'tish sovg'asi"
+        )
+
         await db.commit()
         await db.refresh(new_user)
 

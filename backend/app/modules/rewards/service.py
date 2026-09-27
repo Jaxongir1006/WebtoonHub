@@ -34,6 +34,15 @@ class RewardService:
 
         user.lightning_coins += settings.DAILY_LOGIN_COINS
         user.last_daily_login = now_utc
+
+        await RewardService.record_transaction(
+            db=db,
+            user_id=user.id,
+            amount=settings.DAILY_LOGIN_COINS,
+            transaction_type="daily_checkin",
+            description="Kunlik kirish bonusi"
+        )
+
         await db.commit()
         await db.refresh(user)
 

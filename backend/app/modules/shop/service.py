@@ -84,6 +84,16 @@ class ShopService:
             is_active=False
         )
         db.add(new_inv)
+
+        from app.modules.rewards.service import RewardService
+        await RewardService.record_transaction(
+            db=db,
+            user_id=user.id,
+            amount=-item.price_coins,
+            transaction_type="shop_purchase",
+            description=f"'{item.name}' buyumini xarid qilish"
+        )
+
         await db.commit()
         await db.refresh(user)
 
