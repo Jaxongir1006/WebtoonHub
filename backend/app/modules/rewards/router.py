@@ -85,13 +85,36 @@ async def adjust_reader_coins(
         db=db,
         staff_id=staff.id,
         user_id=id,
-        amount_delta=data.amount_delta,
+        amount_delta=data.get_delta(),
         reason=data.reason
     )
     return {
         "success": True,
         "data": result,
         "message": "Foydalanuvchi chaqmoq balansi muvaffaqiyatli o'zgartirildi"
+    }
+
+
+# 4b. Economy Transactions Alias for Admin Panel
+@staff_router.get("/economy/transactions", status_code=status.HTTP_200_OK)
+async def list_economy_transactions_alias(
+    user_id: Optional[int] = Query(None, description="Foydalanuvchi ID"),
+    transaction_type: Optional[str] = Query(None, description="Tranzaksiya turi"),
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+    _staff: StaffUser = Depends(require_permission("coins:view")),
+    db: AsyncSession = Depends(get_db)
+):
+    result = await RewardService.list_transactions(
+        db=db,
+        user_id=user_id,
+        transaction_type=transaction_type,
+        page=page,
+        limit=limit
+    )
+    return {
+        "success": True,
+        "data": result
     }
 
 

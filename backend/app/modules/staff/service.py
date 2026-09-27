@@ -550,3 +550,16 @@ class StaffService:
         await db.execute(term_stmt)
         await db.commit()
 
+    @staticmethod
+    async def toggle_reader_status(db: AsyncSession, user_id: int):
+        from app.modules.users.models import User
+        stmt = select(User).where(User.id == user_id)
+        res = await db.execute(stmt)
+        user = res.scalar_one_or_none()
+        if not user:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Foydalanuvchi topilmadi")
+        user.is_active = not user.is_active
+        await db.commit()
+        await db.refresh(user)
+        return user
+

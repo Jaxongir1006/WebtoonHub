@@ -52,7 +52,11 @@ export const usersApi = {
 
   async adjustCoins(userId, amount, reason = 'Admin balansi tuzatishi') {
     try {
-      const res = await apiClient.post(`/readers/${userId}/coins`, { amount, reason })
+      const res = await apiClient.post(`/readers/${userId}/coins`, {
+        amount: Number(amount),
+        amount_delta: Number(amount),
+        reason
+      })
       return res.data
     } catch {
       const user = mockDb.users.find((u) => u.id === Number(userId))

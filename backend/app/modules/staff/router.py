@@ -321,6 +321,24 @@ async def terminate_reader_sessions(
     }
 
 
+@router.patch("/readers/{id}/status", status_code=status.HTTP_200_OK)
+async def toggle_reader_status(
+    id: int,
+    _staff: StaffUser = Depends(require_permission("users:manage")),
+    db: AsyncSession = Depends(get_db)
+):
+    user = await StaffService.toggle_reader_status(db, id)
+    return {
+        "success": True,
+        "data": {
+            "id": user.id,
+            "username": user.username,
+            "is_active": user.is_active
+        },
+        "message": f"Foydalanuvchi hisobi {'faollashtirildi' if user.is_active else 'bloklandi'}"
+    }
+
+
 # 9. Dashboard Analytics
 @router.get("/analytics/dashboard", status_code=status.HTTP_200_OK)
 async def get_dashboard_analytics(

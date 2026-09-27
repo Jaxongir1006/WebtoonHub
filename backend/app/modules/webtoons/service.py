@@ -621,3 +621,37 @@ class WebtoonService:
             await CacheService.delete(f"webtoons:{webtoon_slug}")
         await CacheService.delete_pattern("webtoons:catalog:*")
 
+    @staticmethod
+    async def list_all_chapters_staff(
+        db: AsyncSession,
+        status_filter: Optional[str] = None,
+        page: int = 1,
+        limit: int = 50
+    ):
+        query = select(Chapter).options(
+            selectinload(Chapter.webtoon),
+            selectinload(Chapter.images)
+        )
+        if status_filter and status_filter != "all":
+            query = query.where(Chapter.status == status_filter)
+        query = query.order_by(Chapter.created_at.desc()).offset((page - 1) * limit).limit(limit)
+
+        res = await db.execute(query)
+        chapters = res.scalars().all()
+
+        return [
+            {
+                "id": c.id,
+                "webtoon_id": c.webtoon_id,
+                "webtoon_title": c.webtoon.title if c.webtoon else "Noma'lum",
+                "webtoon_cover": c.webtoon.cover_image_url if c.webtoon else None,
+                "chapter_number": float(c.chapter_number),
+                "title": c.title,
+                "status": c.status,
+                "images_count": len(c.images),
+                "reward_coins": c.reward_coins,
+                "created_at": c.created_at.isoformat() if c.created_at else None
+            }
+            for c in chapters
+        ]
+

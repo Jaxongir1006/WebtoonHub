@@ -195,3 +195,23 @@ async def update_staff_comment(
         "message": "Sharh muvaffaqiyatli tahrirlandi"
     }
 
+
+@router.delete("/staff/comments/{id}", status_code=status.HTTP_200_OK)
+async def delete_staff_comment(
+    id: int,
+    staff: StaffUser = Depends(require_permission("comments:moderate")),
+    db: AsyncSession = Depends(get_db)
+):
+    await CommentsService.delete_comment(
+        db=db,
+        comment_id=id,
+        actor_role="staff",
+        actor_id=staff.id,
+        permissions=["comments:moderate"]
+    )
+    return {
+        "success": True,
+        "data": None,
+        "message": "Sharh muvaffaqiyatli o'chirildi"
+    }
+

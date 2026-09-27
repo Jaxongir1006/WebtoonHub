@@ -34,8 +34,16 @@ class CoinTransactionListResponse(BaseModel):
 
 
 class AdjustUserCoinsRequest(BaseModel):
-    amount_delta: int = Field(..., description="Qo'shiladigan yoki ayriladigan miqdor")
+    amount_delta: Optional[int] = Field(None, description="Qo'shiladigan yoki ayriladigan miqdor")
+    amount: Optional[int] = Field(None, description="Alternativ miqdor nomi")
     reason: str = Field(..., min_length=2, max_length=255, description="Sabab")
+
+    def get_delta(self) -> int:
+        if self.amount_delta is not None:
+            return self.amount_delta
+        if self.amount is not None:
+            return self.amount
+        return 0
 
 
 class AdjustUserCoinsResponse(BaseModel):

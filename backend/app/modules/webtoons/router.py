@@ -138,6 +138,42 @@ async def create_webtoon(
     }
 
 
+# 5b. Staff Webtoons Listing & Detail
+@staff_router.get("/webtoons", status_code=status.HTTP_200_OK)
+async def list_staff_webtoons(
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+    genre: Optional[str] = None,
+    status: Optional[str] = Query(None, pattern=r"^(ongoing|completed)$"),
+    search: Optional[str] = None,
+    db: AsyncSession = Depends(get_db)
+):
+    catalog = await WebtoonService.list_catalog(
+        db=db,
+        page=page,
+        limit=limit,
+        genre_slug=genre,
+        status_filter=status,
+        search_query=search
+    )
+    return {
+        "success": True,
+        "data": catalog
+    }
+
+
+@staff_router.get("/webtoons/{id_or_slug}", status_code=status.HTTP_200_OK)
+async def get_staff_webtoon(
+    id_or_slug: str,
+    db: AsyncSession = Depends(get_db)
+):
+    detail = await WebtoonService.get_webtoon_detail(db, id_or_slug, None)
+    return {
+        "success": True,
+        "data": detail
+    }
+
+
 # 6. Upload Chapter (Creator / Admin)
 @staff_router.post("/chapters", status_code=status.HTTP_201_CREATED)
 async def upload_chapter(
@@ -200,6 +236,38 @@ async def list_pending_chapters(
     return {
         "success": True,
         "data": chapters
+    }
+
+
+# 8b. List All Chapters & Read Chapter (Admin / Moderator)
+@staff_router.get("/chapters", status_code=status.HTTP_200_OK)
+async def list_staff_chapters(
+    status: Optional[str] = Query(None, description="Bob statusi filtri"),
+    page: int = Query(1, ge=1),
+    limit: int = Query(50, ge=1, le=100),
+    _staff: StaffUser = Depends(require_permission("chapters:approve")),
+    db: AsyncSession = Depends(get_db)
+):
+    chapters = await WebtoonService.list_all_chapters_staff(db, status_filter=status, page=page, limit=limit)
+    return {
+        "success": True,
+        "data": {
+            "items": chapters,
+            "total": len(chapters)
+        }
+    }
+
+
+@staff_router.get("/chapters/{id}", status_code=status.HTTP_200_OK)
+async def read_staff_chapter(
+    id: int,
+    _staff: StaffUser = Depends(require_permission("chapters:approve")),
+    db: AsyncSession = Depends(get_db)
+):
+    chapter_data = await WebtoonService.read_chapter(db, id, None)
+    return {
+        "success": True,
+        "data": chapter_data
     }
 
 
