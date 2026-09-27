@@ -12,6 +12,7 @@ class CreatorRequest(Base):
     status = Column(String(20), default="pending", nullable=False, index=True) # pending, approved, rejected
     reviewed_by = Column(Integer, ForeignKey("staff_users.id"), nullable=True)
     reviewed_at = Column(DateTime(timezone=True), nullable=True)
+    admin_feedback = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     user = relationship("User", back_populates="creator_request")

@@ -182,6 +182,11 @@ const IconDevices = () =>
     h('path', { strokeLinecap: 'round', strokeLinejoin: 'round', strokeWidth: '2', d: 'M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z' })
   ])
 
+const IconLightning = () =>
+  h('svg', { fill: 'none', viewBox: '0 0 24 24', stroke: 'currentColor' }, [
+    h('path', { strokeLinecap: 'round', strokeLinejoin: 'round', strokeWidth: '2', d: 'M13 10V3L4 14h7v7l9-11h-7z' })
+  ])
+
 const navSections = [
   {
     titleKey: 'nav.general',
@@ -215,6 +220,7 @@ const navSections = [
         badge: () => mockDb.creatorRequests.filter((r) => r.status === 'pending').length
       },
       { titleKey: 'nav.users', path: '/users', icon: IconUsers, permission: 'users:manage' },
+      { titleKey: 'nav.economy', path: '/economy', icon: IconLightning, permission: 'users:manage' },
       { titleKey: 'nav.comments', path: '/comments', icon: IconChat, permission: 'comments:moderate' },
       { titleKey: 'nav.sessions', path: '/sessions', icon: IconDevices }
     ]

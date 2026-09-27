@@ -112,7 +112,9 @@
               <p class="text-xs text-slate-500 dark:text-studio-400 mt-1 flex items-center gap-3 flex-wrap">
                 <span>🖼 {{ ch.images?.length || 0 }} ta rasm</span>
                 <span>•</span>
-                <span>⚡ {{ ch.reward_coins || 5 }} Chaqmoq mukofoti</span>
+                <span class="px-2 py-0.5 rounded-lg bg-brand-500/15 text-brand-600 dark:text-brand-400 font-mono font-bold text-[11px] border border-brand-500/30">
+                  ⚡ +{{ ch.reward_coins || 5 }} Chaqmoq
+                </span>
                 <span>•</span>
                 <span class="font-mono">{{ formatDate(ch.created_at) }}</span>
               </p>

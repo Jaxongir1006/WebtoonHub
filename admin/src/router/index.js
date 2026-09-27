@@ -12,6 +12,7 @@ import ShopView from '../views/ShopView.vue'
 import RbacView from '../views/RbacView.vue'
 import CreatorRequestsView from '../views/CreatorRequestsView.vue'
 import UsersView from '../views/UsersView.vue'
+import EconomyView from '../views/EconomyView.vue'
 import CommentsView from '../views/CommentsView.vue'
 import SessionsView from '../views/SessionsView.vue'
 
@@ -75,6 +76,12 @@ const routes = [
         name: 'users',
         component: UsersView,
         meta: { title: 'O\'quvchilar & Chaqmoq', permission: 'users:manage' }
+      },
+      {
+        path: 'economy',
+        name: 'economy',
+        component: EconomyView,
+        meta: { title: '⚡ Chaqmoq Iqtisodiyoti', permission: 'users:manage' }
       },
       {
         path: 'comments',

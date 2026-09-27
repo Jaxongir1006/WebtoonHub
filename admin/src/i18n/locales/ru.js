@@ -41,6 +41,7 @@ export default {
     rbac: 'Динамический RBAC',
     creator_requests: 'Заявки Создателей',
     users: 'Читатели & Молнии',
+    economy: '⚡ Настройки Молний',
     comments: 'Комментарии',
     sessions: 'Активные Сессии',
     current_role: 'Текущая роль'
@@ -231,6 +232,28 @@ export default {
     amount_label: 'Количество Молний *',
     reason_label: 'Причина / Комментарий *',
     projected_balance: 'Ожидаемый баланс:'
+  },
+  economy: {
+    title: '⚡ Экономика Молний & Настройка Наград',
+    subtitle: 'Управление количеством начисляемых Молний (⚡) за чтение, вход, регистрацию и загрузку',
+    kpi_chapter_reward: 'За чтение главы',
+    kpi_daily_checkin: 'Ежедневный вход',
+    kpi_welcome_bonus: 'Бонус за регистрацию',
+    kpi_creator_reward: 'Создателю за главу',
+    kpi_comment_reward: 'За комментарий',
+    kpi_daily_cap: 'Дневной лимит',
+    btn_save: 'Сохранить Настройки',
+    btn_reset: 'Сбросить по умолчанию',
+    sim_title: 'Симулятор Экономики & Калькулятор',
+    sim_active_readers: 'Активных читателей в день',
+    sim_avg_chapters: 'Глав в день на читателя',
+    sim_daily_emission: 'Дневная эмиссия Молний',
+    sim_monthly_emission: 'Месячная эмиссия',
+    tx_title: 'Журнал Начисленных Наград',
+    th_user: 'Читатель',
+    th_type: 'Тип Награды',
+    th_amount: 'Количество',
+    th_date: 'Время'
   },
   comments: {
     title: 'Модерация Комментариев',

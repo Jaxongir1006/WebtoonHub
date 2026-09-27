@@ -64,3 +64,12 @@ class StaffSession(Base):
     expires_at = Column(DateTime(timezone=True), nullable=False)
 
     staff = relationship("StaffUser", back_populates="sessions")
+
+
+class SystemSetting(Base):
+    __tablename__ = "system_settings"
+
+    key = Column(String(50), primary_key=True, index=True)
+    value = Column(String(255), nullable=False)
+    description = Column(String(255), nullable=True)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)

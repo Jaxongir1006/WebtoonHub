@@ -41,6 +41,7 @@ export default {
     rbac: 'Dinamik RBAC',
     creator_requests: 'Creator Arizalari',
     users: 'O\'quvchilar & Chaqmoq',
+    economy: '⚡ Chaqmoq Sozlamalari',
     comments: 'Sharhlar',
     sessions: 'Faol Seanslar',
     current_role: 'Joriy rol'
@@ -231,6 +232,28 @@ export default {
     amount_label: 'Chaqmoq Miqdori *',
     reason_label: 'Sabab / Izoh *',
     projected_balance: 'Yangilangan kutilayotgan balans:'
+  },
+  economy: {
+    title: '⚡ Chaqmoq Iqtisodiyoti & Mukofotlar Sozlamalari',
+    subtitle: 'O\'quvchilar va creatorlarga beriladigan barcha turdagi chaqmoqlar miqdorini belgilash, limitlar va emissiya nazorati',
+    kpi_chapter_reward: 'Bob o\'qish mukofoti',
+    kpi_daily_checkin: 'Kunlik kirish streak',
+    kpi_welcome_bonus: 'Xush kelibsiz bonusi',
+    kpi_creator_reward: 'Creator bob yuklaganda',
+    kpi_comment_reward: 'Sharh qoldirganda',
+    kpi_daily_cap: 'Kunlik maksimal limit',
+    btn_save: 'Sozlamalarni Saqlash',
+    btn_reset: 'Standart holatga qaytarish',
+    sim_title: 'Iqtisodiyot Simulyatori & Kalkulyator',
+    sim_active_readers: 'Kunlik faol o\'quvchilar soni',
+    sim_avg_chapters: 'Bir kunda o\'qiladigan boblar (o\'rtacha)',
+    sim_daily_emission: 'Kunlik umumiy Chaqmoq emissiyasi',
+    sim_monthly_emission: 'Oylik kutilayotgan emissiya',
+    tx_title: 'So\'nggi Berilgan Mukofotlar Jurnali',
+    th_user: 'O\'quvchi',
+    th_type: 'Mukofot Turi',
+    th_amount: 'Miqdori',
+    th_date: 'Vaqti'
   },
   comments: {
     title: 'Sharhlar Moderatsiyasi',

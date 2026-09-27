@@ -20,6 +20,12 @@ Ushbu modul manhvalar katalogi, janrlar bo‘yicha filtrlash, jonli qidiruv, uzl
 * [POST /api/v1/staff/webtoons](file:///home/jahongir/KIUT/PBL/WebtoonHub/backend/docs/modules/webtoons/api/create_webtoon.md) — Yangi manhva yaratish (muqova yuklash)
 * [PATCH /api/v1/staff/webtoons/{id}](file:///home/jahongir/KIUT/PBL/WebtoonHub/backend/docs/modules/webtoons/api/update_webtoon.md) — Manhvani tahrirlash
 * [DELETE /api/v1/staff/webtoons/{id}](file:///home/jahongir/KIUT/PBL/WebtoonHub/backend/docs/modules/webtoons/api/delete_webtoon.md) — Manhvani o'chirish
+* [POST /api/v1/staff/genres](file:///home/jahongir/KIUT/PBL/WebtoonHub/backend/docs/modules/webtoons/api/create_genre.md) — Yangi janr yaratish
+* [PATCH /api/v1/staff/genres/{id}](file:///home/jahongir/KIUT/PBL/WebtoonHub/backend/docs/modules/webtoons/api/update_genre.md) — Janrni tahrirlash
+* [DELETE /api/v1/staff/genres/{id}](file:///home/jahongir/KIUT/PBL/WebtoonHub/backend/docs/modules/webtoons/api/delete_genre.md) — Janrni o'chirish
 * [POST /api/v1/staff/chapters](file:///home/jahongir/KIUT/PBL/WebtoonHub/backend/docs/modules/webtoons/api/upload_chapter.md) — Bob yaratish va rasmlarni MinIO ga yuklash (`pending`)
 * [GET /api/v1/staff/chapters/pending](file:///home/jahongir/KIUT/PBL/WebtoonHub/backend/docs/modules/webtoons/api/list_pending_chapters.md) — Moderatorlar uchun kutilayotgan boblar ro'yxati
+* [GET /api/v1/staff/webtoons/{id}/chapters](file:///home/jahongir/KIUT/PBL/WebtoonHub/backend/docs/modules/webtoons/api/list_webtoon_chapters.md) — Manhvaning barcha boblarini ko'rish (Admin)
+* [PATCH /api/v1/staff/chapters/{id}](file:///home/jahongir/KIUT/PBL/WebtoonHub/backend/docs/modules/webtoons/api/update_chapter.md) — Bob ma'lumotlarini tahrirlash
+* [DELETE /api/v1/staff/chapters/{id}](file:///home/jahongir/KIUT/PBL/WebtoonHub/backend/docs/modules/webtoons/api/delete_chapter.md) — Bobni o'chirish
 * [PATCH /api/v1/staff/chapters/{id}/status](file:///home/jahongir/KIUT/PBL/WebtoonHub/backend/docs/modules/webtoons/api/moderate_chapter.md) — Bobni moderatsiyadan o‘tkazish (`published` / `rejected`)

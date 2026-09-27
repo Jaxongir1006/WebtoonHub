@@ -41,6 +41,7 @@ export default {
     rbac: 'Dynamic RBAC',
     creator_requests: 'Creator Applications',
     users: 'Readers & Lightning',
+    economy: '⚡ Lightning Economy',
     comments: 'Comments',
     sessions: 'Active Sessions',
     current_role: 'Current role'
@@ -231,6 +232,28 @@ export default {
     amount_label: 'Lightning Amount *',
     reason_label: 'Reason / Note *',
     projected_balance: 'Projected new balance:'
+  },
+  economy: {
+    title: '⚡ Lightning Economy & Reward Rates',
+    subtitle: 'Configure lightning coin distribution rates for chapter reads, daily check-ins, registration and uploads',
+    kpi_chapter_reward: 'Per chapter read',
+    kpi_daily_checkin: 'Daily check-in',
+    kpi_welcome_bonus: 'Welcome bonus',
+    kpi_creator_reward: 'Creator upload reward',
+    kpi_comment_reward: 'Comment reward',
+    kpi_daily_cap: 'Daily earnings cap',
+    btn_save: 'Save Settings',
+    btn_reset: 'Reset to Defaults',
+    sim_title: 'Economy Simulator & Projection',
+    sim_active_readers: 'Daily active readers',
+    sim_avg_chapters: 'Avg chapters read per reader',
+    sim_daily_emission: 'Daily lightning distribution',
+    sim_monthly_emission: 'Monthly projected distribution',
+    tx_title: 'Recent Reward Transactions',
+    th_user: 'Reader',
+    th_type: 'Reward Type',
+    th_amount: 'Amount',
+    th_date: 'Time'
   },
   comments: {
     title: 'Comments Moderation',

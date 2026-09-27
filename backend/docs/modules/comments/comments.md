@@ -18,3 +18,4 @@ Ushbu modul har bir bob ostida o‘quvchilar tomonidan sharh qoldirish, sharhlar
 * [POST /api/v1/chapters/{id}/comments](file:///home/jahongir/KIUT/PBL/WebtoonHub/backend/docs/modules/comments/api/create_comment.md) — Yangi sharh yoki mavjud sharhga javob yozish
 * [DELETE /api/v1/comments/{id}](file:///home/jahongir/KIUT/PBL/WebtoonHub/backend/docs/modules/comments/api/delete_comment.md) — Sharhni o‘chirish
 * [GET /api/v1/staff/comments](file:///home/jahongir/KIUT/PBL/WebtoonHub/backend/docs/modules/comments/api/list_all_comments.md) — Moderatsiya uchun barcha sharhlar ro'yxati (Admin)
+* [PATCH /api/v1/staff/comments/{id}](file:///home/jahongir/KIUT/PBL/WebtoonHub/backend/docs/modules/comments/api/update_comment.md) — Sharhni moderatsiyada tahrirlash / senzura qilish (Admin)

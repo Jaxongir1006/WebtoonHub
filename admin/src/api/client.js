@@ -10,7 +10,9 @@ import {
   initialCreatorRequests,
   initialUsers,
   initialComments,
-  initialSessions
+  initialSessions,
+  initialEconomySettings,
+  initialRewardTransactions
 } from './mockData'
 
 // Initialize state from LocalStorage or mock data
@@ -44,6 +46,8 @@ export const mockDb = {
   users: loadStorage('users', initialUsers),
   comments: loadStorage('comments', initialComments),
   sessions: loadStorage('sessions', initialSessions),
+  economySettings: loadStorage('economySettings', initialEconomySettings),
+  rewardTransactions: loadStorage('rewardTransactions', initialRewardTransactions),
   save(key) {
     if (this[key]) {
       saveStorage(key, this[key])

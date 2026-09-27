@@ -53,6 +53,14 @@
               {{ pendingChaptersCount }} {{ $t('dashboard.in_review') }}
             </Button>
           </router-link>
+
+          <router-link
+            to="/economy"
+          >
+            <Button variant="ghost" size="md" class="border border-brand-500/30 text-brand-600 dark:text-brand-400 hover:bg-brand-500/10">
+              ⚡ {{ $t('nav.economy') }}
+            </Button>
+          </router-link>
         </div>
       </div>
     </div>

@@ -2,25 +2,20 @@ import asyncio
 import logging
 from app.core.database import engine, Base
 
-# Import all models to ensure they are registered with Base.metadata
-from app.modules.users.models import User, UserSession
-from app.modules.staff.models import Role, Permission, RolePermission, StaffUser, StaffSession
-from app.modules.creator_requests.models import CreatorRequest
-from app.modules.webtoons.models import Genre, Webtoon, WebtoonGenre, Chapter, ChapterImage
-from app.modules.rewards.models import ReadReward
-from app.modules.shop.models import ShopItem, UserInventory
-from app.modules.comments.models import Comment
-from app.modules.library.models import Bookmark
+import app.models
+from sqlalchemy import text
 
 logger = logging.getLogger(__name__)
 
 
 async def init_db() -> None:
-    """Create all tables asynchronously in PostgreSQL"""
+    """Create all tables asynchronously in PostgreSQL and ensure columns exist"""
     async with engine.begin() as conn:
         logger.info("Creating database tables...")
         await conn.run_sync(Base.metadata.create_all)
-        logger.info("All tables created successfully!")
+        # Ensure new column exists on creator_requests
+        await conn.execute(text("ALTER TABLE creator_requests ADD COLUMN IF NOT EXISTS admin_feedback TEXT;"))
+        logger.info("All tables and columns created successfully!")
 
 
 if __name__ == "__main__":

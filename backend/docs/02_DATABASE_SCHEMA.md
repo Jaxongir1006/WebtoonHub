@@ -85,6 +85,7 @@ Ushbu hujjat PostgreSQL uchun mo‘ljallangan barcha relying jadvallar, ularning
 | `status` | `VARCHAR(20)` | NOT NULL, DEFAULT 'pending' | `pending`, `approved`, `rejected` |
 | `reviewed_by` | `INTEGER` | NULLABLE, FK -> `staff_users.id` | Kim tekshirdi |
 | `reviewed_at` | `TIMESTAMPTZ` | NULLABLE | Tekshirilgan sana |
+| `admin_feedback` | `TEXT` | NULLABLE | Admin/Moderatorning arizaga izohi yoki rad etish sababi |
 | `created_at` | `TIMESTAMPTZ` | NOT NULL, DEFAULT NOW() | Ariza topshirilgan sana |
 
 ---
@@ -153,6 +154,17 @@ Ushbu hujjat PostgreSQL uchun mo‘ljallangan barcha relying jadvallar, ularning
 | `claimed_at` | `TIMESTAMPTZ` | NOT NULL, DEFAULT NOW() | Olingan vaqt |
 | *Unique Constraint* | (`user_id`, `chapter_id`) | UNIQUE | Bitta bobdan faqat 1 marta mukofot olish cheklovi |
 
+### 5.2 `coin_transactions` — Chaqmoqlar Audit va Tranzaksiya Tarixi
+| Maydon | Tipi | Cheklovlar | Tavsif |
+| :--- | :--- | :--- | :--- |
+| `id` | `BIGSERIAL` | PRIMARY KEY | Tranzaksiya ID |
+| `user_id` | `BIGINT` | FK -> `users.id` ON DELETE CASCADE, INDEX | O'quvchi ID |
+| `amount` | `INTEGER` | NOT NULL | Miqdor (musbat: kirim, manfiy: chiqim) |
+| `transaction_type` | `VARCHAR(50)` | NOT NULL, INDEX | `register_bonus`, `daily_checkin`, `chapter_read`, `shop_purchase`, `admin_adjustment`, `admin_gift` |
+| `description` | `TEXT` | NULLABLE | Tranzaksiya sababi / tafsiloti |
+| `created_by_staff_id`| `INTEGER` | NULLABLE, FK -> `staff_users.id` | Agar admin bajargan bo'lsa, xodim ID |
+| `created_at` | `TIMESTAMPTZ` | NOT NULL, DEFAULT NOW(), INDEX | Tranzaksiya vaqti |
+
 ---
 
 ## 6. Do‘kon va Inventar (Shop & Inventory)
@@ -201,3 +213,15 @@ Ushbu hujjat PostgreSQL uchun mo‘ljallangan barcha relying jadvallar, ularning
 | `parent_id` | `BIGINT` | NULLABLE, FK -> `comments.id` ON DELETE CASCADE | Asosiy sharh ID (agar javob bo'lsa) |
 | `content` | `TEXT` | NOT NULL | Sharh matni (1-500 belgi) |
 | `created_at` | `TIMESTAMPTZ` | NOT NULL, DEFAULT NOW() | Yozilgan sana |
+
+---
+
+## 8. Tizim Sozlamalari (System Settings)
+
+### 8.1 `system_settings` — Dinamik Platforma Parametrlari
+| Maydon | Tipi | Cheklovlar | Tavsif |
+| :--- | :--- | :--- | :--- |
+| `key` | `VARCHAR(50)` | PRIMARY KEY | Sozlama kaliti (`register_bonus_coins`, `daily_checkin_coins`, `chapter_read_coins`, `maintenance_mode`) |
+| `value` | `VARCHAR(255)` | NOT NULL | Sozlama qiymati |
+| `description` | `VARCHAR(255)` | NULLABLE | Sozlama tavsifi |
+| `updated_at` | `TIMESTAMPTZ` | NOT NULL, DEFAULT NOW() | Oxirgi o'zgartirilgan sana |

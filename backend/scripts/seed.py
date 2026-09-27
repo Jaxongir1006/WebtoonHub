@@ -106,6 +106,20 @@ async def seed_data():
             if not res.scalar_one_or_none():
                 db.add(Genre(name=g["name"], slug=g["slug"]))
 
+        logger.info("5. Seeding default system settings...")
+        DEFAULT_SETTINGS = [
+            {"key": "register_bonus_coins", "value": "50", "description": "Boshlang'ich ro'yxatdan o'tish bonusi"},
+            {"key": "daily_checkin_coins", "value": "15", "description": "Kunlik kirish bonusi"},
+            {"key": "chapter_read_coins", "value": "5", "description": "Bob mutolaasi uchun beriladigan tanga"},
+            {"key": "maintenance_mode", "value": "false", "description": "Texnik ishlar rejimi"},
+        ]
+        from app.modules.staff.models import SystemSetting
+        for s in DEFAULT_SETTINGS:
+            stmt = select(SystemSetting).where(SystemSetting.key == s["key"])
+            res = await db.execute(stmt)
+            if not res.scalar_one_or_none():
+                db.add(SystemSetting(key=s["key"], value=s["value"], description=s["description"]))
+
         await db.commit()
         logger.info("Seeding completed successfully!")
 

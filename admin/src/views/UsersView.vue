@@ -13,6 +13,18 @@
           {{ $t('users.subtitle') }}
         </p>
       </div>
+
+      <div class="flex items-center gap-3">
+        <router-link
+          to="/economy"
+          class="px-4 py-2 rounded-xl text-xs font-bold bg-brand-500/15 hover:bg-brand-500/25 text-brand-600 dark:text-brand-400 border border-brand-500/30 transition-all flex items-center gap-2 shadow-sm"
+        >
+          <svg class="w-4 h-4 text-brand-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+          <span>⚡ {{ $t('nav.economy') }}</span>
+        </router-link>
+      </div>
     </div>
 
     <!-- Search & Filters -->

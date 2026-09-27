@@ -63,8 +63,9 @@
           <input
             v-model.number="form.reward_coins"
             type="number"
-            disabled
-            class="w-full px-3.5 py-2 text-sm bg-studio-950/60 border border-white/5 rounded-xl text-brand-400 font-bold font-mono"
+            min="0"
+            required
+            class="w-full px-3.5 py-2 text-sm bg-studio-900 border border-white/10 rounded-xl text-brand-400 font-bold font-mono focus:outline-none focus:border-brand-500/70"
           />
         </div>
       </div>
@@ -232,7 +233,7 @@ const form = reactive({
   webtoon_id: props.preselectedWebtoonId || availableWebtoons.value[0]?.id || 1,
   chapter_number: 1.0,
   title: '',
-  reward_coins: 5
+  reward_coins: mockDb.economySettings?.chapter_read_reward ?? 5
 })
 
 // Demo initial sample images

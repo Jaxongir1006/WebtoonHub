@@ -15,3 +15,7 @@ Ushbu modul platformadagi bepul ichki ballar — **Chaqmoq (⚡)** iqtisodiyoti,
 ## 3. Ushbu Modulning API Endpointlari
 * [POST /api/v1/rewards/daily-checkin](file:///home/jahongir/KIUT/PBL/WebtoonHub/backend/docs/modules/rewards/api/daily_checkin.md) — Kunlik bonus olish (+15 ⚡)
 * [POST /api/v1/chapters/{id}/reward](file:///home/jahongir/KIUT/PBL/WebtoonHub/backend/docs/modules/rewards/api/chapter_reward.md) — Bobni yakunlab mutolaa mukofotini olish (+5 ⚡)
+* [GET /api/v1/staff/coins/transactions](file:///home/jahongir/KIUT/PBL/WebtoonHub/backend/docs/modules/rewards/api/list_transactions.md) — Chaqmoq tranzaksiyalari tarixi (Audit Log)
+* [POST /api/v1/staff/readers/{id}/coins](file:///home/jahongir/KIUT/PBL/WebtoonHub/backend/docs/modules/rewards/api/adjust_user_coins.md) — O'quvchiga tanga berish yoki ayirish
+* [POST /api/v1/staff/coins/distribute](file:///home/jahongir/KIUT/PBL/WebtoonHub/backend/docs/modules/rewards/api/distribute_coins.md) — Ommaviy bayram bonusi tarqatish
+* [GET /api/v1/staff/coins/summary](file:///home/jahongir/KIUT/PBL/WebtoonHub/backend/docs/modules/rewards/api/coins_summary.md) — Chaqmoq iqtisodiyoti statistikasi

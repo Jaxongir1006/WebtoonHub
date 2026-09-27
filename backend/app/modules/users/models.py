@@ -26,6 +26,7 @@ class User(Base):
     read_rewards = relationship("ReadReward", back_populates="user", cascade="all, delete-orphan")
     comments = relationship("Comment", back_populates="user", cascade="all, delete-orphan")
     creator_request = relationship("CreatorRequest", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    coin_transactions = relationship("CoinTransaction", back_populates="user", cascade="all, delete-orphan")
 
 
 class UserSession(Base):

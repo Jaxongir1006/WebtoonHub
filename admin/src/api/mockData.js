@@ -383,3 +383,64 @@ export const initialSessions = [
     created_at: '2026-09-26T19:30:00Z'
   }
 ]
+
+export const initialEconomySettings = {
+  chapter_read_reward: 5,        // Bob o'qiganda beriladigan chaqmoq
+  daily_checkin_reward: 15,      // Kunlik kirish bonusi (00:00 da yangilanadi)
+  welcome_bonus: 50,             // Yangi ro'yxatdan o'tgan o'quvchiga beriladigan chaqmoq
+  creator_chapter_reward: 25,    // Creator yangi bob yuklaganda beriladigan rag'bat
+  comment_reward: 2,             // Sharh qoldirgan o'quvchiga
+  daily_max_limit: 100,          // Bir kunda o'quvchi to'plashi mumkin bo'lgan maksimal limit (0 bo'lsa cheksiz)
+  reset_timezone: 'Asia/Tashkent',
+  reset_time: '00:00',
+  anti_farming_cooldown_min: 3   // Boblar orasidagi minimal kutish vaqti (daqiqa)
+}
+
+export const initialRewardTransactions = [
+  {
+    id: 1,
+    user_id: 1,
+    username: 'otaku_king',
+    type: 'chapter_reward',
+    title: 'Solo Leveling (1-bob o\'qildi)',
+    amount: 5,
+    created_at: '2026-09-27T17:40:00Z'
+  },
+  {
+    id: 2,
+    user_id: 2,
+    username: 'sakura_uz',
+    type: 'daily_checkin',
+    title: 'Kunlik Kirish Bonusi (Streak #5)',
+    amount: 15,
+    created_at: '2026-09-27T12:15:00Z'
+  },
+  {
+    id: 3,
+    user_id: 3,
+    username: 'manhwa_fanat',
+    type: 'welcome_bonus',
+    title: 'Yangi Foydalanuvchi Bonusi',
+    amount: 50,
+    created_at: '2026-09-27T09:00:00Z'
+  },
+  {
+    id: 4,
+    user_id: 1,
+    username: 'otaku_king',
+    type: 'comment_reward',
+    title: 'Bobga sharh qoldirgani uchun',
+    amount: 2,
+    created_at: '2026-09-27T17:42:00Z'
+  },
+  {
+    id: 5,
+    user_id: 2,
+    username: 'creator_ali',
+    type: 'creator_reward',
+    title: 'Yangi bob muvaffaqiyatli chop etildi',
+    amount: 25,
+    created_at: '2026-09-27T14:30:00Z'
+  }
+]
+

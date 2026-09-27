@@ -1,6 +1,7 @@
 import uuid
 from typing import List, Optional, Tuple
 from fastapi import APIRouter, Depends, Query, Request, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -224,3 +225,91 @@ async def get_dashboard_analytics(
         "success": True,
         "data": stats
     }
+
+
+# 10. Economy & Rewards Rates Configuration
+@router.get("/economy/settings", status_code=status.HTTP_200_OK)
+async def get_economy_settings(
+    _staff: StaffUser = Depends(require_permission("users:manage"))
+):
+    from app.core.config import settings
+    return {
+        "success": True,
+        "data": {
+            "chapter_read_reward": settings.CHAPTER_READ_COINS,
+            "daily_checkin_reward": settings.DAILY_LOGIN_COINS,
+            "welcome_bonus": settings.INITIAL_COINS,
+            "creator_chapter_reward": 25,
+            "comment_reward": 2,
+            "daily_max_limit": 100,
+            "reset_timezone": settings.TIMEZONE,
+            "reset_time": "00:00",
+            "anti_farming_cooldown_min": 3
+        }
+    }
+
+
+@router.patch("/economy/settings", status_code=status.HTTP_200_OK)
+async def update_economy_settings(
+    data: dict,
+    _staff: StaffUser = Depends(require_permission("users:manage"))
+):
+    from app.core.config import settings
+    if "chapter_read_reward" in data:
+        settings.CHAPTER_READ_COINS = int(data["chapter_read_reward"])
+    if "daily_checkin_reward" in data:
+        settings.DAILY_LOGIN_COINS = int(data["daily_checkin_reward"])
+    if "welcome_bonus" in data:
+        settings.INITIAL_COINS = int(data["welcome_bonus"])
+    return {
+        "success": True,
+        "data": {
+            "chapter_read_reward": settings.CHAPTER_READ_COINS,
+            "daily_checkin_reward": settings.DAILY_LOGIN_COINS,
+            "welcome_bonus": settings.INITIAL_COINS,
+            "creator_chapter_reward": data.get("creator_chapter_reward", 25),
+            "comment_reward": data.get("comment_reward", 2),
+            "daily_max_limit": data.get("daily_max_limit", 100),
+            "reset_timezone": settings.TIMEZONE,
+            "reset_time": "00:00",
+            "anti_farming_cooldown_min": 3
+        },
+        "message": "Chaqmoq berilishi va iqtisodiyot sozlamalari muvaffaqiyatli saqlandi"
+    }
+
+
+@router.get("/economy/transactions", status_code=status.HTTP_200_OK)
+async def get_economy_transactions(
+    limit: int = Query(20, ge=1, le=100),
+    _staff: StaffUser = Depends(require_permission("users:manage")),
+    db: AsyncSession = Depends(get_db)
+):
+    from app.modules.rewards.models import ReadReward
+    from app.modules.users.models import User
+    stmt = (
+        select(ReadReward, User.username)
+        .join(User, ReadReward.user_id == User.id)
+        .order_by(ReadReward.created_at.desc())
+        .limit(limit)
+    )
+    result = await db.execute(stmt)
+    rows = result.all()
+    items = []
+    for r, username in rows:
+        items.append({
+            "id": r.id,
+            "user_id": r.user_id,
+            "username": username,
+            "type": "chapter_reward",
+            "title": f"Bob #{r.chapter_id} mutolaasi uchun mukofot",
+            "amount": r.coins_earned,
+            "created_at": r.created_at.isoformat() if r.created_at else None
+        })
+    return {
+        "success": True,
+        "data": {
+            "items": items,
+            "total": len(items)
+        }
+    }
+
