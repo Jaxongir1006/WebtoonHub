@@ -53,6 +53,29 @@ class RewardService:
         )
 
     @staticmethod
+    async def get_daily_status(db: AsyncSession, user_id: int) -> dict:
+        stmt = select(User).where(User.id == user_id)
+        result = await db.execute(stmt)
+        user = result.scalar_one_or_none()
+        if not user:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Foydalanuvchi topilmadi")
+
+        uz_tz = ZoneInfo(settings.TIMEZONE)
+        now_utc = datetime.now(timezone.utc)
+        now_uz = now_utc.astimezone(uz_tz)
+        daily_bonus_claimed = False
+
+        if user.last_daily_login:
+            last_uz = user.last_daily_login.astimezone(uz_tz)
+            daily_bonus_claimed = (last_uz.date() == now_uz.date())
+
+        return {
+            "claimed_today": daily_bonus_claimed,
+            "reward_amount": settings.DAILY_LOGIN_COINS,
+            "last_daily_login": user.last_daily_login.isoformat() if user.last_daily_login else None
+        }
+
+    @staticmethod
     async def claim_chapter_reward(db: AsyncSession, user_id: int, chapter_id: int) -> ChapterRewardResponse:
         # 1. Verify chapter exists and is published
         ch_stmt = select(Chapter).where(Chapter.id == chapter_id)

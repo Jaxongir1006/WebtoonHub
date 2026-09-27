@@ -21,7 +21,7 @@ import {
 
 export const Navbar: React.FC = () => {
   const { user, isAuthenticated, logout, openAuthModal } = useAuth();
-  const { openModal: openDailyBonusModal } = useDailyBonus();
+  const { openModal: openDailyBonusModal, isClaimedToday } = useDailyBonus();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -122,18 +122,20 @@ export const Navbar: React.FC = () => {
 
           {/* Right Action Items */}
           <div className="flex items-center gap-2.5 sm:gap-3">
-            {/* Daily Bonus Trigger Button */}
-            <button
-              onClick={openDailyBonusModal}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-brand-500/10 to-amber-500/20 border border-brand-500/30 text-brand-300 hover:border-brand-400 hover:text-white text-xs font-bold transition-all shadow-glow-brand shrink-0"
-              title="Kunlik kirish bonusi (+15 ⚡)"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-brand-400 animate-spin" style={{ animationDuration: '8s' }} />
-              <span className="hidden sm:inline">Kunlik bonus</span>
-              <span className="bg-brand-500 text-studio-950 px-1.5 py-0.2 rounded-full text-[10px] font-black">
-                +15 ⚡
-              </span>
-            </button>
+            {/* Daily Bonus Trigger Button (Olingan bo'lsa butkul yashiriladi) */}
+            {!isClaimedToday && (
+              <button
+                onClick={openDailyBonusModal}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-brand-500/10 to-amber-500/20 border border-brand-500/30 text-brand-300 hover:border-brand-400 hover:text-white text-xs font-bold transition-all shadow-glow-brand shrink-0"
+                title="Kunlik kirish bonusi (+15 ⚡)"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-brand-400 animate-spin" style={{ animationDuration: '8s' }} />
+                <span className="hidden sm:inline">Kunlik bonus</span>
+                <span className="bg-brand-500 text-studio-950 px-1.5 py-0.2 rounded-full text-[10px] font-black">
+                  +15 ⚡
+                </span>
+              </button>
+            )}
 
             {/* Chaqmoq Badge */}
             {isAuthenticated && user && (

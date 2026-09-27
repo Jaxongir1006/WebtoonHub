@@ -10,7 +10,7 @@ import { getApiErrorMessage } from '../api/client';
 
 export const ShopPage: React.FC = () => {
   const { user, isAuthenticated, refreshProfile, updateCoinsLocally, openAuthModal } = useAuth();
-  const { openModal: openDailyBonusModal } = useDailyBonus();
+  const { openModal: openDailyBonusModal, isClaimedToday } = useDailyBonus();
 
   const [items, setItems] = useState<ShopItem[]>([]);
   const [filterType, setFilterType] = useState<'all' | 'frame' | 'background'>('all');
@@ -144,13 +144,20 @@ export const ShopPage: React.FC = () => {
 
                   <div className="h-8 w-px bg-studio-800 hidden sm:block" />
 
-                  <button
-                    onClick={openDailyBonusModal}
-                    className="w-full sm:w-auto px-4 py-2.5 rounded-xl font-bold bg-gradient-to-r from-brand-500 to-amber-400 text-studio-950 text-xs hover:from-brand-400 hover:to-amber-300 shadow-glow-brand transition-all flex items-center justify-center gap-1.5 shrink-0"
-                  >
-                    <Gift className="w-4 h-4" />
-                    <span>Kunlik bonus (+15 ⚡)</span>
-                  </button>
+                  {!isClaimedToday ? (
+                    <button
+                      onClick={openDailyBonusModal}
+                      className="w-full sm:w-auto px-4 py-2.5 rounded-xl font-bold bg-gradient-to-r from-brand-500 to-amber-400 text-studio-950 text-xs hover:from-brand-400 hover:to-amber-300 shadow-glow-brand transition-all flex items-center justify-center gap-1.5 shrink-0"
+                    >
+                      <Gift className="w-4 h-4" />
+                      <span>Kunlik bonus (+15 ⚡)</span>
+                    </button>
+                  ) : (
+                    <div className="w-full sm:w-auto px-3.5 py-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold flex items-center justify-center gap-1.5 shrink-0">
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>Kunlik bonus olingan</span>
+                    </div>
+                  )}
                 </>
               ) : (
                 <div className="text-center py-2 px-4">

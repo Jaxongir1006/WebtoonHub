@@ -3,6 +3,8 @@ export interface UserSummary {
   email: string;
   username: string;
   lightning_coins: number;
+  daily_bonus_claimed?: boolean;
+  last_daily_login?: string | null;
   created_at?: string;
 }
 
@@ -19,6 +21,8 @@ export interface UserProfile {
   lightning_coins: number;
   active_frame?: ActiveAsset | null;
   active_background?: ActiveAsset | null;
+  daily_bonus_claimed?: boolean;
+  last_daily_login?: string | null;
   created_at: string;
 }
 

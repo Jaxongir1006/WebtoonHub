@@ -22,6 +22,19 @@ staff_router = APIRouter(prefix="/staff", tags=["Staff - Coins Management"])
 
 
 # 1. Daily Check-in (+15 Chaqmoq, Tashkent 00:00 midnight reset)
+@client_router.get("/rewards/daily-status", status_code=status.HTTP_200_OK)
+@client_router.get("/rewards/daily-checkin", status_code=status.HTTP_200_OK)
+async def get_daily_status(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    result = await RewardService.get_daily_status(db, user.id)
+    return {
+        "success": True,
+        "data": result
+    }
+
+
 @client_router.post("/rewards/daily-checkin", status_code=status.HTTP_200_OK)
 async def daily_checkin(
     user: User = Depends(get_current_user),

@@ -61,3 +61,17 @@ export const getTimeUntilTashkentMidnight = (): { hours: number; minutes: number
 
   return { hours, minutes, seconds, totalSeconds };
 };
+
+/**
+ * Returns YYYY-MM-DD string according to Asia/Tashkent (UTC+5)
+ */
+export const getTashkentDateString = (dateInput?: string | Date): string => {
+  const d = dateInput ? new Date(dateInput) : new Date();
+  const tashkentOffsetMs = 5 * 60 * 60 * 1000;
+  const utcMs = d.getTime() + d.getTimezoneOffset() * 60 * 1000;
+  const tashkentTime = new Date(utcMs + tashkentOffsetMs);
+  const year = tashkentTime.getFullYear();
+  const month = String(tashkentTime.getMonth() + 1).padStart(2, '0');
+  const day = String(tashkentTime.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};

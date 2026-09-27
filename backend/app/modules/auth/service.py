@@ -2,6 +2,7 @@ import hashlib
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Tuple
+from zoneinfo import ZoneInfo
 from fastapi import HTTPException, status
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -36,6 +37,15 @@ def _detect_device_type(user_agent: Optional[str]) -> str:
     if "tablet" in ua or "ipad" in ua:
         return "Tablet"
     return "Desktop"
+
+
+def _is_daily_bonus_claimed(last_daily_login: Optional[datetime]) -> bool:
+    if not last_daily_login:
+        return False
+    uz_tz = ZoneInfo(settings.TIMEZONE)
+    now_uz = datetime.now(timezone.utc).astimezone(uz_tz)
+    last_uz = last_daily_login.astimezone(uz_tz)
+    return last_uz.date() == now_uz.date()
 
 
 class AuthService:
@@ -140,7 +150,15 @@ class AuthService:
             access_token=access_token,
             refresh_token=raw_refresh_token,
             expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-            user=UserSummary.model_validate(user)
+            user=UserSummary(
+                id=user.id,
+                email=user.email,
+                username=user.username,
+                lightning_coins=user.lightning_coins,
+                daily_bonus_claimed=_is_daily_bonus_claimed(user.last_daily_login),
+                last_daily_login=user.last_daily_login,
+                created_at=user.created_at
+            )
         )
 
     @staticmethod
@@ -221,6 +239,8 @@ class AuthService:
             lightning_coins=user.lightning_coins,
             active_frame=active_frame,
             active_background=active_background,
+            daily_bonus_claimed=_is_daily_bonus_claimed(user.last_daily_login),
+            last_daily_login=user.last_daily_login,
             created_at=user.created_at
         )
 

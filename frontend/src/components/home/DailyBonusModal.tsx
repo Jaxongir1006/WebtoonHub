@@ -4,7 +4,7 @@ import { useDailyBonus } from '../../context/DailyBonusContext';
 import { Zap, Clock, Sparkles, CheckCircle2, AlertCircle } from 'lucide-react';
 
 export const DailyBonusModal: React.FC = () => {
-  const { isModalOpen, closeModal, countdown, claimBonus, isClaiming } = useDailyBonus();
+  const { isModalOpen, closeModal, countdown, claimBonus, isClaiming, isClaimedToday } = useDailyBonus();
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   const handleClaim = async () => {
@@ -102,15 +102,22 @@ export const DailyBonusModal: React.FC = () => {
           </div>
         )}
 
-        {/* Claim Button */}
-        <button
-          onClick={handleClaim}
-          disabled={isClaiming}
-          className="w-full py-3.5 px-6 rounded-xl font-bold text-studio-950 bg-gradient-to-r from-brand-500 to-amber-400 hover:from-brand-400 hover:to-amber-300 active:scale-98 shadow-glow-brand transition-all flex items-center justify-center gap-2 disabled:opacity-50 text-base"
-        >
-          <Zap className="w-5 h-5 fill-studio-950" />
-          <span>{isClaiming ? "Olinmoqda..." : "Bonusni hisobga olish (+15 ⚡)"}</span>
-        </button>
+        {/* Claim Button / Already Claimed Notice */}
+        {isClaimedToday ? (
+          <div className="w-full py-3.5 px-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-bold flex items-center justify-center gap-2 text-sm shadow-glow-brand">
+            <CheckCircle2 className="w-5 h-5 shrink-0" />
+            <span>Bugungi bonus olingan! Keyingisi 00:00 da ochiladi</span>
+          </div>
+        ) : (
+          <button
+            onClick={handleClaim}
+            disabled={isClaiming}
+            className="w-full py-3.5 px-6 rounded-xl font-bold text-studio-950 bg-gradient-to-r from-brand-500 to-amber-400 hover:from-brand-400 hover:to-amber-300 active:scale-98 shadow-glow-brand transition-all flex items-center justify-center gap-2 disabled:opacity-50 text-base"
+          >
+            <Zap className="w-5 h-5 fill-studio-950" />
+            <span>{isClaiming ? "Olinmoqda..." : "Bonusni hisobga olish (+15 ⚡)"}</span>
+          </button>
+        )}
       </div>
     </Modal>
   );
