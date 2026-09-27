@@ -1,0 +1,132 @@
+import React, { useState } from 'react';
+import { rewardsApi } from '../../api/rewards';
+import { useAuth } from '../../context/AuthContext';
+import { Zap, CheckCircle2, AlertCircle, Loader2, Sparkles } from 'lucide-react';
+import { getApiErrorMessage } from '../../api/client';
+
+interface RewardClaimCardProps {
+  chapterId: number;
+  initialClaimed: boolean;
+  rewardAmount?: number;
+  onClaimSuccess?: () => void;
+}
+
+export const RewardClaimCard: React.FC<RewardClaimCardProps> = ({
+  chapterId,
+  initialClaimed,
+  rewardAmount = 5,
+  onClaimSuccess
+}) => {
+  const { isAuthenticated, updateCoinsLocally, openAuthModal } = useAuth();
+  const [isClaimed, setIsClaimed] = useState(initialClaimed);
+  const [loading, setLoading] = useState(false);
+  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  // Sync state when navigating between chapters
+  React.useEffect(() => {
+    setIsClaimed(initialClaimed);
+    setFeedback(null);
+  }, [chapterId, initialClaimed]);
+
+  const handleClaim = async () => {
+    if (!isAuthenticated) {
+      openAuthModal('login');
+      return;
+    }
+
+    setLoading(true);
+    setFeedback(null);
+    try {
+      const res = await rewardsApi.claimChapterReward(chapterId);
+      setIsClaimed(true);
+      const newBalance = res.data?.total_lightning_coins ?? res.data?.new_balance;
+      if (typeof newBalance === 'number') {
+        updateCoinsLocally(newBalance);
+      }
+      setFeedback({
+        type: 'success',
+        message: res.message || `+${rewardAmount} Chaqmoq hisobingizga qo'shildi!`
+      });
+      onClaimSuccess?.();
+    } catch (err) {
+      const msg = getApiErrorMessage(err, "Chaqmoqni olishda xatolik yuz berdi");
+      setFeedback({ type: 'error', message: msg });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="w-full max-w-xl mx-auto my-8 p-6 rounded-3xl bg-studio-900 border border-studio-800 shadow-2xl relative overflow-hidden">
+      {/* Background glow */}
+      <div className="absolute -top-12 -right-12 w-40 h-40 bg-brand-500/10 rounded-full blur-3xl pointer-events-none" />
+
+      {isClaimed ? (
+        <div className="flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left">
+          <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center shrink-0">
+            <CheckCircle2 className="w-8 h-8 text-emerald-400" />
+          </div>
+          <div>
+            <h4 className="font-bold text-white text-base">Bob mutolaasi yakunlandi!</h4>
+            <p className="text-xs text-studio-400 mt-0.5">
+              Ushbu bob uchun berilgan <b>+{rewardAmount} ⚡ Chaqmoq</b> balansingizga qo'shilgan.
+            </p>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-4 text-center">
+          <div className="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-tr from-brand-600 to-amber-400 flex items-center justify-center shadow-glow-brand">
+            <Zap className="w-7 h-7 text-studio-950 fill-studio-950" />
+          </div>
+
+          <div>
+            <h4 className="font-black text-white text-lg flex items-center justify-center gap-2">
+              <span>Mutolaa bonusi: +{rewardAmount} ⚡ Chaqmoq</span>
+              <Sparkles className="w-4 h-4 text-brand-400" />
+            </h4>
+            <p className="text-xs text-studio-300 mt-1 max-w-sm mx-auto">
+              Bobni o'qib tugatdingiz! Chaqmoqlarni hisobingizga qo'shish uchun quyidagi tugmani bosing:
+            </p>
+          </div>
+
+          {feedback && (
+            <div
+              className={`p-3 rounded-xl text-xs flex items-center justify-center gap-2 ${
+                feedback.type === 'success'
+                  ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-400'
+                  : 'bg-rose-500/10 border border-rose-500/30 text-rose-400'
+              }`}
+            >
+              {feedback.type === 'success' ? (
+                <CheckCircle2 className="w-4 h-4 shrink-0" />
+              ) : (
+                <AlertCircle className="w-4 h-4 shrink-0" />
+              )}
+              <span>{feedback.message}</span>
+            </div>
+          )}
+
+          <button
+            onClick={handleClaim}
+            disabled={loading}
+            className="w-full py-3.5 px-6 rounded-2xl font-bold bg-gradient-to-r from-brand-500 to-amber-400 text-studio-950 hover:from-brand-400 hover:to-amber-300 active:scale-98 shadow-glow-brand transition-all flex items-center justify-center gap-2 text-sm disabled:opacity-50"
+          >
+            {loading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Olinmoqda...</span>
+              </>
+            ) : isAuthenticated ? (
+              <>
+                <Zap className="w-4 h-4 fill-studio-950" />
+                <span>+{rewardAmount} ⚡ Chaqmoqni olish</span>
+              </>
+            ) : (
+              <span>Kirish va +{rewardAmount} ⚡ Chaqmoqni olish</span>
+            )}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
