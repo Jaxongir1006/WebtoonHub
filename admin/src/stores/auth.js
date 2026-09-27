@@ -1,39 +1,23 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { authApi } from '../api/auth'
-import { mockDb } from '../api/client'
 
 export const useAuthStore = defineStore('auth', () => {
   const token = ref(localStorage.getItem('webtoonhub_staff_token') || null)
-  const staff = ref(
-    JSON.parse(localStorage.getItem('webtoonhub_current_staff') || 'null') || {
-      id: 1,
-      username: 'superadmin',
-      email: 'admin@webtoonhub.uz',
-      role: {
-        id: 1,
-        name: 'superadmin',
-        description: 'To\'liq boshqaruv huquqiga ega tizim rahbari'
-      },
-      permissions: [
-        'webtoons:create',
-        'webtoons:edit',
-        'chapters:create',
-        'chapters:approve',
-        'shop:manage',
-        'users:manage',
-        'roles:manage',
-        'comments:moderate'
-      ]
-    }
-  )
-
+  const staff = ref(JSON.parse(localStorage.getItem('webtoonhub_current_staff') || 'null'))
   const sessions = ref([])
   const isLoading = ref(false)
 
-  const isAuthenticated = computed(() => !!staff.value)
+  const isAuthenticated = computed(() => !!token.value && !!staff.value)
   const userRole = computed(() => staff.value?.role?.name || 'viewer')
-  const permissions = computed(() => staff.value?.permissions || [])
+  const permissions = computed(() => {
+    if (!staff.value) return []
+    if (staff.value.permissions) return staff.value.permissions
+    if (staff.value.role?.permissions) {
+      return staff.value.role.permissions.map((p) => (typeof p === 'string' ? p : p.code))
+    }
+    return []
+  })
 
   function hasPermission(code) {
     if (!staff.value) return false
@@ -62,29 +46,25 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.removeItem('webtoonhub_current_staff')
   }
 
-  function switchRole(roleName) {
-    const role = mockDb.roles.find((r) => r.name.toLowerCase() === roleName.toLowerCase())
-    if (!role) return
-
-    const rolePerms = mockDb.permissions
-      .filter((p) => role.permission_ids.includes(p.id))
-      .map((p) => p.code)
-
-    staff.value = {
-      ...staff.value,
-      role: {
-        id: role.id,
-        name: role.name,
-        description: role.description
-      },
-      permissions: rolePerms
+  async function checkAuth() {
+    if (!token.value) {
+      logout()
+      return false
     }
-    localStorage.setItem('webtoonhub_current_staff', JSON.stringify(staff.value))
+    try {
+      const res = await authApi.getMe()
+      staff.value = res.data
+      localStorage.setItem('webtoonhub_current_staff', JSON.stringify(staff.value))
+      return true
+    } catch {
+      logout()
+      return false
+    }
   }
 
   async function fetchSessions() {
     const res = await authApi.getSessions()
-    sessions.value = res.data
+    sessions.value = res.data || []
   }
 
   async function revokeSession(id) {
@@ -108,7 +88,7 @@ export const useAuthStore = defineStore('auth', () => {
     hasPermission,
     login,
     logout,
-    switchRole,
+    checkAuth,
     fetchSessions,
     revokeSession,
     revokeOtherSessions

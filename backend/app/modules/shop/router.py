@@ -80,7 +80,8 @@ async def create_shop_item(
     name: str = Form(...),
     item_type: str = Form(..., pattern=r"^(frame|background)$"),
     price_coins: int = Form(..., ge=1),
-    asset_file: UploadFile = File(...),
+    asset_file: Optional[UploadFile] = File(None),
+    asset_url: Optional[str] = Form(None),
     _staff: StaffUser = Depends(require_permission("shop:manage")),
     db: AsyncSession = Depends(get_db)
 ):
@@ -89,7 +90,8 @@ async def create_shop_item(
         name=name,
         item_type=item_type,
         price_coins=price_coins,
-        asset_file=asset_file
+        asset_file=asset_file,
+        asset_url=asset_url
     )
     return {
         "success": True,

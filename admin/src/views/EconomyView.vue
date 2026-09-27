@@ -456,10 +456,9 @@
 </template>
 
 <script setup>
-import { reactive, ref, computed } from 'vue'
+import { reactive, ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useSystemStore } from '../stores/system'
-import { mockDb } from '../api/client'
 import { economyApi } from '../api/economy'
 import Badge from '../components/common/Badge.vue'
 import Button from '../components/common/Button.vue'
@@ -470,25 +469,57 @@ const systemStore = useSystemStore()
 
 const isSaving = ref(false)
 const showDistributeModal = ref(false)
-const settings = computed(() => mockDb.economySettings)
-const transactions = computed(() => mockDb.rewardTransactions)
 
-function onDistributed(data) {
-  systemStore.addToast({
-    type: 'success',
-    title: 'Muvaffaqiyatli tarqatildi',
-    message: `${data.count} ta faol foydalanuvchiga jami ${data.total} ⚡ Chaqmoq ulashildi`
-  })
-}
+const settings = ref({
+  chapter_read_reward: 5,
+  daily_checkin_reward: 15,
+  welcome_bonus: 50,
+  creator_chapter_reward: 25,
+  comment_reward: 2,
+  daily_max_limit: 100,
+  reset_timezone: 'Asia/Tashkent',
+  reset_time: '00:00'
+})
+
+const transactions = ref([])
 
 const form = reactive({
-  chapter_read_reward: settings.value.chapter_read_reward,
-  daily_checkin_reward: settings.value.daily_checkin_reward,
-  welcome_bonus: settings.value.welcome_bonus,
-  creator_chapter_reward: settings.value.creator_chapter_reward,
-  comment_reward: settings.value.comment_reward,
-  daily_max_limit: settings.value.daily_max_limit
+  chapter_read_reward: 5,
+  daily_checkin_reward: 15,
+  welcome_bonus: 50,
+  creator_chapter_reward: 25,
+  comment_reward: 2,
+  daily_max_limit: 100
 })
+
+async function loadData() {
+  try {
+    const [settingsRes, txRes] = await Promise.all([
+      economyApi.getSettings(),
+      economyApi.getTransactions({ limit: 50 })
+    ])
+
+    if (settingsRes.data) {
+      settings.value = { ...settingsRes.data }
+      form.chapter_read_reward = settingsRes.data.chapter_read_reward ?? 5
+      form.daily_checkin_reward = settingsRes.data.daily_checkin_reward ?? 15
+      form.welcome_bonus = settingsRes.data.welcome_bonus ?? 50
+      form.creator_chapter_reward = settingsRes.data.creator_chapter_reward ?? 25
+      form.comment_reward = settingsRes.data.comment_reward ?? 2
+      form.daily_max_limit = settingsRes.data.daily_max_limit ?? 100
+    }
+
+    if (txRes.data) {
+      transactions.value = txRes.data.items || txRes.data || []
+    }
+  } catch (err) {
+    console.error('Failed to load economy data', err)
+  }
+}
+
+async function onDistributed(data) {
+  await loadData()
+}
 
 // Simulator inputs
 const simReaders = ref(500)
@@ -541,7 +572,10 @@ function resetToDefaults() {
 async function saveSettings() {
   isSaving.value = true
   try {
-    await economyApi.updateSettings({ ...form })
+    const res = await economyApi.updateSettings({ ...form })
+    if (res.data) {
+      settings.value = { ...settings.value, ...res.data }
+    }
     systemStore.addToast({
       type: 'success',
       title: 'Saqlandi',
@@ -551,10 +585,14 @@ async function saveSettings() {
     systemStore.addToast({
       type: 'error',
       title: 'Xatolik',
-      message: err.message || 'Sozlamalarni saqlashda xatolik yuz berdi'
+      message: err.response?.data?.detail || err.message || 'Sozlamalarni saqlashda xatolik yuz berdi'
     })
   } finally {
     isSaving.value = false
   }
 }
+
+onMounted(() => {
+  loadData()
+})
 </script>

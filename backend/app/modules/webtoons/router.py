@@ -264,7 +264,7 @@ async def read_staff_chapter(
     _staff: StaffUser = Depends(require_permission("chapters:approve")),
     db: AsyncSession = Depends(get_db)
 ):
-    chapter_data = await WebtoonService.read_chapter(db, id, None)
+    chapter_data = await WebtoonService.read_chapter(db, id, None, is_staff=True)
     return {
         "success": True,
         "data": chapter_data

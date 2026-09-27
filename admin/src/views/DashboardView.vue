@@ -256,10 +256,10 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { useSystemStore } from '../stores/system'
-import { mockDb } from '../api/client'
+import { analyticsApi } from '../api/analytics'
 import StatCard from '../components/common/StatCard.vue'
 import Badge from '../components/common/Badge.vue'
 import Button from '../components/common/Button.vue'
@@ -281,20 +281,24 @@ const currentTime = ref(
   }).format(new Date())
 )
 
-const totalWebtoons = computed(() => mockDb.webtoons.length)
+const stats = ref({
+  total_webtoons: 0,
+  total_chapters: 0,
+  pending_chapters: 0,
+  pending_creator_requests: 0,
+  total_readers: 0,
+  total_comments: 0,
+  total_coins_in_circulation: 0
+})
+
+const totalWebtoons = computed(() => stats.value.total_webtoons)
 const publishedChaptersCount = computed(
-  () => mockDb.chapters.filter((c) => c.status === 'published').length
+  () => Math.max(0, stats.value.total_chapters - stats.value.pending_chapters)
 )
-const pendingChaptersCount = computed(
-  () => mockDb.chapters.filter((c) => c.status === 'pending').length
-)
-const pendingRequestsCount = computed(
-  () => mockDb.creatorRequests.filter((r) => r.status === 'pending').length
-)
-const totalReaders = computed(() => mockDb.users.length)
-const totalLightningInCirculation = computed(() =>
-  mockDb.users.reduce((acc, u) => acc + (u.lightning_coins || 0), 0)
-)
+const pendingChaptersCount = computed(() => stats.value.pending_chapters)
+const pendingRequestsCount = computed(() => stats.value.pending_creator_requests)
+const totalReaders = computed(() => stats.value.total_readers)
+const totalLightningInCirculation = computed(() => stats.value.total_coins_in_circulation)
 
 const activityBars = [
   { day: 'Mon', val: 420, percent: 55 },
@@ -306,21 +310,82 @@ const activityBars = [
   { day: 'Sun', val: 760, percent: 88 }
 ]
 
-function onWebtoonCreated(newItem) {
-  mockDb.webtoons.unshift(newItem)
-  mockDb.save('webtoons')
-  systemStore.addToast({
-    type: 'success',
-    title: 'Manhwa yaratildi',
-    message: `"${newItem.title}" muvaffaqiyatli katalogga qo'shildi`
-  })
+async function loadStats() {
+  try {
+    const res = await analyticsApi.getDashboardStats()
+    if (res.data) {
+      stats.value = res.data
+    }
+  } catch (err) {
+    console.error('Failed to load dashboard stats:', err)
+  }
 }
 
-function onChapterUploaded(newChapter) {
-  systemStore.addToast({
-    type: 'success',
-    title: 'Bob yuklandi',
-    message: `${newChapter.chapter_number}-bob moderatsiya navbatiga yuborildi`
-  })
+onMounted(() => {
+  loadStats()
+})
+
+import { webtoonsApi } from '../api/webtoons'
+
+async function onWebtoonCreated(formData) {
+  try {
+    const fd = new FormData()
+    fd.append('title', formData.title)
+    fd.append('description', formData.description || '')
+    fd.append('author_name', formData.author_name || '')
+    fd.append('status', formData.status || 'ongoing')
+    fd.append('genre_ids', JSON.stringify(formData.genre_ids || [1]))
+
+    if (formData.cover_image_file) {
+      fd.append('cover_image', formData.cover_image_file)
+    } else {
+      const dummyBlob = new Blob([new Uint8Array([0xFF, 0xD8, 0xFF, 0xE0])], { type: 'image/jpeg' })
+      fd.append('cover_image', dummyBlob, 'cover.jpg')
+    }
+
+    await webtoonsApi.createWebtoon(fd)
+    await loadStats()
+    systemStore.addToast({
+      type: 'success',
+      title: 'Manhwa yaratildi',
+      message: `"${formData.title}" muvaffaqiyatli katalogga qo'shildi`
+    })
+  } catch (err) {
+    systemStore.addToast({
+      type: 'danger',
+      title: 'Xatolik',
+      message: err.response?.data?.detail || 'Manhvani yaratishda xatolik yuz berdi'
+    })
+  }
+}
+
+async function onChapterUploaded(data) {
+  try {
+    const formData = new FormData()
+    formData.append('webtoon_id', data.webtoon_id)
+    formData.append('chapter_number', data.chapter_number)
+    if (data.title) formData.append('title', data.title)
+
+    if (data.rawFiles && data.rawFiles.length > 0) {
+      data.rawFiles.forEach((f) => formData.append('images', f))
+    } else {
+      const dummyBlob = new Blob([new Uint8Array([0xFF, 0xD8, 0xFF, 0xE0])], { type: 'image/jpeg' })
+      formData.append('images', dummyBlob, 'page_01.jpg')
+    }
+
+    await webtoonsApi.uploadChapter(formData)
+    await loadStats()
+    systemStore.addToast({
+      type: 'success',
+      title: 'Bob yuklandi',
+      message: `${data.chapter_number}-bob moderatsiya navbatiga yuborildi`
+    })
+  } catch (err) {
+    systemStore.addToast({
+      type: 'danger',
+      title: 'Xatolik',
+      message: err.response?.data?.detail || 'Bobni yuklashda xatolik yuz berdi'
+    })
+  }
 }
 </script>

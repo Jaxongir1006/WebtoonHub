@@ -54,12 +54,12 @@
       <div class="p-3.5 rounded-2xl bg-slate-100 dark:bg-studio-900/60 border border-slate-200 dark:border-white/5 space-y-2">
         <div class="flex items-center justify-between">
           <span class="text-xs font-semibold text-slate-700 dark:text-studio-300">Qamrov:</span>
-          <Badge variant="success">{{ activeUsersCount }} ta faol o'quvchi</Badge>
+          <Badge variant="success">Barcha faol o'quvchilar</Badge>
         </div>
         <div class="flex items-center justify-between text-xs pt-1 border-t border-slate-200 dark:border-white/5">
-          <span class="text-slate-500 dark:text-studio-400">Jami tarqatiladigan emissiya:</span>
+          <span class="text-slate-500 dark:text-studio-400">Har bir foydalanuvchiga:</span>
           <span class="font-mono font-bold text-brand-600 dark:text-brand-400">
-            ⚡ {{ (form.amount * activeUsersCount).toLocaleString() }} Chaqmoq
+            +{{ form.amount }} ⚡ Chaqmoq
           </span>
         </div>
       </div>
@@ -78,8 +78,9 @@
 </template>
 
 <script setup>
-import { reactive, ref, computed } from 'vue'
-import { mockDb } from '../../api/client'
+import { reactive, ref } from 'vue'
+import { economyApi } from '../../api/economy'
+import { useSystemStore } from '../../stores/system'
 import Modal from '../common/Modal.vue'
 import Button from '../common/Button.vue'
 import Badge from '../common/Badge.vue'
@@ -89,6 +90,7 @@ defineProps({
 })
 
 const emit = defineEmits(['update:modelValue', 'distributed'])
+const systemStore = useSystemStore()
 const isSubmitting = ref(false)
 
 const form = reactive({
@@ -97,41 +99,36 @@ const form = reactive({
   all_active_users: true
 })
 
-const activeUsersCount = computed(() => {
-  return mockDb.users.filter((u) => u.is_active).length
-})
-
-function handleSubmit() {
+async function handleSubmit() {
   isSubmitting.value = true
-  setTimeout(() => {
-    // Distribute to all active users in mockDb
-    mockDb.users.forEach((u) => {
-      if (u.is_active) {
-        u.lightning_coins += form.amount
-      }
+  try {
+    const res = await economyApi.distributeCoins({
+      amount: Number(form.amount),
+      reason: form.reason,
+      all_active_users: true
     })
-    mockDb.save('users')
 
-    // Add record to reward transactions
-    mockDb.rewardTransactions.unshift({
-      id: Date.now(),
-      user_id: 0,
-      username: 'Barcha O\'quvchilar',
-      type: 'creator_reward',
-      title: `Ommaviy sovg'a: ${form.reason}`,
-      amount: form.amount,
-      created_at: new Date().toISOString()
+    const distributedData = res.data || {}
+    systemStore.addToast({
+      type: 'success',
+      title: 'Muvaffaqiyatli tarqatildi',
+      message: `${distributedData.users_count || distributedData.count || 'Barcha'} ta foydalanuvchiga ${form.amount} ⚡ Chaqmoq yuborildi`
     })
-    mockDb.save('rewardTransactions')
 
-    isSubmitting.value = false
     emit('distributed', {
       amount: form.amount,
       reason: form.reason,
-      count: activeUsersCount.value,
-      total: form.amount * activeUsersCount.value
+      ...distributedData
     })
     emit('update:modelValue', false)
-  }, 400)
+  } catch (err) {
+    systemStore.addToast({
+      type: 'error',
+      title: 'Xatolik',
+      message: err.response?.data?.detail || err.message || 'Chaqmoq tarqatishda xatolik yuz berdi'
+    })
+  } finally {
+    isSubmitting.value = false
+  }
 }
 </script>

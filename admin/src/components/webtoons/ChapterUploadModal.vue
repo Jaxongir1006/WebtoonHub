@@ -208,16 +208,20 @@
 </template>
 
 <script setup>
-import { reactive, ref, computed } from 'vue'
+import { reactive, ref, computed, onMounted } from 'vue'
 import Modal from '../common/Modal.vue'
 import Button from '../common/Button.vue'
-import { mockDb } from '../../api/client'
+import { webtoonsApi } from '../../api/webtoons'
 
 const props = defineProps({
   modelValue: Boolean,
   preselectedWebtoonId: {
     type: Number,
     default: null
+  },
+  webtoons: {
+    type: Array,
+    default: () => []
   }
 })
 
@@ -226,22 +230,34 @@ const emit = defineEmits(['update:modelValue', 'upload-success'])
 const isDragging = ref(false)
 const isSubmitting = ref(false)
 const fileInput = ref(null)
+const loadedWebtoons = ref([])
 
-const availableWebtoons = computed(() => mockDb.webtoons)
-
-const form = reactive({
-  webtoon_id: props.preselectedWebtoonId || availableWebtoons.value[0]?.id || 1,
-  chapter_number: 1.0,
-  title: '',
-  reward_coins: mockDb.economySettings?.chapter_read_reward ?? 5
+onMounted(async () => {
+  if (!props.webtoons || props.webtoons.length === 0) {
+    try {
+      const res = await webtoonsApi.getWebtoons({ limit: 100 })
+      loadedWebtoons.value = res.data?.items || res.data || []
+    } catch (e) {
+      console.error('Failed to load webtoons in ChapterUploadModal', e)
+    }
+  }
 })
 
-// Demo initial sample images
-const uploadedImages = ref([
-  'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=800&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1563089145-599997674d42?w=800&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?w=800&auto=format&fit=crop&q=80'
-])
+const availableWebtoons = computed(() => {
+  if (props.webtoons && props.webtoons.length > 0) return props.webtoons
+  return loadedWebtoons.value
+})
+
+const form = reactive({
+  webtoon_id: props.preselectedWebtoonId || 1,
+  chapter_number: 1.0,
+  title: '',
+  reward_coins: 5
+})
+
+// Track real File objects alongside preview data URLs
+const rawFiles = ref([])
+const uploadedImages = ref([])
 
 function handleDrop(e) {
   isDragging.value = false
@@ -257,6 +273,7 @@ function handleFileInput(e) {
 function processFiles(files) {
   files.forEach((file) => {
     if (file.type.startsWith('image/')) {
+      rawFiles.value.push(file)
       const reader = new FileReader()
       reader.onload = (event) => {
         uploadedImages.value.push(event.target.result)
@@ -271,14 +288,22 @@ function moveImage(index, dir) {
   if (target < 0 || target >= uploadedImages.value.length) return
   const item = uploadedImages.value.splice(index, 1)[0]
   uploadedImages.value.splice(target, 0, item)
+  if (rawFiles.value[index]) {
+    const rawItem = rawFiles.value.splice(index, 1)[0]
+    rawFiles.value.splice(target, 0, rawItem)
+  }
 }
 
 function removeImage(index) {
   uploadedImages.value.splice(index, 1)
+  if (rawFiles.value[index]) {
+    rawFiles.value.splice(index, 1)
+  }
 }
 
 function clearImages() {
   uploadedImages.value = []
+  rawFiles.value = []
 }
 
 function handleSubmit() {
@@ -291,10 +316,11 @@ function handleSubmit() {
       chapter_number: form.chapter_number,
       title: form.title || `${form.chapter_number}-bob`,
       reward_coins: form.reward_coins,
+      rawFiles: [...rawFiles.value],
       images: [...uploadedImages.value]
     })
     isSubmitting.value = false
     emit('update:modelValue', false)
-  }, 600)
+  }, 400)
 }
 </script>

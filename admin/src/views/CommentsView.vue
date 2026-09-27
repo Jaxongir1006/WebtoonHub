@@ -15,13 +15,23 @@
       </div>
 
       <div class="text-xs font-mono text-slate-500 dark:text-studio-400">
-        Jami: <strong>{{ comments.length }}</strong> {{ $t('comments.total') }}
+        Jami: <strong>{{ totalComments }}</strong> {{ $t('comments.total') }}
       </div>
     </div>
 
+    <!-- Loading State -->
+    <div v-if="loading" class="flex flex-col items-center justify-center p-16 space-y-4">
+      <div class="w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full animate-spin"></div>
+      <p class="text-xs text-studio-400 font-medium">Sharhlar yuklanmoqda...</p>
+    </div>
+
     <!-- Empty State -->
-    <div v-if="comments.length === 0" class="glass-card rounded-2xl p-12 text-center border border-slate-200 dark:border-white/5">
-      <p class="text-slate-400 dark:text-studio-400 text-sm">Hozirda hech qanday sharh mavjud emas.</p>
+    <div v-else-if="comments.length === 0" class="glass-card rounded-2xl p-12 text-center border border-slate-200 dark:border-white/5 space-y-3">
+      <div class="w-12 h-12 rounded-2xl bg-studio-800 text-studio-400 mx-auto flex items-center justify-center text-lg">
+        💬
+      </div>
+      <h3 class="font-bold text-white text-base">Sharhlar mavjud emas</h3>
+      <p class="text-slate-400 dark:text-studio-400 text-xs">Hozirda foydalanuvchilar tomonidan qoldirilgan hech qanday sharh yo'q.</p>
     </div>
 
     <!-- Comments List -->
@@ -33,10 +43,12 @@
       >
         <div class="space-y-2 flex-1">
           <div class="flex items-center gap-2 flex-wrap">
-            <span class="font-bold text-slate-900 dark:text-white text-sm">{{ comment.username }}</span>
+            <span class="font-bold text-slate-900 dark:text-white text-sm">
+              {{ comment.author?.username || comment.username || 'Foydalanuvchi' }}
+            </span>
             <span class="text-slate-300 dark:text-studio-600">•</span>
             <span class="text-xs text-brand-600 dark:text-brand-400 font-semibold">
-              {{ comment.webtoon_title }} ({{ comment.chapter_number }}-bob)
+              {{ comment.webtoon_title }} ({{ comment.chapter_title || (comment.chapter_number ? comment.chapter_number + '-bob' : '') }})
             </span>
             <span class="text-slate-300 dark:text-studio-600">•</span>
             <span class="text-xs text-slate-400 dark:text-studio-500 font-mono">{{ formatDate(comment.created_at) }}</span>
@@ -79,19 +91,37 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { useSystemStore } from '../stores/system'
-import { mockDb } from '../api/client'
 import { commentsApi } from '../api/comments'
 import CommentEditModal from '../components/comments/CommentEditModal.vue'
 
 const authStore = useAuthStore()
 const systemStore = useSystemStore()
 
-const comments = computed(() => mockDb.comments)
+const comments = ref([])
+const totalComments = ref(0)
+const loading = ref(false)
 const showEditModal = ref(false)
 const selectedComment = ref(null)
+
+async function loadComments() {
+  loading.value = true
+  try {
+    const res = await commentsApi.getComments({ limit: 100 })
+    comments.value = res.data?.items || res.data || []
+    totalComments.value = res.data?.total || comments.value.length
+  } catch (err) {
+    systemStore.addToast({
+      type: 'danger',
+      title: 'Xatolik',
+      message: 'Sharhlarni yuklashda xatolik yuz berdi'
+    })
+  } finally {
+    loading.value = false
+  }
+}
 
 function formatDate(iso) {
   if (!iso) return ''
@@ -116,11 +146,12 @@ async function onCommentUpdated({ id, content }) {
       title: 'Sharh tahrirlandi',
       message: 'Sharh muvaffaqiyatli saqlandi'
     })
+    await loadComments()
   } catch (err) {
     systemStore.addToast({
       type: 'error',
       title: 'Xatolik',
-      message: err.message || 'Sharhni yangilashda xatolik yuz berdi'
+      message: err.response?.data?.detail || err.message || 'Sharhni yangilashda xatolik yuz berdi'
     })
   }
 }
@@ -129,15 +160,23 @@ async function deleteComment(id) {
   if (confirm('Ushbu sharhni o\'chirmoqchimisiz?')) {
     try {
       await commentsApi.deleteComment(id)
+      comments.value = comments.value.filter((c) => c.id !== id)
       systemStore.addToast({
         type: 'info',
         title: 'Sharh o\'chirildi',
         message: 'Sharh muvaffaqiyatli olib tashlandi'
       })
-    } catch {
-      mockDb.comments = mockDb.comments.filter((c) => c.id !== id)
-      mockDb.save('comments')
+    } catch (err) {
+      systemStore.addToast({
+        type: 'danger',
+        title: 'Xatolik',
+        message: err.response?.data?.detail || 'Sharhni o\'chirishda xatolik yuz berdi'
+      })
     }
   }
 }
+
+onMounted(() => {
+  loadComments()
+})
 </script>

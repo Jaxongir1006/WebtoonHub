@@ -203,9 +203,9 @@
 </template>
 
 <script setup>
-import { reactive, ref, computed, watch } from 'vue'
+import { reactive, ref, computed, watch, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { mockDb } from '../../api/client'
+import { shopApi } from '../../api/shop'
 import { usersApi } from '../../api/users'
 import { useSystemStore } from '../../stores/system'
 import Modal from '../common/Modal.vue'
@@ -225,6 +225,7 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue', 'save'])
 const isSubmitting = ref(false)
 const isTerminating = ref(false)
+const shopItems = ref([])
 
 const form = reactive({
   username: '',
@@ -236,11 +237,20 @@ const form = reactive({
 })
 
 const availableFrames = computed(() => {
-  return mockDb.shopItems.filter((i) => i.item_type === 'frame')
+  return shopItems.value.filter((i) => i.item_type === 'frame')
 })
 
 const availableBackgrounds = computed(() => {
-  return mockDb.shopItems.filter((i) => i.item_type === 'background')
+  return shopItems.value.filter((i) => i.item_type === 'background')
+})
+
+onMounted(async () => {
+  try {
+    const res = await shopApi.getItems()
+    shopItems.value = res.data || []
+  } catch (e) {
+    console.error('Failed to load shop items in UserEditModal', e)
+  }
 })
 
 const selectedFrameStyle = computed(() => {

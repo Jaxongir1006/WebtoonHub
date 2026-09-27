@@ -113,7 +113,6 @@
 
 <script setup>
 import { reactive, ref, computed, watch } from 'vue'
-import { mockDb } from '../../api/client'
 import Modal from '../common/Modal.vue'
 import Button from '../common/Button.vue'
 
@@ -122,6 +121,10 @@ const props = defineProps({
   staff: {
     type: Object,
     default: null
+  },
+  roles: {
+    type: Array,
+    default: () => []
   }
 })
 
@@ -129,7 +132,7 @@ const emit = defineEmits(['update:modelValue', 'save'])
 const isSubmitting = ref(false)
 
 const isEdit = computed(() => !!props.staff)
-const roles = computed(() => mockDb.roles)
+const roles = computed(() => props.roles)
 
 const form = reactive({
   username: '',

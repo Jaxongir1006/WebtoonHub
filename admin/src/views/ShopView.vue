@@ -155,11 +155,10 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '../stores/auth'
 import { useSystemStore } from '../stores/system'
-import { mockDb } from '../api/client'
 import { shopApi } from '../api/shop'
 import Badge from '../components/common/Badge.vue'
 import Button from '../components/common/Button.vue'
@@ -172,6 +171,8 @@ const systemStore = useSystemStore()
 const currentType = ref('all')
 const showModal = ref(false)
 const editingItem = ref(null)
+const loading = ref(false)
+const items = ref([])
 
 const filterTabs = computed(() => [
   { label: t('shop.tab_all'), value: 'all' },
@@ -179,12 +180,26 @@ const filterTabs = computed(() => [
   { label: t('shop.tab_backgrounds'), value: 'background' }
 ])
 
-const items = computed(() => mockDb.shopItems)
-
 const filteredItems = computed(() => {
   if (currentType.value === 'all') return items.value
   return items.value.filter((i) => i.item_type === currentType.value)
 })
+
+async function loadItems() {
+  loading.value = true
+  try {
+    const res = await shopApi.getItems()
+    items.value = res.data || []
+  } catch (err) {
+    systemStore.addToast({
+      type: 'danger',
+      title: 'Xatolik',
+      message: 'Do\'kon buyumlarini yuklashda xatolik yuz berdi'
+    })
+  } finally {
+    loading.value = false
+  }
+}
 
 function openCreateModal() {
   editingItem.value = null
@@ -198,27 +213,40 @@ function openEditModal(item) {
 
 async function toggleAvailability(item) {
   try {
-    await shopApi.toggleAvailability(item.id)
+    const newStatus = !item.is_available
+    await shopApi.toggleAvailability(item.id, newStatus)
+    item.is_available = newStatus
     systemStore.addToast({
       type: 'info',
       title: 'Holat yangilandi',
-      message: `"${item.name}" ${item.is_available ? 'sotuvga chiqarildi' : 'nofaol qilindi'}`
+      message: `"${item.name}" ${newStatus ? 'sotuvga chiqarildi' : 'nofaol qilindi'}`
     })
-  } catch {
-    item.is_available = !item.is_available
-    mockDb.save('shopItems')
+  } catch (err) {
+    systemStore.addToast({
+      type: 'danger',
+      title: 'Xatolik',
+      message: err.response?.data?.detail || 'Holatni o\'zgartirishda xatolik'
+    })
   }
 }
 
 async function deleteItem(id) {
   if (confirm('Ushbu bezakni do\'kondan o\'chirmoqchimisiz?')) {
-    mockDb.shopItems = mockDb.shopItems.filter((i) => i.id !== id)
-    mockDb.save('shopItems')
-    systemStore.addToast({
-      type: 'info',
-      title: 'Buyum o\'chirildi',
-      message: 'Buyum do\'kondan olib tashlandi'
-    })
+    try {
+      await shopApi.deleteItem(id)
+      items.value = items.value.filter((i) => i.id !== id)
+      systemStore.addToast({
+        type: 'info',
+        title: 'Buyum o\'chirildi',
+        message: 'Buyum do\'kondan olib tashlandi'
+      })
+    } catch (err) {
+      systemStore.addToast({
+        type: 'danger',
+        title: 'Xatolik',
+        message: err.response?.data?.detail || 'Buyumni o\'chirishda xatolik'
+      })
+    }
   }
 }
 
@@ -239,12 +267,17 @@ async function onItemSaved(formData) {
         message: `"${formData.name}" muvaffaqiyatli do'konga joylandi`
       })
     }
+    await loadItems()
   } catch (err) {
     systemStore.addToast({
       type: 'error',
       title: 'Xatolik',
-      message: err.message || 'Saqlashda xatolik yuz berdi'
+      message: err.response?.data?.detail || err.message || 'Saqlashda xatolik yuz berdi'
     })
   }
 }
+
+onMounted(() => {
+  loadItems()
+})
 </script>

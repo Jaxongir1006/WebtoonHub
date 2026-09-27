@@ -18,13 +18,13 @@
 
     <!-- Right: Language, Theme, Role, Profile -->
     <div class="flex items-center gap-2 sm:gap-3">
-      <!-- Hybrid Mode Pill -->
+      <!-- Live Backend Status Pill -->
       <div
-        class="hidden xl:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-mono font-semibold border bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30"
-        title="Mock + API sync"
+        class="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-mono font-semibold border bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30"
+        title="FastAPI serveriga ulangan"
       >
         <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-pulse" />
-        <span>{{ $t('common.hybrid_badge') }}</span>
+        <span>⚡ Jonli API (Online)</span>
       </div>
 
       <!-- Language Switcher Dropdown -->
@@ -111,41 +111,10 @@
         </div>
       </div>
 
-      <!-- Live Role Switcher (RBAC) -->
-      <div class="relative hidden sm:block">
-        <button
-          class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-xl bg-slate-100 dark:bg-studio-850 hover:bg-slate-200 dark:hover:bg-studio-800 text-slate-700 dark:text-studio-200 border border-slate-200 dark:border-white/10 transition-colors"
-          @click="showRoleDropdown = !showRoleDropdown; showLangDropdown = false; showThemeDropdown = false"
-        >
-          <span class="text-slate-400 dark:text-studio-400">{{ $t('common.test_role') }}:</span>
-          <span class="font-bold text-brand-600 dark:text-brand-400 uppercase font-mono">{{ authStore.userRole }}</span>
-          <svg class="w-3.5 h-3.5 text-slate-400 dark:text-studio-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-          </svg>
-        </button>
-
-        <div
-          v-if="showRoleDropdown"
-          class="absolute right-0 mt-2 w-48 glass-panel rounded-xl shadow-2xl border border-slate-200 dark:border-white/10 p-1.5 z-50 text-xs"
-        >
-          <div class="px-2 py-1 text-[10px] uppercase font-bold text-slate-400 dark:text-studio-400">
-            RBAC
-          </div>
-          <button
-            v-for="role in availableRoles"
-            :key="role"
-            :class="[
-              'w-full text-left px-2.5 py-1.5 rounded-lg flex items-center justify-between font-mono font-semibold transition-colors',
-              authStore.userRole === role
-                ? 'bg-brand-500/20 text-brand-600 dark:text-brand-300'
-                : 'text-slate-700 dark:text-studio-300 hover:bg-slate-100 dark:hover:bg-studio-800'
-            ]"
-            @click="selectRole(role)"
-          >
-            <span>{{ role }}</span>
-            <span v-if="authStore.userRole === role" class="text-brand-500">✓</span>
-          </button>
-        </div>
+      <!-- Staff Role Badge -->
+      <div class="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-xl bg-slate-100 dark:bg-studio-850 text-slate-700 dark:text-studio-200 border border-slate-200 dark:border-white/10">
+        <span class="text-slate-400 dark:text-studio-400">{{ $t('nav.current_role') }}:</span>
+        <span class="font-bold text-brand-600 dark:text-brand-400 uppercase font-mono">{{ authStore.userRole }}</span>
       </div>
 
       <!-- User Profile & Logout -->
@@ -189,11 +158,8 @@ const { t } = useI18n()
 const systemStore = useSystemStore()
 const authStore = useAuthStore()
 
-const showRoleDropdown = ref(false)
 const showLangDropdown = ref(false)
 const showThemeDropdown = ref(false)
-
-const availableRoles = ['superadmin', 'creator', 'moderator', 'viewer']
 
 const languages = [
   { code: 'uz', flag: '🇺🇿', label: 'O\'zbekcha' },
@@ -242,15 +208,6 @@ function selectTheme(theme) {
   })
 }
 
-function selectRole(role) {
-  authStore.switchRole(role)
-  showRoleDropdown.value = false
-  systemStore.addToast({
-    type: 'info',
-    title: 'Rol almashtirildi',
-    message: `Siz hozir '${role}' sifatida tizimdasiz`
-  })
-}
 
 function logout() {
   authStore.logout()

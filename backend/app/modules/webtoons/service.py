@@ -202,7 +202,8 @@ class WebtoonService:
     async def read_chapter(
         db: AsyncSession,
         chapter_id: int,
-        user_id: Optional[int] = None
+        user_id: Optional[int] = None,
+        is_staff: bool = False
     ) -> ChapterReaderResponse:
         stmt = (
             select(Chapter)
@@ -217,7 +218,7 @@ class WebtoonService:
         if not chapter:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Bob topilmadi")
 
-        if chapter.status != "published":
+        if not is_staff and chapter.status != "published":
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Ushbu bob hali moderatorlar tomonidan tekshirilmoqda"
@@ -649,6 +650,7 @@ class WebtoonService:
                 "title": c.title,
                 "status": c.status,
                 "images_count": len(c.images),
+                "images": [img.image_url for img in sorted(c.images, key=lambda x: x.order_index)],
                 "reward_coins": c.reward_coins,
                 "created_at": c.created_at.isoformat() if c.created_at else None
             }

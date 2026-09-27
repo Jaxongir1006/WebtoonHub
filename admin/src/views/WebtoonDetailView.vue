@@ -200,12 +200,12 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useSystemStore } from '../stores/system'
-import { mockDb } from '../api/client'
 import { webtoonsApi } from '../api/webtoons'
+import { moderationApi } from '../api/moderation'
 import Badge from '../components/common/Badge.vue'
 import Button from '../components/common/Button.vue'
 import Modal from '../components/common/Modal.vue'
@@ -217,11 +217,29 @@ const route = useRoute()
 const authStore = useAuthStore()
 const systemStore = useSystemStore()
 
-const webtoonId = computed(() => Number(route.params.id))
-const webtoon = computed(() => mockDb.webtoons.find((w) => w.id === webtoonId.value))
-const chapters = computed(() =>
-  mockDb.chapters.filter((c) => c.webtoon_id === webtoonId.value).sort((a, b) => a.chapter_number - b.chapter_number)
-)
+const webtoonId = computed(() => route.params.id)
+const webtoon = ref(null)
+const chapters = ref([])
+const isLoading = ref(false)
+
+async function loadWebtoon() {
+  isLoading.value = true
+  try {
+    const res = await webtoonsApi.getWebtoon(webtoonId.value)
+    if (res.data) {
+      webtoon.value = res.data
+      chapters.value = (res.data.chapters || []).sort((a, b) => a.chapter_number - b.chapter_number)
+    }
+  } catch (err) {
+    console.error('Failed to load webtoon detail:', err)
+  } finally {
+    isLoading.value = false
+  }
+}
+
+onMounted(() => {
+  loadWebtoon()
+})
 
 const showChapterUpload = ref(false)
 const showChapterEditModal = ref(false)
@@ -271,49 +289,104 @@ function openEditChapterModal(ch) {
 }
 
 async function onChapterUpdated(updatedData) {
-  await webtoonsApi.updateChapter(updatedData.id, updatedData)
-  systemStore.addToast({
-    type: 'success',
-    title: 'Bob tahrirlandi',
-    message: `${updatedData.chapter_number}-bob ma'lumotlari muvaffaqiyatli saqlandi`
-  })
-}
-
-async function onWebtoonUpdated(savedItem) {
-  await webtoonsApi.updateWebtoon(savedItem.id, savedItem)
-  systemStore.addToast({
-    type: 'success',
-    title: 'Manhwa tahrirlandi',
-    message: `"${savedItem.title}" muvaffaqiyatli yangilandi`
-  })
-}
-
-function quickApprove(ch) {
-  ch.status = 'published'
-  mockDb.save('chapters')
-  systemStore.addToast({
-    type: 'success',
-    title: 'Bob tasdiqlandi',
-    message: `${ch.chapter_number}-bob muvaffaqiyatli chop etildi`
-  })
-}
-
-async function deleteChapter(id) {
-  if (confirm('Ushbu bobni o\'chirmoqchimisiz?')) {
-    await webtoonsApi.deleteChapter(id)
+  try {
+    await webtoonsApi.updateChapter(updatedData.id, updatedData)
     systemStore.addToast({
-      type: 'info',
-      title: 'Bob o\'chirildi',
-      message: 'Bob muvaffaqiyatli o\'chirildi'
+      type: 'success',
+      title: 'Bob tahrirlandi',
+      message: `${updatedData.chapter_number}-bob ma'lumotlari muvaffaqiyatli saqlandi`
+    })
+    await loadWebtoon()
+  } catch (err) {
+    systemStore.addToast({
+      type: 'error',
+      title: 'Xatolik',
+      message: err.message || 'Bobni yangilashda xatolik'
     })
   }
 }
 
-function onChapterUploaded() {
-  systemStore.addToast({
-    type: 'success',
-    title: 'Bob yuklandi',
-    message: 'Yangi bob moderatsiyaga yuborildi'
-  })
+async function onWebtoonUpdated(savedItem) {
+  try {
+    await webtoonsApi.updateWebtoon(savedItem.id, savedItem)
+    systemStore.addToast({
+      type: 'success',
+      title: 'Manhwa tahrirlandi',
+      message: `"${savedItem.title}" muvaffaqiyatli yangilandi`
+    })
+    await loadWebtoon()
+  } catch (err) {
+    systemStore.addToast({
+      type: 'error',
+      title: 'Xatolik',
+      message: err.message || 'Manhvani yangilashda xatolik'
+    })
+  }
+}
+
+async function quickApprove(ch) {
+  try {
+    await moderationApi.moderateChapter(ch.id, 'published')
+    systemStore.addToast({
+      type: 'success',
+      title: 'Bob tasdiqlandi',
+      message: `${ch.chapter_number}-bob muvaffaqiyatli chop etildi`
+    })
+    await loadWebtoon()
+  } catch (err) {
+    systemStore.addToast({
+      type: 'error',
+      title: 'Xatolik',
+      message: err.message || 'Bobni tasdiqlashda xatolik'
+    })
+  }
+}
+
+async function deleteChapter(id) {
+  if (confirm('Ushbu bobni o\'chirmoqchimisiz?')) {
+    try {
+      await webtoonsApi.deleteChapter(id)
+      systemStore.addToast({
+        type: 'info',
+        title: 'Bob o\'chirildi',
+        message: 'Bob muvaffaqiyatli o\'chirildi'
+      })
+      await loadWebtoon()
+    } catch (err) {
+      systemStore.addToast({
+        type: 'error',
+        title: 'Xatolik',
+        message: err.message || 'O\'chirishda xatolik yuz berdi'
+      })
+    }
+  }
+}
+
+async function onChapterUploaded(data) {
+  try {
+    const formData = new FormData()
+    formData.append('webtoon_id', data.webtoon_id || webtoonId.value)
+    formData.append('chapter_number', data.chapter_number)
+    if (data.title) formData.append('title', data.title)
+    if (data.rawFiles && data.rawFiles.length > 0) {
+      data.rawFiles.forEach((f) => formData.append('images', f))
+    } else {
+      const dummyBlob = new Blob([new Uint8Array([0xFF, 0xD8, 0xFF, 0xE0])], { type: 'image/jpeg' })
+      formData.append('images', dummyBlob, 'page_01.jpg')
+    }
+    await webtoonsApi.uploadChapter(formData)
+    await loadWebtoon()
+    systemStore.addToast({
+      type: 'success',
+      title: 'Bob yuklandi',
+      message: `${data.chapter_number}-bob muvaffaqiyatli yuklandi va tekshiruvga yuborildi`
+    })
+  } catch (err) {
+    systemStore.addToast({
+      type: 'error',
+      title: 'Xatolik',
+      message: err.message || 'Bobni yuklashda xatolik yuz berdi'
+    })
+  }
 }
 </script>

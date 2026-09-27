@@ -18,6 +18,7 @@
         <Button
           variant="danger"
           size="sm"
+          :disabled="sessions.length <= 1"
           @click="revokeOthers"
         >
           Boshqa barcha seanslardan chiqish
@@ -25,8 +26,14 @@
       </div>
     </div>
 
+    <!-- Loading State -->
+    <div v-if="loading" class="flex flex-col items-center justify-center p-16 space-y-4">
+      <div class="w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full animate-spin"></div>
+      <p class="text-xs text-studio-400 font-medium">Seanslar yuklanmoqda...</p>
+    </div>
+
     <!-- Sessions List -->
-    <div class="space-y-4">
+    <div v-else class="space-y-4">
       <div
         v-for="s in sessions"
         :key="s.id"
@@ -58,7 +65,7 @@
           <div class="space-y-1">
             <div class="flex items-center gap-2">
               <span class="font-bold text-white text-base">
-                {{ s.device_type }}
+                {{ s.device_type || 'Brauzer' }}
               </span>
               <Badge v-if="s.is_current" variant="success" :dot="true">
                 Joriy Qurilma
@@ -66,15 +73,15 @@
             </div>
 
             <p class="text-xs text-studio-400 font-mono">
-              IP: {{ s.ip_address }} • Seans ID: {{ s.id.substring(0, 8) }}...
+              IP: {{ s.ip_address || '127.0.0.1' }} • Seans ID: {{ String(s.id).substring(0, 8) }}...
             </p>
 
             <p class="text-[11px] text-studio-500 line-clamp-1 max-w-xl">
-              {{ s.user_agent }}
+              {{ s.user_agent || 'Noma\'lum brauzer' }}
             </p>
 
             <p class="text-[11px] text-studio-400 font-mono pt-1">
-              Oxirgi faollik: {{ formatDate(s.last_active_at) }}
+              Oxirgi faollik: {{ formatDate(s.last_active_at || s.created_at) }}
             </p>
           </div>
         </div>
@@ -84,6 +91,7 @@
             v-if="!s.is_current"
             variant="danger"
             size="xs"
+            :disabled="actionLoading === s.id"
             @click="revoke(s.id)"
           >
             Seansni Yakunlash
@@ -98,17 +106,32 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
-import { useAuthStore } from '../stores/auth'
+import { ref, onMounted } from 'vue'
 import { useSystemStore } from '../stores/system'
-import { mockDb } from '../api/client'
+import { authApi } from '../api/auth'
 import Badge from '../components/common/Badge.vue'
 import Button from '../components/common/Button.vue'
 
-const authStore = useAuthStore()
 const systemStore = useSystemStore()
+const sessions = ref([])
+const loading = ref(false)
+const actionLoading = ref(null)
 
-const sessions = computed(() => mockDb.sessions)
+async function loadSessions() {
+  loading.value = true
+  try {
+    const res = await authApi.getSessions()
+    sessions.value = res.data || []
+  } catch (err) {
+    systemStore.addToast({
+      type: 'danger',
+      title: 'Xatolik',
+      message: 'Seanslarni yuklashda xatolik yuz berdi'
+    })
+  } finally {
+    loading.value = false
+  }
+}
 
 function formatDate(iso) {
   if (!iso) return ''
@@ -120,23 +143,47 @@ function formatDate(iso) {
   })
 }
 
-function revoke(id) {
-  mockDb.sessions = mockDb.sessions.filter((s) => s.id !== id)
-  mockDb.save('sessions')
-  systemStore.addToast({
-    type: 'info',
-    title: 'Seans tugatildi',
-    message: 'Ko\'rsatilgan qurilmadagi seans bekor qilindi'
-  })
+async function revoke(id) {
+  actionLoading.value = id
+  try {
+    await authApi.revokeSession(id)
+    sessions.value = sessions.value.filter((s) => s.id !== id)
+    systemStore.addToast({
+      type: 'info',
+      title: 'Seans tugatildi',
+      message: 'Ko\'rsatilgan qurilmadagi seans bekor qilindi'
+    })
+  } catch (err) {
+    systemStore.addToast({
+      type: 'error',
+      title: 'Xatolik',
+      message: err.response?.data?.detail || 'Seansni yakunlashda xatolik'
+    })
+  } finally {
+    actionLoading.value = null
+  }
 }
 
-function revokeOthers() {
-  mockDb.sessions = mockDb.sessions.filter((s) => s.is_current)
-  mockDb.save('sessions')
-  systemStore.addToast({
-    type: 'success',
-    title: 'Barcha boshqa seanslar bekor qilindi',
-    message: 'Faqat joriy faol qurilma qoldirildi'
-  })
+async function revokeOthers() {
+  if (!confirm('Barcha boshqa qurilmalardagi seanslarni yakunlamoqchimisiz?')) return
+  try {
+    await authApi.revokeOtherSessions()
+    sessions.value = sessions.value.filter((s) => s.is_current)
+    systemStore.addToast({
+      type: 'success',
+      title: 'Barcha boshqa seanslar bekor qilindi',
+      message: 'Faqat joriy faol qurilma qoldirildi'
+    })
+  } catch (err) {
+    systemStore.addToast({
+      type: 'error',
+      title: 'Xatolik',
+      message: err.response?.data?.detail || 'Seanslarni yakunlashda xatolik'
+    })
+  }
 }
+
+onMounted(() => {
+  loadSessions()
+})
 </script>

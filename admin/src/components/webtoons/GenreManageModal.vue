@@ -120,8 +120,7 @@
 </template>
 
 <script setup>
-import { reactive, ref, computed } from 'vue'
-import { mockDb } from '../../api/client'
+import { reactive, ref, onMounted } from 'vue'
 import { webtoonsApi } from '../../api/webtoons'
 import { useSystemStore } from '../../stores/system'
 import Modal from '../common/Modal.vue'
@@ -137,13 +136,25 @@ const systemStore = useSystemStore()
 
 const isSubmitting = ref(false)
 const editingGenreId = ref(null)
+const genres = ref([])
 
 const form = reactive({
   name: '',
   slug: ''
 })
 
-const genres = computed(() => mockDb.genres)
+async function loadGenres() {
+  try {
+    const res = await webtoonsApi.getGenres()
+    genres.value = res.data || []
+  } catch (err) {
+    console.error('Failed to load genres', err)
+  }
+}
+
+onMounted(() => {
+  loadGenres()
+})
 
 function onNameInput() {
   if (!editingGenreId.value) {
@@ -154,10 +165,6 @@ function onNameInput() {
       .replace(/\s+/g, '-')
       .replace(/-+/g, '-')
   }
-}
-
-function getManhwasCount(genreId) {
-  return mockDb.webtoons.filter((w) => w.genre_ids?.includes(genreId)).length
 }
 
 function startEdit(genre) {
@@ -197,6 +204,7 @@ async function handleSave() {
       })
     }
     cancelEdit()
+    await loadGenres()
     emit('changed')
   } catch (err) {
     systemStore.addToast({
@@ -210,15 +218,8 @@ async function handleSave() {
 }
 
 async function handleDelete(genre) {
-  const count = getManhwasCount(genre.id)
-  if (count > 0) {
-    if (!confirm(`Diqqat! "${genre.name}" janriga ${count} ta manhva biriktirilgan. Haqiqatan ham o'chirmoqchimisiz?`)) {
-      return
-    }
-  } else {
-    if (!confirm(`"${genre.name}" janrini o'chirishni tasdiqlaysizmi?`)) {
-      return
-    }
+  if (!confirm(`"${genre.name}" janrini o'chirishni tasdiqlaysizmi?`)) {
+    return
   }
 
   try {
@@ -231,12 +232,13 @@ async function handleDelete(genre) {
       title: 'Janr o\'chirildi',
       message: `"${genre.name}" muvaffaqiyatli o'chirildi`
     })
+    await loadGenres()
     emit('changed')
   } catch (err) {
     systemStore.addToast({
       type: 'error',
       title: 'Xatolik',
-      message: err.message || 'Janrni o\'chirishda xatolik yuz berdi'
+      message: err.response?.data?.detail || err.message || 'Janrni o\'chirishda xatolik yuz berdi'
     })
   }
 }

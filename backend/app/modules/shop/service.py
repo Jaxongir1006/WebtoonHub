@@ -163,25 +163,28 @@ class ShopService:
         name: str,
         item_type: str,
         price_coins: int,
-        asset_file: UploadFile
+        asset_file: Optional[UploadFile] = None,
+        asset_url: Optional[str] = None
     ) -> ShopItem:
-        file_ext = asset_file.filename.split(".")[-1].lower() if asset_file.filename else "png"
-        folder = "frames" if item_type == "frame" else "backgrounds"
-        object_name = f"{folder}/{uuid.uuid4().hex[:10]}.{file_ext}"
+        final_url = asset_url or ""
+        if asset_file and asset_file.filename:
+            file_ext = asset_file.filename.split(".")[-1].lower() if asset_file.filename else "png"
+            folder = "frames" if item_type == "frame" else "backgrounds"
+            object_name = f"{folder}/{uuid.uuid4().hex[:10]}.{file_ext}"
 
-        content = await asset_file.read()
-        asset_url = StorageService.upload_file(
-            bucket_name=settings.MINIO_BUCKET_SHOP,
-            object_name=object_name,
-            data=content,
-            content_type=asset_file.content_type or "image/png"
-        )
+            content = await asset_file.read()
+            final_url = StorageService.upload_file(
+                bucket_name=settings.MINIO_BUCKET_SHOP,
+                object_name=object_name,
+                data=content,
+                content_type=asset_file.content_type or "image/png"
+            )
 
         item = ShopItem(
             name=name,
             item_type=item_type,
             price_coins=price_coins,
-            asset_url=asset_url,
+            asset_url=final_url,
             is_available=True
         )
         db.add(item)

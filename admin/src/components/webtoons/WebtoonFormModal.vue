@@ -144,16 +144,20 @@
 </template>
 
 <script setup>
-import { reactive, watch, ref } from 'vue'
+import { reactive, watch, ref, computed, onMounted } from 'vue'
 import Modal from '../common/Modal.vue'
 import Button from '../common/Button.vue'
-import { mockDb } from '../../api/client'
+import { webtoonsApi } from '../../api/webtoons'
 
 const props = defineProps({
   modelValue: Boolean,
   webtoon: {
     type: Object,
     default: null
+  },
+  genres: {
+    type: Array,
+    default: () => []
   }
 })
 
@@ -161,7 +165,23 @@ const emit = defineEmits(['update:modelValue', 'save'])
 
 const isEdit = ref(false)
 const isSubmitting = ref(false)
-const availableGenres = mockDb.genres
+const loadedGenres = ref([])
+
+onMounted(async () => {
+  if (!props.genres || props.genres.length === 0) {
+    try {
+      const res = await webtoonsApi.getGenres()
+      loadedGenres.value = res.data || []
+    } catch (e) {
+      console.error(e)
+    }
+  }
+})
+
+const availableGenres = computed(() => {
+  if (props.genres && props.genres.length > 0) return props.genres
+  return loadedGenres.value
+})
 
 const form = reactive({
   title: '',
@@ -169,7 +189,8 @@ const form = reactive({
   status: 'ongoing',
   description: '',
   genre_ids: [1],
-  cover_image_url: 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=600&auto=format&fit=crop&q=80'
+  cover_image_url: 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=600&auto=format&fit=crop&q=80',
+  cover_image_file: null
 })
 
 watch(
@@ -183,6 +204,7 @@ watch(
       form.description = val.description || ''
       form.genre_ids = val.genre_ids ? [...val.genre_ids] : [1]
       form.cover_image_url = val.cover_image_url || ''
+      form.cover_image_file = null
     } else {
       isEdit.value = false
       form.title = ''
@@ -191,6 +213,7 @@ watch(
       form.description = ''
       form.genre_ids = [1, 2]
       form.cover_image_url = 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=600&auto=format&fit=crop&q=80'
+      form.cover_image_file = null
     }
   },
   { immediate: true }
@@ -210,6 +233,7 @@ function toggleGenre(id) {
 function handleFileUpload(e) {
   const file = e.target.files[0]
   if (file) {
+    form.cover_image_file = file
     const reader = new FileReader()
     reader.onload = (event) => {
       form.cover_image_url = event.target.result

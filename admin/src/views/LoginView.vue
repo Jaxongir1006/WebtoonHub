@@ -153,7 +153,7 @@
             <button
               type="button"
               class="p-2 rounded-xl bg-slate-100 dark:bg-studio-900 hover:bg-brand-500/10 border border-slate-200 dark:border-white/5 hover:border-brand-500/30 text-center transition-all group"
-              @click="quickFill('admin@webtoonhub.uz', 'Admin12345!')"
+              @click="quickFill('admin@webtoonhub.uz', 'AdminPassword123')"
             >
               <span class="block text-xs font-bold text-slate-800 dark:text-white group-hover:text-brand-600 dark:group-hover:text-brand-300">Superadmin</span>
               <span class="text-[10px] text-slate-500 dark:text-studio-500 font-mono">{{ $t('login.superadmin_desc') }}</span>
@@ -162,7 +162,7 @@
             <button
               type="button"
               class="p-2 rounded-xl bg-slate-100 dark:bg-studio-900 hover:bg-cyan-500/10 border border-slate-200 dark:border-white/5 hover:border-cyan-500/30 text-center transition-all group"
-              @click="quickFill('ali@webtoonhub.uz', 'Creator123!')"
+              @click="quickFill('creator@webtoonhub.uz', 'CreatorPassword123')"
             >
               <span class="block text-xs font-bold text-slate-800 dark:text-white group-hover:text-cyan-600 dark:group-hover:text-cyan-300">Creator</span>
               <span class="text-[10px] text-slate-500 dark:text-studio-500 font-mono">{{ $t('login.creator_desc') }}</span>
@@ -171,7 +171,7 @@
             <button
               type="button"
               class="p-2 rounded-xl bg-slate-100 dark:bg-studio-900 hover:bg-purple-500/10 border border-slate-200 dark:border-white/5 hover:border-purple-500/30 text-center transition-all group"
-              @click="quickFill('nodir@webtoonhub.uz', 'Mod12345!')"
+              @click="quickFill('moderator@webtoonhub.uz', 'ModeratorPassword123')"
             >
               <span class="block text-xs font-bold text-slate-800 dark:text-white group-hover:text-purple-600 dark:group-hover:text-purple-300">Moderator</span>
               <span class="text-[10px] text-slate-500 dark:text-studio-500 font-mono">{{ $t('login.moderator_desc') }}</span>
@@ -203,7 +203,7 @@ const authStore = useAuthStore()
 const systemStore = useSystemStore()
 
 const email = ref('admin@webtoonhub.uz')
-const password = ref('Admin12345!')
+const password = ref('AdminPassword123')
 const isLoading = ref(false)
 const errorMessage = ref('')
 

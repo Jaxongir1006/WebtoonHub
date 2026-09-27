@@ -126,15 +126,32 @@
 </template>
 
 <script setup>
-import { h } from 'vue'
+import { h, ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useSystemStore } from '../../stores/system'
 import { useAuthStore } from '../../stores/auth'
-import { mockDb } from '../../api/client'
+import { analyticsApi } from '../../api/analytics'
 
 const route = useRoute()
 const systemStore = useSystemStore()
 const authStore = useAuthStore()
+
+const pendingChapters = ref(0)
+const pendingCreatorRequests = ref(0)
+
+onMounted(async () => {
+  if (authStore.isAuthenticated) {
+    try {
+      const res = await analyticsApi.getDashboardStats()
+      if (res.data) {
+        pendingChapters.value = res.data.pending_chapters || 0
+        pendingCreatorRequests.value = res.data.pending_creator_requests || 0
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+})
 
 // SVG Icon Helpers
 const IconDashboard = () =>
@@ -203,7 +220,7 @@ const navSections = [
         path: '/moderation',
         icon: IconShieldCheck,
         permission: 'chapters:approve',
-        badge: () => mockDb.chapters.filter((c) => c.status === 'pending').length
+        badge: () => pendingChapters.value
       },
       { titleKey: 'nav.shop', path: '/shop', icon: IconShoppingBag, permission: 'shop:manage' }
     ]
@@ -217,7 +234,7 @@ const navSections = [
         path: '/creator-requests',
         icon: IconUserCheck,
         permission: 'roles:manage',
-        badge: () => mockDb.creatorRequests.filter((r) => r.status === 'pending').length
+        badge: () => pendingCreatorRequests.value
       },
       { titleKey: 'nav.users', path: '/users', icon: IconUsers, permission: 'users:manage' },
       { titleKey: 'nav.economy', path: '/economy', icon: IconLightning, permission: 'users:manage' },

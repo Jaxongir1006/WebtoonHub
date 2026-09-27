@@ -104,16 +104,19 @@
 </template>
 
 <script setup>
-import { reactive, watch, ref } from 'vue'
+import { reactive, watch, ref, computed } from 'vue'
 import Modal from '../common/Modal.vue'
 import Button from '../common/Button.vue'
-import { mockDb } from '../../api/client'
 
 const props = defineProps({
   modelValue: Boolean,
   role: {
     type: Object,
     default: null
+  },
+  permissions: {
+    type: Array,
+    default: () => []
   }
 })
 
@@ -121,7 +124,7 @@ const emit = defineEmits(['update:modelValue', 'save'])
 
 const isEdit = ref(false)
 const isSubmitting = ref(false)
-const availablePermissions = mockDb.permissions
+const availablePermissions = computed(() => props.permissions)
 
 const form = reactive({
   name: '',

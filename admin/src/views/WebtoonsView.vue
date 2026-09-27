@@ -284,10 +284,10 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { useSystemStore } from '../stores/system'
-import { mockDb } from '../api/client'
+import { webtoonsApi } from '../api/webtoons'
 import Badge from '../components/common/Badge.vue'
 import Button from '../components/common/Button.vue'
 import SearchInput from '../components/common/SearchInput.vue'
@@ -308,8 +308,29 @@ const showChapterUpload = ref(false)
 const showGenreModal = ref(false)
 const selectedWebtoon = ref(null)
 
-const webtoons = computed(() => mockDb.webtoons)
-const genres = computed(() => mockDb.genres)
+const webtoons = ref([])
+const genres = ref([])
+const isLoading = ref(false)
+
+async function loadData() {
+  isLoading.value = true
+  try {
+    const [wRes, gRes] = await Promise.all([
+      webtoonsApi.getWebtoons({ limit: 100 }),
+      webtoonsApi.getGenres()
+    ])
+    webtoons.value = wRes.data?.items || wRes.data || []
+    genres.value = gRes.data || []
+  } catch (err) {
+    console.error('Failed to load webtoons:', err)
+  } finally {
+    isLoading.value = false
+  }
+}
+
+onMounted(() => {
+  loadData()
+})
 
 const filteredWebtoons = computed(() => {
   return webtoons.value.filter((w) => {
@@ -321,16 +342,25 @@ const filteredWebtoons = computed(() => {
     const matchesStatus =
       selectedStatus.value === 'all' || w.status === selectedStatus.value
 
-    const matchesGenre =
-      selectedGenre.value === 'all' ||
-      w.genre_ids?.includes(Number(selectedGenre.value))
+    let matchesGenre = true
+    if (selectedGenre.value !== 'all') {
+      const targetGenre = genres.value.find((g) => g.id === Number(selectedGenre.value))
+      if (targetGenre) {
+        matchesGenre = (w.genres && w.genres.includes(targetGenre.name)) ||
+          (w.genre_ids && w.genre_ids.includes(Number(selectedGenre.value)))
+      }
+    }
 
     return matchesSearch && matchesStatus && matchesGenre
   })
 })
 
-function getWebtoonChaptersCount(id) {
-  return mockDb.chapters.filter((c) => c.webtoon_id === id).length
+function getWebtoonChaptersCount(itemOrId) {
+  if (typeof itemOrId === 'object' && itemOrId !== null) {
+    return itemOrId.latest_chapter?.chapter_number || itemOrId.chapters_count || 0
+  }
+  const found = webtoons.value.find((w) => w.id === itemOrId)
+  return found?.latest_chapter?.chapter_number || found?.chapters_count || 0
 }
 
 function openCreateModal() {
@@ -343,48 +373,90 @@ function openEditModal(item) {
   showCreateModal.value = true
 }
 
-function onWebtoonSaved(savedItem) {
-  if (savedItem.id) {
-    const idx = mockDb.webtoons.findIndex((w) => w.id === savedItem.id)
-    if (idx !== -1) {
-      mockDb.webtoons[idx] = { ...mockDb.webtoons[idx], ...savedItem }
-      mockDb.save('webtoons')
+async function onWebtoonSaved(savedItem) {
+  try {
+    if (savedItem.id) {
+      await webtoonsApi.updateWebtoon(savedItem.id, savedItem)
       systemStore.addToast({
         type: 'success',
         title: 'Manhwa yangilandi',
         message: `"${savedItem.title}" muvaffaqiyatli saqlandi`
       })
+    } else {
+      const formData = new FormData()
+      formData.append('title', savedItem.title)
+      if (savedItem.description) formData.append('description', savedItem.description)
+      if (savedItem.author_name) formData.append('author_name', savedItem.author_name)
+      formData.append('status', savedItem.status || 'ongoing')
+      formData.append('genre_ids', JSON.stringify(savedItem.genre_ids || []))
+      if (savedItem.cover_file) {
+        formData.append('cover_image', savedItem.cover_file)
+      } else {
+        const dummyBlob = new Blob([new Uint8Array([0xFF, 0xD8, 0xFF, 0xE0])], { type: 'image/jpeg' })
+        formData.append('cover_image', dummyBlob, 'cover.jpg')
+      }
+      await webtoonsApi.createWebtoon(formData)
+      systemStore.addToast({
+        type: 'success',
+        title: 'Manhwa yaratildi',
+        message: `"${savedItem.title}" muvaffaqiyatli katalogga qo'shildi`
+      })
     }
-  } else {
-    mockDb.webtoons.unshift(savedItem)
-    mockDb.save('webtoons')
+    await loadData()
+  } catch (err) {
+    systemStore.addToast({
+      type: 'error',
+      title: 'Xatolik',
+      message: err.message || 'Manhvani saqlashda xatolik yuz berdi'
+    })
+  }
+}
+
+async function deleteWebtoon(id) {
+  if (confirm('Rostdan ham ushbu manhva va uning barcha boblarini o\'chirmoqchimisiz?')) {
+    try {
+      await webtoonsApi.deleteWebtoon(id)
+      systemStore.addToast({
+        type: 'info',
+        title: 'Manhwa o\'chirildi',
+        message: 'Manhwa va uning barcha ma\'lumotlari bazadan o\'chirildi'
+      })
+      await loadData()
+    } catch (err) {
+      systemStore.addToast({
+        type: 'error',
+        title: 'Xatolik',
+        message: err.message || 'O\'chirishda xatolik yuz berdi'
+      })
+    }
+  }
+}
+
+async function onChapterUploaded(data) {
+  try {
+    const formData = new FormData()
+    formData.append('webtoon_id', data.webtoon_id)
+    formData.append('chapter_number', data.chapter_number)
+    if (data.title) formData.append('title', data.title)
+    if (data.rawFiles && data.rawFiles.length > 0) {
+      data.rawFiles.forEach((f) => formData.append('images', f))
+    } else {
+      const dummyBlob = new Blob([new Uint8Array([0xFF, 0xD8, 0xFF, 0xE0])], { type: 'image/jpeg' })
+      formData.append('images', dummyBlob, 'page_01.jpg')
+    }
+    await webtoonsApi.uploadChapter(formData)
+    await loadData()
     systemStore.addToast({
       type: 'success',
-      title: 'Manhwa yaratildi',
-      message: `"${savedItem.title}" muvaffaqiyatli katalogga qo'shildi`
+      title: 'Bob yuklandi',
+      message: `${data.chapter_number}-bob muvaffaqiyatli yuklandi va moderatsiya navbatiga qo'shildi`
     })
-  }
-}
-
-function deleteWebtoon(id) {
-  if (confirm('Rostdan ham ushbu manhva va uning barcha boblarini o\'chirmoqchimisiz?')) {
-    mockDb.webtoons = mockDb.webtoons.filter((w) => w.id !== id)
-    mockDb.chapters = mockDb.chapters.filter((c) => c.webtoon_id !== id)
-    mockDb.save('webtoons')
-    mockDb.save('chapters')
+  } catch (err) {
     systemStore.addToast({
-      type: 'info',
-      title: 'Manhwa o\'chirildi',
-      message: 'Manhwa va uning barcha ma\'lumotlari bazadan o\'chirildi'
+      type: 'error',
+      title: 'Xatolik',
+      message: err.message || 'Bobni yuklashda xatolik yuz berdi'
     })
   }
-}
-
-function onChapterUploaded(newChapter) {
-  systemStore.addToast({
-    type: 'success',
-    title: 'Bob yuklandi',
-    message: `${newChapter.chapter_number}-bob muvaffaqiyatli yuklandi`
-  })
 }
 </script>
