@@ -19,4 +19,9 @@ Ushbu modul Admin / Studio boshqaruv paneliga kiruvchi xodimlarning hisoblari (`
 * [GET /api/v1/staff/roles](file:///home/jahongir/KIUT/PBL/WebtoonHub/backend/docs/modules/staff_rbac/api/list_roles.md) — Mavjud rollar ro‘yxatini olish
 * [POST /api/v1/staff/roles](file:///home/jahongir/KIUT/PBL/WebtoonHub/backend/docs/modules/staff_rbac/api/create_role.md) — Yangi dinamik rol yaratish
 * [GET /api/v1/staff/permissions](file:///home/jahongir/KIUT/PBL/WebtoonHub/backend/docs/modules/staff_rbac/api/list_permissions.md) — Tizim ruxsatlari katalogi
+* [GET /api/v1/staff/users](file:///home/jahongir/KIUT/PBL/WebtoonHub/backend/docs/modules/staff_rbac/api/list_staff_users.md) — Xodimlar ro'yxatini olish
+* [POST /api/v1/staff/users](file:///home/jahongir/KIUT/PBL/WebtoonHub/backend/docs/modules/staff_rbac/api/create_staff_user.md) — Yangi xodim qo'shish
 * [PATCH /api/v1/staff/users/{id}/role](file:///home/jahongir/KIUT/PBL/WebtoonHub/backend/docs/modules/staff_rbac/api/update_staff_role.md) — Xodimning rolini o‘zgartirish
+* [GET /api/v1/staff/readers](file:///home/jahongir/KIUT/PBL/WebtoonHub/backend/docs/modules/staff_rbac/api/list_readers.md) — O'quvchilar ro'yxati va qidiruv
+* [PATCH /api/v1/staff/readers/{id}](file:///home/jahongir/KIUT/PBL/WebtoonHub/backend/docs/modules/staff_rbac/api/update_reader.md) — O'quvchi hisobini boshqarish va balansini to'g'irlash
+* [GET /api/v1/staff/analytics/dashboard](file:///home/jahongir/KIUT/PBL/WebtoonHub/backend/docs/modules/staff_rbac/api/analytics_dashboard.md) — Boshqaruv paneli umumiy ko'rsatkichlari (statistika)

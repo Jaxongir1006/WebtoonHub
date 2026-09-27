@@ -1,20 +1,25 @@
 import uuid
-from typing import List, Tuple
-from fastapi import APIRouter, Depends, Request, status
+from typing import List, Optional, Tuple
+from fastapi import APIRouter, Depends, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.modules.staff.dependencies import get_current_staff_and_session, require_permission
 from app.modules.staff.models import StaffUser
 from app.modules.staff.schemas import (
+    DashboardStatsResponse,
     PermissionItem,
+    ReaderListResponse,
+    ReaderUpdateRequest,
     RoleCreateRequest,
     RoleItem,
     StaffLoginRequest,
     StaffRoleUpdateRequest,
     StaffSessionItem,
     StaffSummary,
-    StaffTokenResponse
+    StaffTokenResponse,
+    StaffUserCreate,
+    StaffUserResponse
 )
 from app.modules.staff.service import StaffService
 
@@ -141,4 +146,81 @@ async def update_staff_role(
         "success": True,
         "data": None,
         "message": "Xodim roli muvaffaqiyatli yangilandi"
+    }
+
+
+# 7. Staff Users List & Create
+@router.get("/users", status_code=status.HTTP_200_OK)
+async def list_staff_users(
+    _staff: StaffUser = Depends(require_permission("staff:manage")),
+    db: AsyncSession = Depends(get_db)
+):
+    users = await StaffService.list_staff_users(db)
+    return {
+        "success": True,
+        "data": users
+    }
+
+
+@router.post("/users", status_code=status.HTTP_201_CREATED)
+async def create_staff_user(
+    data: StaffUserCreate,
+    _staff: StaffUser = Depends(require_permission("staff:manage")),
+    db: AsyncSession = Depends(get_db)
+):
+    new_user = await StaffService.create_staff_user(db, data)
+    return {
+        "success": True,
+        "data": new_user,
+        "message": "Yangi xodim muvaffaqiyatli yaratildi"
+    }
+
+
+# 8. Readers (Users) Management
+@router.get("/readers", status_code=status.HTTP_200_OK)
+async def list_readers(
+    search: Optional[str] = Query(None),
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+    _staff: StaffUser = Depends(require_permission("users:manage")),
+    db: AsyncSession = Depends(get_db)
+):
+    res = await StaffService.list_readers(db, search=search, page=page, limit=limit)
+    return {
+        "success": True,
+        "data": res
+    }
+
+
+@router.patch("/readers/{id}", status_code=status.HTTP_200_OK)
+async def update_reader(
+    id: int,
+    data: ReaderUpdateRequest,
+    _staff: StaffUser = Depends(require_permission("users:manage")),
+    db: AsyncSession = Depends(get_db)
+):
+    user = await StaffService.update_reader(db, user_id=id, data=data)
+    return {
+        "success": True,
+        "data": {
+            "id": user.id,
+            "username": user.username,
+            "email": user.email,
+            "lightning_coins": user.lightning_coins,
+            "is_active": user.is_active
+        },
+        "message": "Foydalanuvchi ma'lumotlari muvaffaqiyatli yangilandi"
+    }
+
+
+# 9. Dashboard Analytics
+@router.get("/analytics/dashboard", status_code=status.HTTP_200_OK)
+async def get_dashboard_analytics(
+    _staff: StaffUser = Depends(require_permission("analytics:view")),
+    db: AsyncSession = Depends(get_db)
+):
+    stats = await StaffService.get_dashboard_stats(db)
+    return {
+        "success": True,
+        "data": stats
     }

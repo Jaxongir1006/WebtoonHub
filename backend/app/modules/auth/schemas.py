@@ -65,3 +65,9 @@ class UserSessionItem(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class UserProfileUpdateRequest(BaseModel):
+    username: Optional[str] = Field(None, min_length=3, max_length=50, pattern=r"^[a-zA-Z0-9_-]+$")
+    old_password: Optional[str] = None
+    new_password: Optional[str] = Field(None, min_length=8, max_length=100)

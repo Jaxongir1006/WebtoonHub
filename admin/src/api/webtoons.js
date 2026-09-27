@@ -72,7 +72,6 @@ export const webtoonsApi = {
       })
       return res.data
     } catch {
-      // Mock creation
       const title = formData.get ? formData.get('title') : formData.title
       const author_name = formData.get ? formData.get('author_name') : formData.author_name
       const description = formData.get ? formData.get('description') : formData.description
@@ -171,14 +170,13 @@ export const webtoonsApi = {
         webtoon_id,
         chapter_number,
         title: title || `${chapter_number}-bob`,
-        status: 'pending', // Starts in pending review queue
+        status: 'pending',
         reward_coins: 5,
         created_at: new Date().toISOString(),
         images
       }
 
       mockDb.chapters.push(newChapter)
-      // Increment chapter count on webtoon
       const targetWebtoon = mockDb.webtoons.find((w) => w.id === webtoon_id)
       if (targetWebtoon) {
         targetWebtoon.chapters_count = (targetWebtoon.chapters_count || 0) + 1
@@ -190,6 +188,53 @@ export const webtoonsApi = {
         success: true,
         data: newChapter,
         message: 'Bob rasmlari muvaffaqiyatli yuklandi va moderatorlar tekshiruviga yuborildi'
+      }
+    }
+  },
+
+  async updateChapter(id, data) {
+    try {
+      const res = await apiClient.patch(`/chapters/${id}`, data)
+      return res.data
+    } catch {
+      const chapter = mockDb.chapters.find((c) => c.id === Number(id))
+      if (!chapter) throw new Error('Bob topilmadi')
+
+      if (data.chapter_number !== undefined) chapter.chapter_number = parseFloat(data.chapter_number)
+      if (data.title !== undefined) chapter.title = data.title
+      if (data.reward_coins !== undefined) chapter.reward_coins = Number(data.reward_coins)
+      if (data.status !== undefined) chapter.status = data.status
+      if (data.images !== undefined) chapter.images = [...data.images]
+
+      mockDb.save('chapters')
+
+      return {
+        success: true,
+        data: chapter,
+        message: 'Bob muvaffaqiyatli tahrirlandi'
+      }
+    }
+  },
+
+  async deleteChapter(id) {
+    try {
+      const res = await apiClient.delete(`/chapters/${id}`)
+      return res.data
+    } catch {
+      const target = mockDb.chapters.find((c) => c.id === Number(id))
+      if (target) {
+        const webtoon = mockDb.webtoons.find((w) => w.id === target.webtoon_id)
+        if (webtoon && webtoon.chapters_count > 0) {
+          webtoon.chapters_count -= 1
+          mockDb.save('webtoons')
+        }
+      }
+      mockDb.chapters = mockDb.chapters.filter((c) => c.id !== Number(id))
+      mockDb.save('chapters')
+      return {
+        success: true,
+        data: null,
+        message: 'Bob muvaffaqiyatli o\'chirildi'
       }
     }
   }

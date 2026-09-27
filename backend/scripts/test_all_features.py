@@ -231,8 +231,126 @@ async def run_tests():
         assert not any(c["id"] == top_comment_id for c in comments_list_after)
         print("✓ Comment tree cleanly removed: OK")
 
+        # 10. Staff User Management
+        print("\n--- 10. Testing Staff User Management ---")
+        new_staff_email = f"staff_{ts}@webtoonhub.uz"
+        res = await client.post(
+            "/staff/users",
+            headers=staff_headers,
+            json={
+                "username": f"staff_{ts}",
+                "email": new_staff_email,
+                "password": "Password123!",
+                "role_id": 3  # moderator
+            }
+        )
+        assert res.status_code == 201, f"Create staff user failed: {res.text}"
+        print("✓ Staff user created: OK")
+
+        res = await client.get("/staff/users", headers=staff_headers)
+        assert res.status_code == 200, f"List staff users failed: {res.text}"
+        staff_list = res.json()["data"]
+        assert any(s["email"] == new_staff_email for s in staff_list)
+        print("✓ Staff users listed: OK")
+
+        # 11. Readers Management
+        print("\n--- 11. Testing Readers Management ---")
+        res = await client.get(f"/staff/readers?search={u1_name}", headers=staff_headers)
+        assert res.status_code == 200, f"Search reader failed: {res.text}"
+        readers = res.json()["data"]["items"]
+        assert any(r["id"] == u1_id for r in readers)
+        print("✓ Reader search: OK")
+
+        res = await client.patch(
+            f"/staff/readers/{u1_id}",
+            headers=staff_headers,
+            json={"lightning_coins": 350, "is_active": True}
+        )
+        assert res.status_code == 200, f"Update reader failed: {res.text}"
+        assert res.json()["data"]["lightning_coins"] == 350
+        print("✓ Reader updated by staff: OK")
+
+        # 12. Dashboard Analytics
+        print("\n--- 12. Testing Dashboard Analytics ---")
+        res = await client.get("/staff/analytics/dashboard", headers=staff_headers)
+        assert res.status_code == 200, f"Dashboard analytics failed: {res.text}"
+        dash = res.json()["data"]
+        assert dash["total_readers"] >= 2
+        assert dash["total_webtoons"] >= 1
+        assert dash["total_coins_in_circulation"] >= 350
+        print(f"✓ Dashboard analytics (readers={dash['total_readers']}, webtoons={dash['total_webtoons']}): OK")
+
+        # 13. Pending Chapters List
+        print("\n--- 13. Testing Pending Chapters Listing ---")
+        res = await client.get("/staff/chapters/pending", headers=staff_headers)
+        assert res.status_code == 200, f"List pending chapters failed: {res.text}"
+        print("✓ Pending chapters listed: OK")
+
+        # 14. Webtoon Management: Edit
+        print("\n--- 14. Testing Webtoon Edit ---")
+        res = await client.patch(
+            f"/staff/webtoons/{webtoon_id}",
+            headers=staff_headers,
+            data={"title": f"Updated Webtoon {ts}", "status": "completed"}
+        )
+        assert res.status_code == 200, f"Webtoon update failed: {res.text}"
+        assert res.json()["data"]["title"] == f"Updated Webtoon {ts}"
+        print("✓ Webtoon updated: OK")
+
+        # 15. Staff Shop Management: List & Update
+        print("\n--- 15. Testing Staff Shop Management ---")
+        res = await client.get("/staff/shop/items", headers=staff_headers)
+        assert res.status_code == 200, f"List staff shop items failed: {res.text}"
+        print("✓ Staff shop items listed: OK")
+
+        res = await client.patch(
+            f"/staff/shop/items/{item_id}",
+            headers=staff_headers,
+            json={"price_coins": 25}
+        )
+        assert res.status_code == 200, f"Update shop item failed: {res.text}"
+        assert res.json()["data"]["price_coins"] == 25
+        print("✓ Shop item updated: OK")
+
+        # 16. Staff Comments Moderation Listing
+        print("\n--- 16. Testing Staff Comments Listing ---")
+        res = await client.get("/staff/comments", headers=staff_headers)
+        assert res.status_code == 200, f"List staff comments failed: {res.text}"
+        print("✓ Staff comments list: OK")
+
+        # 17. User Profile Update
+        print("\n--- 17. Testing User Profile Update ---")
+        new_u1_username = f"new_user1_{ts}"
+        res = await client.patch(
+            "/auth/profile",
+            headers=u1_headers,
+            json={"username": new_u1_username}
+        )
+        assert res.status_code == 200, f"Update profile username failed: {res.text}"
+        assert res.json()["data"]["username"] == new_u1_username
+        print("✓ User profile username updated: OK")
+
+        # Update password
+        res = await client.patch(
+            "/auth/profile",
+            headers=u1_headers,
+            json={
+                "old_password": "Password123!",
+                "new_password": "BrandNewPassword123!"
+            }
+        )
+        assert res.status_code == 200, f"Update profile password failed: {res.text}"
+
+        # Login with new password
+        res = await client.post("/auth/login", json={
+            "email": u1_email,
+            "password": "BrandNewPassword123!"
+        })
+        assert res.status_code == 200, f"Login with new password failed: {res.text}"
+        print("✓ User profile password updated & verified login: OK")
+
         print("\n==========================================")
-        print("ALL END-TO-END TESTS PASSED SUCCESSFULLY! 🚀")
+        print("ALL 17 EXTENDED END-TO-END TESTS PASSED! 🚀")
         print("==========================================")
 
 

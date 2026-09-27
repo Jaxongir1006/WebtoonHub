@@ -18,5 +18,8 @@ Ushbu modul manhvalar katalogi, janrlar bo‘yicha filtrlash, jonli qidiruv, uzl
 * [GET /api/v1/webtoons/{id_or_slug}](file:///home/jahongir/KIUT/PBL/WebtoonHub/backend/docs/modules/webtoons/api/get_webtoon.md) — Manhvaning to‘liq kartochkasi va boblar ro‘yxati
 * [GET /api/v1/chapters/{id}](file:///home/jahongir/KIUT/PBL/WebtoonHub/backend/docs/modules/webtoons/api/read_chapter.md) — Vertikal Webtoon Reader (bob rasmlari)
 * [POST /api/v1/staff/webtoons](file:///home/jahongir/KIUT/PBL/WebtoonHub/backend/docs/modules/webtoons/api/create_webtoon.md) — Yangi manhva yaratish (muqova yuklash)
+* [PATCH /api/v1/staff/webtoons/{id}](file:///home/jahongir/KIUT/PBL/WebtoonHub/backend/docs/modules/webtoons/api/update_webtoon.md) — Manhvani tahrirlash
+* [DELETE /api/v1/staff/webtoons/{id}](file:///home/jahongir/KIUT/PBL/WebtoonHub/backend/docs/modules/webtoons/api/delete_webtoon.md) — Manhvani o'chirish
 * [POST /api/v1/staff/chapters](file:///home/jahongir/KIUT/PBL/WebtoonHub/backend/docs/modules/webtoons/api/upload_chapter.md) — Bob yaratish va rasmlarni MinIO ga yuklash (`pending`)
+* [GET /api/v1/staff/chapters/pending](file:///home/jahongir/KIUT/PBL/WebtoonHub/backend/docs/modules/webtoons/api/list_pending_chapters.md) — Moderatorlar uchun kutilayotgan boblar ro'yxati
 * [PATCH /api/v1/staff/chapters/{id}/status](file:///home/jahongir/KIUT/PBL/WebtoonHub/backend/docs/modules/webtoons/api/moderate_chapter.md) — Bobni moderatsiyadan o‘tkazish (`published` / `rejected`)

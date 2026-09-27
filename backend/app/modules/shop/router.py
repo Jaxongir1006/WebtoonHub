@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.modules.auth.dependencies import get_current_user, get_optional_user
+from app.modules.shop.schemas import ShopItemUpdateRequest
 from app.modules.shop.service import ShopService
 from app.modules.staff.dependencies import require_permission
 from app.modules.staff.models import StaffUser
@@ -100,4 +101,59 @@ async def create_shop_item(
             "asset_url": item.asset_url
         },
         "message": "Do'konga yangi buyum muvaffaqiyatli joylandi"
+    }
+
+
+# 6. List All Shop Items (Staff)
+@staff_router.get("/items", status_code=status.HTTP_200_OK)
+async def list_staff_items(
+    _staff: StaffUser = Depends(require_permission("shop:manage")),
+    db: AsyncSession = Depends(get_db)
+):
+    items = await ShopService.list_staff_items(db)
+    return {
+        "success": True,
+        "data": items
+    }
+
+
+# 7. Update Shop Item (Staff)
+@staff_router.patch("/items/{id}", status_code=status.HTTP_200_OK)
+async def update_shop_item(
+    id: int,
+    data: ShopItemUpdateRequest,
+    _staff: StaffUser = Depends(require_permission("shop:manage")),
+    db: AsyncSession = Depends(get_db)
+):
+    item = await ShopService.update_item(
+        db=db,
+        item_id=id,
+        name=data.name,
+        price_coins=data.price_coins,
+        is_available=data.is_available
+    )
+    return {
+        "success": True,
+        "data": {
+            "id": item.id,
+            "name": item.name,
+            "price_coins": item.price_coins,
+            "is_available": item.is_available
+        },
+        "message": "Buyum muvaffaqiyatli yangilandi"
+    }
+
+
+# 8. Delete Shop Item (Staff)
+@staff_router.delete("/items/{id}", status_code=status.HTTP_200_OK)
+async def delete_shop_item(
+    id: int,
+    _staff: StaffUser = Depends(require_permission("shop:manage")),
+    db: AsyncSession = Depends(get_db)
+):
+    await ShopService.delete_item(db, id)
+    return {
+        "success": True,
+        "data": None,
+        "message": "Buyum do'kondan muvaffaqiyatli o'chirildi"
     }

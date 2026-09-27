@@ -9,6 +9,7 @@ from app.modules.auth.schemas import (
     RefreshTokenRequest,
     TokenResponse,
     UserProfileResponse,
+    UserProfileUpdateRequest,
     UserRegisterRequest,
     UserLoginRequest,
     UserSessionItem,
@@ -127,4 +128,23 @@ async def revoke_session(
         "success": True,
         "data": None,
         "message": "Seans muvaffaqiyatli yakunlandi"
+    }
+
+
+@router.patch("/profile", status_code=status.HTTP_200_OK)
+async def update_profile(
+    data: UserProfileUpdateRequest,
+    auth_data: Tuple[User, str] = Depends(get_current_user_and_session),
+    db: AsyncSession = Depends(get_db)
+):
+    user, _ = auth_data
+    updated_user = await AuthService.update_profile(db, user.id, data)
+    return {
+        "success": True,
+        "data": {
+            "id": updated_user.id,
+            "username": updated_user.username,
+            "email": updated_user.email
+        },
+        "message": "Profil ma'lumotlari muvaffaqiyatli yangilandi"
     }

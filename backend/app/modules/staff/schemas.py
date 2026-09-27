@@ -67,3 +67,56 @@ class StaffSessionItem(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class StaffUserCreate(BaseModel):
+    username: str = Field(min_length=3, max_length=50)
+    email: EmailStr
+    password: str = Field(min_length=6)
+    role_id: int
+
+
+class StaffUserResponse(BaseModel):
+    id: int
+    username: str
+    email: str
+    role: RoleItem
+    is_active: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ReaderUserItem(BaseModel):
+    id: int
+    username: str
+    email: str
+    lightning_coins: int
+    is_active: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ReaderListResponse(BaseModel):
+    items: List[ReaderUserItem]
+    total: int
+    page: int
+    limit: int
+
+
+class ReaderUpdateRequest(BaseModel):
+    lightning_coins: Optional[int] = Field(None, ge=0)
+    is_active: Optional[bool] = None
+
+
+class DashboardStatsResponse(BaseModel):
+    total_readers: int
+    total_webtoons: int
+    total_chapters: int
+    pending_chapters: int
+    pending_creator_requests: int
+    total_comments: int
+    total_coins_in_circulation: int

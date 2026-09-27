@@ -404,3 +404,92 @@ class WebtoonService:
 
         # Invalidate cache
         await CacheService.delete_pattern("webtoons:catalog:*")
+
+    @staticmethod
+    async def list_pending_chapters(db: AsyncSession):
+        from app.modules.webtoons.schemas import PendingChapterItem
+        stmt = (
+            select(Chapter)
+            .options(
+                selectinload(Chapter.webtoon),
+                selectinload(Chapter.images)
+            )
+            .where(Chapter.status == "pending")
+            .order_by(Chapter.created_at.asc())
+        )
+        res = await db.execute(stmt)
+        chapters = res.scalars().all()
+        return [
+            PendingChapterItem(
+                id=c.id,
+                webtoon_id=c.webtoon_id,
+                webtoon_title=c.webtoon.title if c.webtoon else "Noma'lum",
+                chapter_number=float(c.chapter_number),
+                title=c.title,
+                status=c.status,
+                images_count=len(c.images),
+                created_at=c.created_at
+            )
+            for c in chapters
+        ]
+
+    @staticmethod
+    async def update_webtoon(
+        db: AsyncSession,
+        webtoon_id: int,
+        title: Optional[str] = None,
+        description: Optional[str] = None,
+        author_name: Optional[str] = None,
+        status_val: Optional[str] = None,
+        genre_ids: Optional[List[int]] = None,
+        cover_file: Optional[UploadFile] = None
+    ) -> Webtoon:
+        stmt = select(Webtoon).options(selectinload(Webtoon.genres)).where(Webtoon.id == webtoon_id)
+        res = await db.execute(stmt)
+        webtoon = res.scalar_one_or_none()
+        if not webtoon:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manhwa topilmadi")
+
+        if title is not None:
+            webtoon.title = title
+        if description is not None:
+            webtoon.description = description
+        if author_name is not None:
+            webtoon.author_name = author_name
+        if status_val is not None:
+            webtoon.status = status_val
+
+        if cover_file is not None and cover_file.filename:
+            file_ext = cover_file.filename.split(".")[-1].lower()
+            object_name = f"{webtoon.slug}_{uuid.uuid4().hex[:8]}.{file_ext}"
+            content = await cover_file.read()
+            cover_url = StorageService.upload_file(
+                bucket_name=settings.MINIO_BUCKET_COVERS,
+                object_name=object_name,
+                data=content,
+                content_type=cover_file.content_type or "image/webp"
+            )
+            webtoon.cover_image_url = cover_url
+
+        if genre_ids is not None:
+            clean_ids = [genre_ids] if isinstance(genre_ids, int) else list(genre_ids)
+            g_stmt = select(Genre).where(Genre.id.in_(clean_ids))
+            g_res = await db.execute(g_stmt)
+            webtoon.genres = list(g_res.scalars().all())
+
+        await db.commit()
+        await db.refresh(webtoon)
+        await CacheService.delete_pattern("webtoons:catalog:*")
+        return webtoon
+
+    @staticmethod
+    async def delete_webtoon(db: AsyncSession, webtoon_id: int) -> None:
+        stmt = select(Webtoon).where(Webtoon.id == webtoon_id)
+        res = await db.execute(stmt)
+        webtoon = res.scalar_one_or_none()
+        if not webtoon:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manhwa topilmadi")
+
+        await db.delete(webtoon)
+        await db.commit()
+        await CacheService.delete_pattern("webtoons:catalog:*")

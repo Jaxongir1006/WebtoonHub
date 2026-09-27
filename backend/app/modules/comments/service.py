@@ -193,3 +193,53 @@ class CommentsService:
 
         await db.delete(comment)
         await db.commit()
+
+    @staticmethod
+    async def list_all_comments_for_staff(db: AsyncSession, page: int = 1, limit: int = 20):
+        from sqlalchemy import func
+        from app.modules.comments.schemas import StaffCommentItem, StaffCommentListResponse
+
+        count_stmt = select(func.count(Comment.id))
+        total_res = await db.execute(count_stmt)
+        total = total_res.scalar() or 0
+
+        offset = (page - 1) * limit
+        stmt = (
+            select(Comment)
+            .options(
+                selectinload(Comment.user),
+                selectinload(Comment.chapter).selectinload(Chapter.webtoon)
+            )
+            .order_by(Comment.created_at.desc())
+            .offset(offset)
+            .limit(limit)
+        )
+        res = await db.execute(stmt)
+        comments = res.scalars().all()
+
+        items = []
+        for c in comments:
+            ch_title = c.chapter.title if c.chapter and c.chapter.title else f"{c.chapter.chapter_number if c.chapter else '?'}-bob"
+            w_title = c.chapter.webtoon.title if c.chapter and c.chapter.webtoon else "Noma'lum"
+            author = CommentAuthor(
+                id=c.user.id if c.user else 0,
+                username=c.user.username if c.user else "Noma'lum"
+            )
+            items.append(
+                StaffCommentItem(
+                    id=c.id,
+                    chapter_id=c.chapter_id,
+                    chapter_title=ch_title,
+                    webtoon_title=w_title,
+                    user=author,
+                    content=c.content,
+                    created_at=c.created_at
+                )
+            )
+
+        return StaffCommentListResponse(
+            items=items,
+            total=total,
+            page=page,
+            limit=limit
+        )

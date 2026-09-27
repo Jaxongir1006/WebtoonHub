@@ -51,6 +51,31 @@ export const shopApi = {
     }
   },
 
+  async updateItem(id, data) {
+    try {
+      const res = await apiClient.patch(`/shop/items/${id}`, data)
+      return res.data
+    } catch {
+      const item = mockDb.shopItems.find((i) => i.id === Number(id))
+      if (!item) throw new Error('Buyum topilmadi')
+
+      if (data.name !== undefined) item.name = data.name
+      if (data.item_type !== undefined) item.item_type = data.item_type
+      if (data.price_coins !== undefined) item.price_coins = Number(data.price_coins)
+      if (data.asset_url !== undefined) item.asset_url = data.asset_url
+      if (data.border_style !== undefined) item.border_style = data.border_style
+      if (data.is_available !== undefined) item.is_available = data.is_available
+
+      mockDb.save('shopItems')
+
+      return {
+        success: true,
+        data: item,
+        message: 'Buyum muvaffaqiyatli tahrirlandi'
+      }
+    }
+  },
+
   async toggleAvailability(id) {
     try {
       const res = await apiClient.patch(`/shop/items/${id}/toggle`)

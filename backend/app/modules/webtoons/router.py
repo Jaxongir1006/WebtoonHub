@@ -184,3 +184,91 @@ async def moderate_chapter(
         },
         "message": msg
     }
+
+
+# 8. List Pending Chapters (Admin / Moderator)
+@staff_router.get("/chapters/pending", status_code=status.HTTP_200_OK)
+async def list_pending_chapters(
+    _staff: StaffUser = Depends(require_permission("chapters:approve")),
+    db: AsyncSession = Depends(get_db)
+):
+    chapters = await WebtoonService.list_pending_chapters(db)
+    return {
+        "success": True,
+        "data": chapters
+    }
+
+
+# 9. Edit Webtoon (Creator / Admin)
+@staff_router.patch("/webtoons/{id}", status_code=status.HTTP_200_OK)
+async def update_webtoon(
+    id: int,
+    title: Optional[str] = Form(None),
+    description: Optional[str] = Form(None),
+    author_name: Optional[str] = Form(None),
+    status: Optional[str] = Form(None),
+    genre_ids: Optional[str] = Form(None),
+    cover_image: Optional[UploadFile] = File(None),
+    _staff: StaffUser = Depends(require_permission("webtoons:edit")),
+    db: AsyncSession = Depends(get_db)
+):
+    parsed_ids = None
+    if genre_ids:
+        try:
+            parsed = json.loads(genre_ids)
+            if isinstance(parsed, list):
+                parsed_ids = [int(x) for x in parsed]
+            elif isinstance(parsed, int):
+                parsed_ids = [parsed]
+        except Exception:
+            try:
+                parsed_ids = [int(x.strip()) for x in genre_ids.split(",") if x.strip().isdigit()]
+            except Exception:
+                parsed_ids = None
+
+    updated = await WebtoonService.update_webtoon(
+        db=db,
+        webtoon_id=id,
+        title=title,
+        description=description,
+        author_name=author_name,
+        status_val=status,
+        genre_ids=parsed_ids,
+        cover_file=cover_image
+    )
+    return {
+        "success": True,
+        "data": {
+            "id": updated.id,
+            "title": updated.title,
+            "slug": updated.slug,
+            "status": updated.status,
+            "cover_image_url": updated.cover_image_url
+        },
+        "message": "Manhwa ma'lumotlari muvaffaqiyatli yangilandi"
+    }
+
+
+# 10. Delete Webtoon (Admin)
+@staff_router.delete("/webtoons/{id}", status_code=status.HTTP_200_OK)
+async def delete_webtoon(
+    id: int,
+    _staff: StaffUser = Depends(require_permission("webtoons:delete")),
+    db: AsyncSession = Depends(get_db)
+):
+    await WebtoonService.delete_webtoon(db, id)
+    return {
+        "success": True,
+        "data": None,
+        "message": "Manhwa va uning barcha materiallari muvaffaqiyatli o'chirildi"
+    }
+
+
+# 11. Staff Genres listing alias
+@staff_router.get("/genres", status_code=status.HTTP_200_OK)
+async def list_staff_genres(db: AsyncSession = Depends(get_db)):
+    genres = await WebtoonService.list_genres(db)
+    return {
+        "success": True,
+        "data": genres
+    }

@@ -18,3 +18,6 @@ Ushbu modul yig‘ilgan Chaqmoq ballariga avatar ramkalari va profil fonlarini x
 * [POST /api/v1/shop/equip/{item_id}](file:///home/jahongir/KIUT/PBL/WebtoonHub/backend/docs/modules/shop/api/equip.md) — Buyumni profilga taqish
 * [POST /api/v1/shop/unequip/{item_id}](file:///home/jahongir/KIUT/PBL/WebtoonHub/backend/docs/modules/shop/api/unequip.md) — Taqilgan buyumni yechish
 * [POST /api/v1/staff/shop/items](file:///home/jahongir/KIUT/PBL/WebtoonHub/backend/docs/modules/shop/api/create_item.md) — Do‘konga yangi buyum joylash (Admin)
+* [GET /api/v1/staff/shop/items](file:///home/jahongir/KIUT/PBL/WebtoonHub/backend/docs/modules/shop/api/list_staff_shop_items.md) — Admin uchun barcha buyumlar ro'yxati
+* [PATCH /api/v1/staff/shop/items/{id}](file:///home/jahongir/KIUT/PBL/WebtoonHub/backend/docs/modules/shop/api/update_shop_item.md) — Do'kon buyumini tahrirlash
+* [DELETE /api/v1/staff/shop/items/{id}](file:///home/jahongir/KIUT/PBL/WebtoonHub/backend/docs/modules/shop/api/delete_shop_item.md) — Do'kon buyumini o'chirish

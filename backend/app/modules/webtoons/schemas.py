@@ -84,3 +84,14 @@ class ChapterReaderResponse(BaseModel):
 
 class ChapterStatusUpdate(BaseModel):
     status: str = Field(pattern=r"^(published|rejected)$")
+
+
+class PendingChapterItem(BaseModel):
+    id: int
+    webtoon_id: int
+    webtoon_title: str
+    chapter_number: float
+    title: Optional[str] = None
+    status: str
+    images_count: int
+    created_at: datetime

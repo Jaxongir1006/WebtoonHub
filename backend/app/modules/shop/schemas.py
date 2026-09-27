@@ -26,3 +26,9 @@ class EquipResponse(BaseModel):
     item_id: int
     item_type: str
     is_active: bool
+
+
+class ShopItemUpdateRequest(BaseModel):
+    name: Optional[str] = None
+    price_coins: Optional[int] = Field(None, ge=1)
+    is_available: Optional[bool] = None

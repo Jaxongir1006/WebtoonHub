@@ -276,3 +276,35 @@ class AuthService:
         )
         await db.execute(stmt)
         await db.commit()
+
+    @staticmethod
+    async def update_profile(db: AsyncSession, user_id: int, data) -> User:
+        stmt = select(User).where(User.id == user_id)
+        res = await db.execute(stmt)
+        user = res.scalar_one_or_none()
+        if not user:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Foydalanuvchi topilmadi")
+
+        if data.username is not None and data.username != user.username:
+            u_stmt = select(User).where(User.username == data.username)
+            u_res = await db.execute(u_stmt)
+            if u_res.scalar_one_or_none():
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Ushbu username allaqachon band")
+            user.username = data.username
+
+        if data.new_password is not None:
+            if not data.old_password:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Parolni o'zgartirish uchun eski parolni kiritish shart"
+                )
+            if not verify_password(data.old_password, user.hashed_password):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Eski parol noto'g'ri kiritildi"
+                )
+            user.hashed_password = hash_password(data.new_password)
+
+        await db.commit()
+        await db.refresh(user)
+        return user

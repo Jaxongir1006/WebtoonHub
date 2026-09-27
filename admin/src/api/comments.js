@@ -13,6 +13,25 @@ export const commentsApi = {
     }
   },
 
+  async updateComment(id, content) {
+    try {
+      const res = await apiClient.patch(`/comments/${id}`, { content })
+      return res.data
+    } catch {
+      const comment = mockDb.comments.find((c) => c.id === Number(id))
+      if (!comment) throw new Error('Sharh topilmadi')
+
+      comment.content = content
+      mockDb.save('comments')
+
+      return {
+        success: true,
+        data: comment,
+        message: 'Sharh muvaffaqiyatli tahrirlandi'
+      }
+    }
+  },
+
   async deleteComment(id) {
     try {
       const res = await apiClient.delete(`/comments/${id}`)

@@ -256,3 +256,118 @@ class StaffService:
         if res.rowcount == 0:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Seans topilmadi")
         await db.commit()
+
+    @staticmethod
+    async def list_staff_users(db: AsyncSession):
+        stmt = (
+            select(StaffUser)
+            .options(selectinload(StaffUser.role).selectinload(Role.permissions))
+            .order_by(StaffUser.id.asc())
+        )
+        res = await db.execute(stmt)
+        return res.scalars().all()
+
+    @staticmethod
+    async def create_staff_user(db: AsyncSession, data):
+        # Check uniqueness
+        stmt = select(StaffUser).where((StaffUser.email == data.email) | (StaffUser.username == data.username))
+        res = await db.execute(stmt)
+        if res.scalar_one_or_none():
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Ushbu email yoki username orqali xodim allaqachon mavjud"
+            )
+
+        # Check role exists
+        r_stmt = select(Role).options(selectinload(Role.permissions)).where(Role.id == data.role_id)
+        r_res = await db.execute(r_stmt)
+        role = r_res.scalar_one_or_none()
+        if not role:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Bunday rol topilmadi")
+
+        from app.core.security import hash_password
+        new_staff = StaffUser(
+            username=data.username,
+            email=data.email,
+            hashed_password=hash_password(data.password),
+            role_id=data.role_id,
+            is_active=True
+        )
+        db.add(new_staff)
+        await db.commit()
+        await db.refresh(new_staff)
+        new_staff.role = role
+        return new_staff
+
+    @staticmethod
+    async def list_readers(db: AsyncSession, search: Optional[str] = None, page: int = 1, limit: int = 20):
+        from sqlalchemy import func
+        from app.modules.users.models import User
+        from app.modules.staff.schemas import ReaderListResponse, ReaderUserItem
+
+        query = select(User)
+        count_stmt = select(func.count(User.id))
+        if search:
+            s_term = f"%{search.strip()}%"
+            query = query.where((User.username.ilike(s_term)) | (User.email.ilike(s_term)))
+            count_stmt = count_stmt.where((User.username.ilike(s_term)) | (User.email.ilike(s_term)))
+
+        total_res = await db.execute(count_stmt)
+        total = total_res.scalar() or 0
+
+        offset = (page - 1) * limit
+        query = query.order_by(User.created_at.desc()).offset(offset).limit(limit)
+        res = await db.execute(query)
+        users = res.scalars().all()
+
+        return ReaderListResponse(
+            items=[ReaderUserItem.model_validate(u) for u in users],
+            total=total,
+            page=page,
+            limit=limit
+        )
+
+    @staticmethod
+    async def update_reader(db: AsyncSession, user_id: int, data):
+        from app.modules.users.models import User
+        stmt = select(User).where(User.id == user_id)
+        res = await db.execute(stmt)
+        user = res.scalar_one_or_none()
+        if not user:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Foydalanuvchi topilmadi")
+
+        if data.lightning_coins is not None:
+            user.lightning_coins = data.lightning_coins
+        if data.is_active is not None:
+            user.is_active = data.is_active
+
+        await db.commit()
+        await db.refresh(user)
+        return user
+
+    @staticmethod
+    async def get_dashboard_stats(db: AsyncSession):
+        from sqlalchemy import func
+        from app.modules.users.models import User
+        from app.modules.webtoons.models import Webtoon, Chapter
+        from app.modules.creator_requests.models import CreatorRequest
+        from app.modules.comments.models import Comment
+        from app.modules.staff.schemas import DashboardStatsResponse
+
+        r_count = (await db.execute(select(func.count(User.id)))).scalar() or 0
+        w_count = (await db.execute(select(func.count(Webtoon.id)))).scalar() or 0
+        ch_count = (await db.execute(select(func.count(Chapter.id)))).scalar() or 0
+        pending_ch = (await db.execute(select(func.count(Chapter.id)).where(Chapter.status == "pending"))).scalar() or 0
+        pending_req = (await db.execute(select(func.count(CreatorRequest.id)).where(CreatorRequest.status == "pending"))).scalar() or 0
+        comm_count = (await db.execute(select(func.count(Comment.id)))).scalar() or 0
+        coins_circ = (await db.execute(select(func.coalesce(func.sum(User.lightning_coins), 0)))).scalar() or 0
+
+        return DashboardStatsResponse(
+            total_readers=r_count,
+            total_webtoons=w_count,
+            total_chapters=ch_count,
+            pending_chapters=pending_ch,
+            pending_creator_requests=pending_req,
+            total_comments=comm_count,
+            total_coins_in_circulation=coins_circ
+        )

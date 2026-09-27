@@ -29,3 +29,4 @@ Har bir API alohida faylda batafsil hujjatlashtirilgan:
 * [GET /api/v1/auth/sessions](file:///home/jahongir/KIUT/PBL/WebtoonHub/backend/docs/modules/auth/api/sessions.md) — Faol qurilmalar / seanslar ro‘yxati
 * [DELETE /api/v1/auth/sessions/{id}](file:///home/jahongir/KIUT/PBL/WebtoonHub/backend/docs/modules/auth/api/revoke_session.md) — Muayyan seansni bekor qilish
 * [DELETE /api/v1/auth/sessions/other](file:///home/jahongir/KIUT/PBL/WebtoonHub/backend/docs/modules/auth/api/revoke_other_sessions.md) — Boshqa barcha qurilmalardan chiqish
+* [PATCH /api/v1/auth/profile](file:///home/jahongir/KIUT/PBL/WebtoonHub/backend/docs/modules/auth/api/update_profile.md) — Profil ma'lumotlarini yangilash (username / parol)

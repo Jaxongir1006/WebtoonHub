@@ -1,6 +1,6 @@
 import uuid
 from typing import List, Optional, Tuple
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,6 +11,7 @@ from app.core.security import decode_token
 from app.modules.auth.dependencies import get_current_user
 from app.modules.comments.schemas import CommentCreate
 from app.modules.comments.service import CommentsService
+from app.modules.staff.dependencies import require_permission
 from app.modules.staff.models import Role, StaffSession, StaffUser
 from app.modules.users.models import User, UserSession
 
@@ -159,4 +160,19 @@ async def delete_comment(
         "success": True,
         "data": None,
         "message": "Sharh muvaffaqiyatli o'chirildi"
+    }
+
+
+# Staff Comments Moderation
+@router.get("/staff/comments", status_code=status.HTTP_200_OK)
+async def list_staff_comments(
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+    _staff: StaffUser = Depends(require_permission("comments:moderate")),
+    db: AsyncSession = Depends(get_db)
+):
+    res = await CommentsService.list_all_comments_for_staff(db, page=page, limit=limit)
+    return {
+        "success": True,
+        "data": res
     }

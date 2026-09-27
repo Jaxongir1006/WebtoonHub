@@ -178,3 +178,45 @@ class ShopService:
         await db.commit()
         await db.refresh(item)
         return item
+
+    @staticmethod
+    async def list_staff_items(db: AsyncSession):
+        stmt = select(ShopItem).order_by(ShopItem.created_at.desc())
+        res = await db.execute(stmt)
+        return res.scalars().all()
+
+    @staticmethod
+    async def update_item(
+        db: AsyncSession,
+        item_id: int,
+        name: Optional[str] = None,
+        price_coins: Optional[int] = None,
+        is_available: Optional[bool] = None
+    ) -> ShopItem:
+        stmt = select(ShopItem).where(ShopItem.id == item_id)
+        res = await db.execute(stmt)
+        item = res.scalar_one_or_none()
+        if not item:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Do'kon buyumi topilmadi")
+
+        if name is not None:
+            item.name = name
+        if price_coins is not None:
+            item.price_coins = price_coins
+        if is_available is not None:
+            item.is_available = is_available
+
+        await db.commit()
+        await db.refresh(item)
+        return item
+
+    @staticmethod
+    async def delete_item(db: AsyncSession, item_id: int) -> None:
+        stmt = select(ShopItem).where(ShopItem.id == item_id)
+        res = await db.execute(stmt)
+        item = res.scalar_one_or_none()
+        if not item:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Do'kon buyumi topilmadi")
+
+        await db.delete(item)
+        await db.commit()

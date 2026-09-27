@@ -36,3 +36,20 @@ class CommentCreatedResponse(BaseModel):
     parent_id: Optional[int] = None
     content: str
     created_at: datetime
+
+
+class StaffCommentItem(BaseModel):
+    id: int
+    chapter_id: int
+    chapter_title: str
+    webtoon_title: str
+    user: CommentAuthor
+    content: str
+    created_at: datetime
+
+
+class StaffCommentListResponse(BaseModel):
+    items: List[StaffCommentItem]
+    total: int
+    page: int
+    limit: int
