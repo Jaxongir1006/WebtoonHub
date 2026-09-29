@@ -21,6 +21,7 @@ from app.modules.auth.schemas import (
 )
 from app.modules.shop.models import ShopItem, UserInventory
 from app.modules.users.models import User, UserSession
+from app.modules.clans.models import ClanMember
 
 
 def _hash_refresh_token(token: str) -> str:
@@ -155,6 +156,7 @@ class AuthService:
                 email=user.email,
                 username=user.username,
                 lightning_coins=user.lightning_coins,
+                avatar_url=user.avatar_url,
                 daily_bonus_claimed=_is_daily_bonus_claimed(user.last_daily_login),
                 last_daily_login=user.last_daily_login,
                 created_at=user.created_at
@@ -232,11 +234,33 @@ class AuthService:
                     asset_url=inv.item.asset_url
                 )
 
+        # Check clan membership
+        clan_stmt = (
+            select(ClanMember)
+            .options(selectinload(ClanMember.clan))
+            .where(ClanMember.user_id == user_id)
+        )
+        clan_member = (await db.execute(clan_stmt)).scalar_one_or_none()
+        clan_info = None
+        if clan_member and clan_member.clan:
+            clan_info = {
+                "id": clan_member.clan.id,
+                "name": clan_member.clan.name,
+                "tag": clan_member.clan.tag,
+                "avatar_url": clan_member.clan.avatar_url,
+                "level": clan_member.clan.level,
+                "role": clan_member.role,
+                "contribution_points": clan_member.contribution_points
+            }
+
         return UserProfileResponse(
             id=user.id,
             email=user.email,
             username=user.username,
             lightning_coins=user.lightning_coins,
+            avatar_url=user.avatar_url,
+            bio=user.bio,
+            clan=clan_info,
             active_frame=active_frame,
             active_background=active_background,
             daily_bonus_claimed=_is_daily_bonus_claimed(user.last_daily_login),

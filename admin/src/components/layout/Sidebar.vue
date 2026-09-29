@@ -174,6 +174,11 @@ const IconShoppingBag = () =>
     h('path', { strokeLinecap: 'round', strokeLinejoin: 'round', strokeWidth: '2', d: 'M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z' })
   ])
 
+const IconSparkles = () =>
+  h('svg', { fill: 'none', viewBox: '0 0 24 24', stroke: 'currentColor' }, [
+    h('path', { strokeLinecap: 'round', strokeLinejoin: 'round', strokeWidth: '2', d: 'M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z' })
+  ])
+
 const IconKey = () =>
   h('svg', { fill: 'none', viewBox: '0 0 24 24', stroke: 'currentColor' }, [
     h('path', { strokeLinecap: 'round', strokeLinejoin: 'round', strokeWidth: '2', d: 'M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z' })
@@ -204,6 +209,11 @@ const IconLightning = () =>
     h('path', { strokeLinecap: 'round', strokeLinejoin: 'round', strokeWidth: '2', d: 'M13 10V3L4 14h7v7l9-11h-7z' })
   ])
 
+const IconClan = () =>
+  h('svg', { fill: 'none', viewBox: '0 0 24 24', stroke: 'currentColor' }, [
+    h('path', { strokeLinecap: 'round', strokeLinejoin: 'round', strokeWidth: '2', d: 'M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9' })
+  ])
+
 const navSections = [
   {
     titleKey: 'nav.general',
@@ -222,7 +232,8 @@ const navSections = [
         permission: 'chapters:approve',
         badge: () => pendingChapters.value
       },
-      { titleKey: 'nav.shop', path: '/shop', icon: IconShoppingBag, permission: 'shop:manage' }
+      { titleKey: 'nav.shop', path: '/shop', icon: IconShoppingBag, permission: 'shop:manage' },
+      { titleKey: 'nav.wheels', path: '/wheels', icon: IconSparkles, permission: 'wheel:manage' }
     ]
   },
   {
@@ -238,6 +249,7 @@ const navSections = [
       },
       { titleKey: 'nav.users', path: '/users', icon: IconUsers, permission: 'users:manage' },
       { titleKey: 'nav.economy', path: '/economy', icon: IconLightning, permission: 'users:manage' },
+      { titleKey: 'nav.clans', path: '/clans', icon: IconClan, permission: 'users:manage' },
       { titleKey: 'nav.comments', path: '/comments', icon: IconChat, permission: 'comments:moderate' },
       { titleKey: 'nav.sessions', path: '/sessions', icon: IconDevices }
     ]

@@ -6,10 +6,17 @@ Ushbu modul manhvalar katalogi, janrlar bo‘yicha filtrlash, jonli qidiruv, uzl
 ---
 
 ## 2. Biznes Qoidalari
-1. **Tezkor kesh (Redis):** Katalog va ommabop manhvalar ro‘yxati Redis da keshlanadi, bu esa javob qaytarish vaqtini 50 ms dan kam bo‘lishini ta'minlaydi.
-2. **Moderatsiya zanjiri:** Creator (tarjimon) yangi bob yuklaganda, bob avtomatik tarzda `pending` holatda bo‘ladi.
-3. **Admin tasdiqlashi:** Faqat Admin / Moderator tomonidan tekshirilib tasdiqlangan (`published`) boblargina ommaga ko‘rinadi va mutolaa qilib Chaqmoq olish imkonini beradi.
-4. **Rasmlar tartibi:** Vertikal Readerda rasm uzluksiz oqishi uchun rasmlar `order_index` (1, 2, 3...) bo‘yicha qat'iy tartiblanadi.
+1. **Kontent turlari (3 xil format):**
+   * `manhwa` — Vertikal uzluksiz o'qiladigan raqamli webtoonlar (barcha rasmlar pastga qarab oqadi).
+   * `manga` — An'anaviy gorizontal sahifali yapon komikslari (standart O'ngdan-chapga / RTL varaqlash, LTR sozlamasi bilan).
+   * `novel` — Ranobe va matnli asarlar (haqiqiy 3D kitob varaqlash animatsiyasi, boy Markdown matni, shrift va fon mavzulari).
+2. **Tezkor kesh (Redis):** Katalog va ommabop manhvalar ro‘yxati Redis da keshlanadi, bu esa javob qaytarish vaqtini 50 ms dan kam bo‘lishini ta'minlaydi.
+3. **Moderatsiya zanjiri:** Creator (tarjimon) yangi bob yuklaganda, bob avtomatik tarzda `pending` holatda bo‘ladi.
+4. **Admin tasdiqlashi:** Faqat Admin / Moderator tomonidan tekshirilib tasdiqlangan (`published`) boblargina ommaga ko‘rinadi va mutolaa qilib Chaqmoq olish imkonini beradi.
+5. **Rasmlar va Matn formati:**
+   * Manhwa va Manga uchun rasmlar `order_index` (1, 2, 3...) bo‘yicha ketma-ket joylanadi.
+   * Novel uchun bob matni `content_text` (Markdown format) orqali kiritiladi, ixtiyoriy illyustratsiya rasmlari bilan boyitilishi mumkin.
+6. **Mutolaa mukofoti:** Barcha turdagi asarlarda (manhwa, manga, novel) bobni to'liq o'qib tugatganda foydalanuvchiga +5 ⚡ Chaqmoq beriladi.
 
 ---
 

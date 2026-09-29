@@ -1,6 +1,6 @@
 from sqlalchemy import BigInteger, Boolean, Column, DateTime, ForeignKey, Integer, String, UniqueConstraint, func
 from sqlalchemy.orm import relationship
-from app.core.database import Base
+from app.core.database import Base, BigIntId
 
 
 class ShopItem(Base):
@@ -20,7 +20,7 @@ class ShopItem(Base):
 class UserInventory(Base):
     __tablename__ = "user_inventory"
 
-    id = Column(BigInteger, primary_key=True, index=True, autoincrement=True)
+    id = Column(BigIntId, primary_key=True, index=True, autoincrement=True)
     user_id = Column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     item_id = Column(Integer, ForeignKey("shop_items.id", ondelete="CASCADE"), nullable=False, index=True)
     is_active = Column(Boolean, default=False, nullable=False)

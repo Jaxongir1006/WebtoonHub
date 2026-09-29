@@ -1,6 +1,7 @@
 import React from 'react';
 import { Genre } from '../../types';
 import { useLanguage } from '../../context/LanguageContext';
+import { localizeGenre } from '../../utils/genres';
 
 interface GenreFilterProps {
   genres: Genre[];
@@ -15,7 +16,7 @@ export const GenreFilter: React.FC<GenreFilterProps> = ({
   onSelect,
   className = ''
 }) => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
 
   return (
     <div className={`flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none select-none ${className}`}>
@@ -44,7 +45,7 @@ export const GenreFilter: React.FC<GenreFilterProps> = ({
                 : 'bg-studio-900 border border-studio-800 text-studio-300 hover:text-white hover:border-studio-700'
             }`}
           >
-            {genre.name}
+            {localizeGenre(genre.name, language)}
           </button>
         );
       })}

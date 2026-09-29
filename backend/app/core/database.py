@@ -1,16 +1,34 @@
 from typing import AsyncGenerator
+from sqlalchemy import BigInteger, Integer
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import DeclarativeBase
 from app.core.config import settings
 
-# Create async engine for PostgreSQL
+from sqlalchemy import BigInteger, Integer, event
+
+# Universal BigInt primary key supporting PostgreSQL BigSerial and SQLite AutoIncrement
+BigIntId = BigInteger().with_variant(Integer, "sqlite")
+
+# Create async engine for PostgreSQL or SQLite
+is_sqlite = settings.DATABASE_URL.startswith("sqlite")
+connect_args = {"check_same_thread": False} if is_sqlite else {}
+
 engine = create_async_engine(
     settings.DATABASE_URL,
     echo=settings.DEBUG,
     future=True,
-    pool_size=10,
-    max_overflow=20
+    connect_args=connect_args,
+    **({} if is_sqlite else {"pool_size": 10, "max_overflow": 20})
 )
+
+if is_sqlite:
+    @event.listens_for(engine.sync_engine, "connect")
+    def set_sqlite_pragma(dbapi_connection, connection_record):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.execute("PRAGMA synchronous=NORMAL")
+        cursor.execute("PRAGMA busy_timeout=5000")
+        cursor.close()
 
 # Async session maker
 AsyncSessionLocal = async_sessionmaker(

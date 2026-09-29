@@ -4,6 +4,7 @@ import { WebtoonSummary } from '../../types';
 import { SafeImage } from '../common/SafeImage';
 import { useLanguage } from '../../context/LanguageContext';
 import { formatNumber, getStatusLabel } from '../../utils/format';
+import { localizeGenre } from '../../utils/genres';
 import { Eye, BookOpen } from 'lucide-react';
 
 interface WebtoonCardProps {
@@ -12,7 +13,7 @@ interface WebtoonCardProps {
 }
 
 export const WebtoonCard: React.FC<WebtoonCardProps> = ({ webtoon, className = '' }) => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const isOngoing = webtoon.status === 'ongoing';
 
   return (
@@ -34,17 +35,33 @@ export const WebtoonCard: React.FC<WebtoonCardProps> = ({ webtoon, className = '
 
         {/* Top Badges */}
         <div className="absolute top-2.5 inset-x-2.5 flex items-center justify-between pointer-events-none">
-          <span
-            className={`px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wide uppercase ${
-              isOngoing
-                ? 'bg-emerald-500/90 text-studio-950 shadow-sm'
-                : 'bg-indigo-500/90 text-white shadow-sm'
-            }`}
-          >
-            {getStatusLabel(webtoon.status, t)}
-          </span>
+          <div className="flex items-center gap-1.5">
+            <span
+              className={`px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wide uppercase ${
+                isOngoing
+                  ? 'bg-emerald-500/90 text-studio-950 shadow-sm'
+                  : 'bg-indigo-500/90 text-white shadow-sm'
+              }`}
+            >
+              {getStatusLabel(webtoon.status, t)}
+            </span>
 
-          <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-studio-950/80 backdrop-blur-md text-studio-300 border border-studio-800/80">
+            {webtoon.type && (
+              <span
+                className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase shadow-sm ${
+                  webtoon.type === 'novel'
+                    ? 'bg-purple-600/90 text-white'
+                    : webtoon.type === 'manga'
+                    ? 'bg-sky-600/90 text-white'
+                    : 'bg-amber-500/90 text-studio-950'
+                }`}
+              >
+                {t(`types.${webtoon.type}` as any) || webtoon.type}
+              </span>
+            )}
+          </div>
+
+          <span className="hidden sm:flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-studio-950/80 backdrop-blur-md text-studio-300 border border-studio-800/80">
             <Eye className="w-3 h-3 text-studio-400" />
             <span>{formatNumber(webtoon.view_count)}</span>
           </span>
@@ -76,7 +93,7 @@ export const WebtoonCard: React.FC<WebtoonCardProps> = ({ webtoon, className = '
                   key={idx}
                   className="text-[10px] font-medium text-brand-400/90 bg-brand-500/10 px-1.5 py-0.5 rounded"
                 >
-                  {genre}
+                  {localizeGenre(genre, language)}
                 </span>
               ))}
             </div>

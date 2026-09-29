@@ -15,6 +15,19 @@ class ShopItemResponse(BaseModel):
         from_attributes = True
 
 
+class InventoryItemResponse(BaseModel):
+    id: int
+    name: str
+    item_type: str
+    price_coins: int
+    asset_url: str
+    is_active: bool
+    purchased_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
 class ShopBuyResponse(BaseModel):
     item_id: int
     item_name: str
@@ -31,4 +44,5 @@ class EquipResponse(BaseModel):
 class ShopItemUpdateRequest(BaseModel):
     name: Optional[str] = None
     price_coins: Optional[int] = Field(None, ge=1)
+    asset_url: Optional[str] = None
     is_available: Optional[bool] = None

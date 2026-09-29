@@ -1,6 +1,6 @@
 from sqlalchemy import BigInteger, Column, DateTime, Float, ForeignKey, Integer, Numeric, String, Text, func
 from sqlalchemy.orm import relationship
-from app.core.database import Base
+from app.core.database import Base, BigIntId
 
 
 class WebtoonGenre(Base):
@@ -23,10 +23,11 @@ class Genre(Base):
 class Webtoon(Base):
     __tablename__ = "webtoons"
 
-    id = Column(BigInteger, primary_key=True, index=True, autoincrement=True)
+    id = Column(BigIntId, primary_key=True, index=True, autoincrement=True)
     title = Column(String(255), index=True, nullable=False)
     slug = Column(String(280), unique=True, index=True, nullable=False)
     description = Column(Text, nullable=True)
+    type = Column(String(20), default="manhwa", nullable=False, index=True) # manhwa, manga, novel
     cover_image_url = Column(String(500), nullable=False)
     author_name = Column(String(100), nullable=True)
     uploader_staff_id = Column(Integer, ForeignKey("staff_users.id"), nullable=True)
@@ -44,11 +45,12 @@ class Webtoon(Base):
 class Chapter(Base):
     __tablename__ = "chapters"
 
-    id = Column(BigInteger, primary_key=True, index=True, autoincrement=True)
+    id = Column(BigIntId, primary_key=True, index=True, autoincrement=True)
     webtoon_id = Column(BigInteger, ForeignKey("webtoons.id", ondelete="CASCADE"), nullable=False, index=True)
     chapter_number = Column(Float, nullable=False, index=True)
     title = Column(String(255), nullable=True)
     status = Column(String(20), default="pending", nullable=False, index=True) # pending, published, rejected
+    content_text = Column(Text, nullable=True) # Markdown/rich text for novel chapters
     reward_coins = Column(Integer, default=5, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
@@ -61,7 +63,7 @@ class Chapter(Base):
 class ChapterImage(Base):
     __tablename__ = "chapter_images"
 
-    id = Column(BigInteger, primary_key=True, index=True, autoincrement=True)
+    id = Column(BigIntId, primary_key=True, index=True, autoincrement=True)
     chapter_id = Column(BigInteger, ForeignKey("chapters.id", ondelete="CASCADE"), nullable=False, index=True)
     image_url = Column(String(500), nullable=False)
     order_index = Column(Integer, nullable=False, index=True)

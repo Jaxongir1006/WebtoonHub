@@ -4,17 +4,19 @@ import { useSystemStore } from '../stores/system'
 
 import AppLayout from '../components/layout/AppLayout.vue'
 import LoginView from '../views/LoginView.vue'
-import DashboardView from '../views/DashboardView.vue'
-import WebtoonsView from '../views/WebtoonsView.vue'
-import WebtoonDetailView from '../views/WebtoonDetailView.vue'
-import ModerationView from '../views/ModerationView.vue'
-import ShopView from '../views/ShopView.vue'
-import RbacView from '../views/RbacView.vue'
-import CreatorRequestsView from '../views/CreatorRequestsView.vue'
-import UsersView from '../views/UsersView.vue'
-import EconomyView from '../views/EconomyView.vue'
-import CommentsView from '../views/CommentsView.vue'
-import SessionsView from '../views/SessionsView.vue'
+const DashboardView = () => import('../views/DashboardView.vue')
+const WebtoonsView = () => import('../views/WebtoonsView.vue')
+const WebtoonDetailView = () => import('../views/WebtoonDetailView.vue')
+const ModerationView = () => import('../views/ModerationView.vue')
+const ShopView = () => import('../views/ShopView.vue')
+const WheelManagementView = () => import('../views/WheelManagementView.vue')
+const RbacView = () => import('../views/RbacView.vue')
+const CreatorRequestsView = () => import('../views/CreatorRequestsView.vue')
+const UsersView = () => import('../views/UsersView.vue')
+const EconomyView = () => import('../views/EconomyView.vue')
+const CommentsView = () => import('../views/CommentsView.vue')
+const SessionsView = () => import('../views/SessionsView.vue')
+const ClanManagementView = () => import('../views/ClanManagementView.vue')
 
 const routes = [
   {
@@ -60,6 +62,12 @@ const routes = [
         meta: { title: 'Do\'kon & Bezaklar', permission: 'shop:manage' }
       },
       {
+        path: 'wheels',
+        name: 'wheels',
+        component: WheelManagementView,
+        meta: { title: 'Omad Charxi (Ruletka)', permission: 'wheel:manage' }
+      },
+      {
         path: 'rbac',
         name: 'rbac',
         component: RbacView,
@@ -84,6 +92,12 @@ const routes = [
         meta: { title: '⚡ Chaqmoq Iqtisodiyoti', permission: 'users:manage' }
       },
       {
+        path: 'clans',
+        name: 'clans',
+        component: ClanManagementView,
+        meta: { title: 'Klanlar & Darajalar', permission: 'users:manage' }
+      },
+      {
         path: 'comments',
         name: 'comments',
         component: CommentsView,
@@ -104,7 +118,7 @@ const routes = [
 ]
 
 const router = createRouter({
-  history: createWebHistory(),
+  history: createWebHistory(import.meta.env.BASE_URL),
   routes
 })
 

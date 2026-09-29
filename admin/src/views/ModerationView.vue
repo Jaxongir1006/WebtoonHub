@@ -83,7 +83,12 @@
             </h3>
 
             <p class="text-xs text-studio-400 flex flex-wrap items-center gap-3 pt-0.5">
-              <span>🖼 {{ ch.images_count || ch.images?.length || 0 }} ta vertikal sahifa</span>
+              <span v-if="ch.content_text">
+                📜 {{ getWordCount(ch.content_text) }} ta so'z (Novel)
+              </span>
+              <span v-else>
+                🖼 {{ ch.images_count || ch.images?.length || 0 }} ta sahifa
+              </span>
               <span>•</span>
               <span>⚡ {{ ch.reward_coins || 5 }} Chaqmoq mukofot</span>
               <span>•</span>
@@ -99,7 +104,7 @@
             size="sm"
             @click="inspectChapter(ch)"
           >
-            Sahifalarni Ko'rish ({{ ch.images_count || ch.images?.length || 0 }})
+            {{ ch.content_text ? 'Matnni Ko\'rish' : `Sahifalarni Ko'rish (${ch.images_count || ch.images?.length || 0})` }}
           </Button>
 
           <template v-if="ch.status === 'pending'">
@@ -134,14 +139,19 @@
     <Modal
       v-model="showInspectorModal"
       :title="inspectorTitle"
-      description="Yuklangan barcha rasmlarni sifat va tartib bo'yicha tekshirish"
+      :description="activeChapter?.content_text ? 'Novel matni va sifatini tekshirish' : 'Yuklangan barcha rasmlarni sifat va tartib bo\'yicha tekshirish'"
       max-width="3xl"
     >
       <div class="space-y-4">
         <!-- Sticky Action Bar inside inspector -->
         <div class="p-3 rounded-xl bg-studio-900/90 border border-white/10 flex items-center justify-between sticky top-0 z-20 backdrop-blur-md">
           <span class="text-xs font-mono text-studio-300">
-            Jami sahifalar: <strong>{{ activeChapter?.images?.length || activeChapter?.images_count || 0 }}</strong>
+            <template v-if="activeChapter?.content_text">
+              Novel matni: <strong>{{ getWordCount(activeChapter.content_text) }} ta so'z</strong>
+            </template>
+            <template v-else>
+              Jami sahifalar: <strong>{{ activeChapter?.images?.length || activeChapter?.images_count || 0 }}</strong>
+            </template>
           </span>
           <div v-if="activeChapter?.status === 'pending'" class="flex items-center gap-2">
             <Button variant="danger" size="xs" :disabled="actionLoading === activeChapter.id" @click="moderate(activeChapter.id, 'rejected')">
@@ -153,11 +163,25 @@
           </div>
         </div>
 
-        <!-- Scrollable Vertical Image Stream -->
-        <div class="max-h-[60vh] overflow-y-auto bg-black p-3 rounded-2xl space-y-2 border border-white/5">
+        <!-- Scrollable Stream: Novel text or Comic Images -->
+        <div class="max-h-[60vh] overflow-y-auto bg-black p-4 rounded-2xl space-y-3 border border-white/5">
           <div v-if="inspectorLoading" class="p-8 text-center text-studio-400 text-xs">
-            Sahifalar yuklanmoqda...
+            Bob ma'lumotlari yuklanmoqda...
           </div>
+          <!-- Novel text display -->
+          <template v-else-if="activeChapter?.content_text">
+            <div class="p-5 bg-studio-950 rounded-xl border border-white/10 text-studio-100 font-serif leading-relaxed text-sm">
+              <div v-html="renderMarkdown(activeChapter.content_text)" />
+            </div>
+            <!-- If novel also has illustrations -->
+            <div v-if="activeChapter?.images?.length" class="space-y-2 mt-4 pt-4 border-t border-white/10">
+              <h5 class="text-xs uppercase font-mono font-bold text-studio-400">Illyustratsiyalar</h5>
+              <div v-for="(img, idx) in activeChapter.images" :key="idx" class="rounded-lg overflow-hidden">
+                <img :src="typeof img === 'string' ? img : img.image_url" class="w-full h-auto block" />
+              </div>
+            </div>
+          </template>
+          <!-- Comic images display -->
           <template v-else>
             <div
               v-for="(img, idx) in (activeChapter?.images || [])"
@@ -242,21 +266,50 @@ function formatDate(iso) {
   })
 }
 
+function getWordCount(text) {
+  if (!text) return 0
+  const words = text.trim().split(/\s+/)
+  return words[0] === '' ? 0 : words.length
+}
+
+function renderMarkdown(text) {
+  if (!text) return ''
+  const escaped = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+
+  return '<p class="mb-3 leading-relaxed">' + escaped
+    .replace(/^### (.*$)/gim, '</p><h3 class="text-base font-bold text-white mt-4 mb-2 font-sans">$1</h3><p class="mb-3 leading-relaxed">')
+    .replace(/^## (.*$)/gim, '</p><h2 class="text-lg font-bold text-white mt-5 mb-2 font-sans">$1</h2><p class="mb-3 leading-relaxed">')
+    .replace(/^# (.*$)/gim, '</p><h1 class="text-xl font-extrabold text-brand-400 mt-5 mb-3 pb-1 border-b border-white/10 font-sans">$1</h1><p class="mb-3 leading-relaxed">')
+    .replace(/^\> (.*$)/gim, '</p><blockquote class="border-l-4 border-brand-500 pl-4 py-1.5 my-3 italic text-studio-300 bg-brand-500/10 rounded-r font-sans">$1</blockquote><p class="mb-3 leading-relaxed">')
+    .replace(/\*\*(.*?)\*\*/g, '<strong class="font-bold text-white">$1</strong>')
+    .replace(/\*(.*?)\*/g, '<em class="italic text-studio-200">$1</em>')
+    .replace(/\n\n/g, '</p><p class="mb-3 leading-relaxed">')
+    .replace(/\n/g, '<br/>') + '</p>'
+}
+
 async function inspectChapter(ch) {
   activeChapter.value = { ...ch }
   inspectorTitle.value = `${ch.webtoon_title} — ${ch.chapter_number}-bobni tekshirish`
   showInspectorModal.value = true
 
-  // If images array is empty or missing, fetch full chapter detail
-  if (!activeChapter.value.images || activeChapter.value.images.length === 0) {
+  // If content_text is missing or images array is empty, fetch full chapter detail
+  if (!activeChapter.value.content_text && (!activeChapter.value.images || activeChapter.value.images.length === 0)) {
     inspectorLoading.value = true
     try {
       const res = await moderationApi.getChapter(ch.id)
-      if (res.data?.images) {
-        activeChapter.value.images = res.data.images.map(img => typeof img === 'string' ? img : img.image_url)
+      if (res.data) {
+        if (res.data.content_text) {
+          activeChapter.value.content_text = res.data.content_text
+        }
+        if (res.data.images) {
+          activeChapter.value.images = res.data.images.map(img => typeof img === 'string' ? img : img.image_url)
+        }
       }
     } catch (e) {
-      console.error('Failed to load chapter images', e)
+      console.error('Failed to load chapter details', e)
     } finally {
       inspectorLoading.value = false
     }

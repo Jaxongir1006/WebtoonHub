@@ -4,6 +4,7 @@ import httpx
 from httpx import ASGITransport
 
 from app.main import app, lifespan
+from scripts._test_credentials import staff_credentials
 
 
 async def run_tests():
@@ -17,9 +18,10 @@ async def run_tests():
 
             # 2. Staff login
             print("\n--- 2. Testing Staff Login ---")
+            staff_email, staff_password = staff_credentials()
             res = await client.post("/staff/auth/login", json={
-                "email": "admin@webtoonhub.uz",
-                "password": "AdminPassword123"
+                "email": staff_email,
+                "password": staff_password
             })
             assert res.status_code == 200, f"Staff login failed: {res.text}"
             staff_token = res.json()["data"]["access_token"]
@@ -114,6 +116,48 @@ async def run_tests():
             )
             assert res.status_code == 200, f"Chapter approve failed: {res.text}"
             print("✓ Chapter approved and published: OK")
+
+            # 5b. Test Novel creation with text chapter
+            res = await client.post(
+                "/staff/webtoons",
+                headers=staff_headers,
+                data={
+                    "title": f"Test Novel {ts}",
+                    "slug": f"test-novel-{ts}",
+                    "type": "novel",
+                    "description": "A thrilling web novel for testing",
+                    "author_name": "Novel Author",
+                    "genre_ids": str(genre_ids[0]) if genre_ids else "1"
+                },
+                files={"cover_image": dummy_cover}
+            )
+            assert res.status_code == 201, f"Novel create failed: {res.text}"
+            novel_id = res.json()["data"]["id"]
+
+            res = await client.post(
+                "/staff/chapters",
+                headers=staff_headers,
+                data={
+                    "webtoon_id": novel_id,
+                    "chapter_number": 1,
+                    "title": "1-bob: Uyg'onish",
+                    "content_text": "# 1-bob: Uyg'onish\n\nQorong'ulik qa'ridan u o'ziga keldi..."
+                }
+            )
+            assert res.status_code == 201, f"Novel chapter create failed: {res.text}"
+            novel_ch_id = res.json()["data"]["id"]
+
+            await client.patch(
+                f"/staff/chapters/{novel_ch_id}/status",
+                headers=staff_headers,
+                json={"status": "published"}
+            )
+            res = await client.get(f"/chapters/{novel_ch_id}")
+            assert res.status_code == 200, f"Read novel chapter failed: {res.text}"
+            novel_data = res.json()["data"]
+            assert novel_data["webtoon_type"] == "novel"
+            assert "Qorong'ulik" in (novel_data["content_text"] or "")
+            print(f"✓ Created & Verified Novel (id={novel_id}) and Text Chapter (id={novel_ch_id}): OK")
 
             # 6. Daily Checkin & Chapter Reward
             print("\n--- 6. Testing Rewards (Daily Checkin & Chapter Read) ---")

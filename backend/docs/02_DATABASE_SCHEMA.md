@@ -106,6 +106,7 @@ Ushbu hujjat PostgreSQL uchun mo‘ljallangan barcha relying jadvallar, ularning
 | `title` | `VARCHAR(255)`| NOT NULL, INDEX | Manhwa nomi |
 | `slug` | `VARCHAR(280)`| UNIQUE, NOT NULL, INDEX | URL uchun slug |
 | `description` | `TEXT` | NULLABLE | Tavsif / mazmuni |
+| `type` | `VARCHAR(20)` | NOT NULL, DEFAULT 'manhwa', INDEX | Kontent turi: `manhwa` (vertikal webtoon), `manga` (gorizontal komiks), `novel` (ranobe / matnli kitob) |
 | `cover_image_url`| `VARCHAR(500)`| NOT NULL | MinIO dagi muqova rasmi manzili |
 | `author_name` | `VARCHAR(100)`| NULLABLE | Asl muallif nomi |
 | `uploader_staff_id`| `INTEGER` | FK -> `staff_users.id` | Joylagan Creator / Admin |
@@ -129,6 +130,7 @@ Ushbu hujjat PostgreSQL uchun mo‘ljallangan barcha relying jadvallar, ularning
 | `chapter_number`| `NUMERIC(6,1)`| NOT NULL, INDEX | Bob raqami (masalan 1, 2, 2.5) |
 | `title` | `VARCHAR(255)`| NULLABLE | Bob sarlavhasi |
 | `status` | `VARCHAR(20)` | NOT NULL, DEFAULT 'pending' | `pending` (moderatsiya), `published`, `rejected` |
+| `content_text` | `TEXT` | NULLABLE | Novel boblari uchun boy matn / Markdown kontenti |
 | `reward_coins` | `INTEGER` | NOT NULL, DEFAULT 5 | Bobni o'qiganda beriladigan chaqmoq |
 | `created_at` | `TIMESTAMPTZ` | NOT NULL, DEFAULT NOW() | Yuklangan sana |
 

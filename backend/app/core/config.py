@@ -1,4 +1,5 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import model_validator
 from typing import List
 
 
@@ -6,9 +7,13 @@ class Settings(BaseSettings):
     # App
     APP_NAME: str = "WebtoonHub"
     APP_ENV: str = "development"
-    DEBUG: bool = True
+    DEBUG: bool = False
     API_V1_STR: str = "/api/v1"
     SECRET_KEY: str = "super-secret-development-key-change-this-in-production-min32chars"
+    SEED_ADMIN_EMAIL: str = ""
+    SEED_ADMIN_PASSWORD: str = ""
+    SEED_DEMO_ACCOUNTS: bool = False
+    SEED_DEMO_PASSWORD: str = ""
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
     ALLOWED_ORIGINS: List[str] = [
@@ -64,6 +69,22 @@ class Settings(BaseSettings):
     INITIAL_COINS: int = 50
     DAILY_LOGIN_COINS: int = 15
     CHAPTER_READ_COINS: int = 5
+
+    @model_validator(mode="after")
+    def validate_deployment(self):
+        if self.APP_ENV.lower() not in {"development", "test"}:
+            if self.DEBUG:
+                raise ValueError("DEBUG must be disabled outside development and test")
+            if self.SECRET_KEY in {"super-secret-development-key-change-this-in-production-min32chars", "replace-with-a-unique-random-secret-of-at-least-32-characters"} or len(self.SECRET_KEY) < 32:
+                raise ValueError("Set a unique SECRET_KEY of at least 32 characters")
+            if self.SEED_DEMO_ACCOUNTS:
+                raise ValueError("SEED_DEMO_ACCOUNTS is allowed only in development")
+            if not self.ALLOWED_ORIGINS or (
+                self.APP_ENV.lower() != "staging"
+                and all("localhost" in origin or "127.0.0.1" in origin for origin in self.ALLOWED_ORIGINS)
+            ):
+                raise ValueError("Set ALLOWED_ORIGINS for the deployed frontend and admin origins")
+        return self
 
     model_config = SettingsConfigDict(
         env_file=".env",

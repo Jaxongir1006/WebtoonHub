@@ -10,6 +10,7 @@ export const webtoonsApi = {
   async listCatalog(params: {
     page?: number;
     limit?: number;
+    type?: 'manhwa' | 'manga' | 'novel';
     genre?: string;
     status?: 'ongoing' | 'completed';
     search?: string;
@@ -18,6 +19,7 @@ export const webtoonsApi = {
       params: {
         page: params.page || 1,
         limit: params.limit || 20,
+        type: params.type || undefined,
         genre: params.genre || undefined,
         status: params.status || undefined,
         search: params.search || undefined,

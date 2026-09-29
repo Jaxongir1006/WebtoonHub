@@ -1,19 +1,20 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import BigInteger, Boolean, Column, DateTime, ForeignKey, Integer, String, Text, func
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import BigInteger, Boolean, Column, DateTime, ForeignKey, Integer, String, Text, Uuid as UUID, func
 from sqlalchemy.orm import relationship
-from app.core.database import Base
+from app.core.database import Base, BigIntId
 
 
 class User(Base):
     __tablename__ = "users"
 
-    id = Column(BigInteger, primary_key=True, index=True, autoincrement=True)
+    id = Column(BigIntId, primary_key=True, index=True, autoincrement=True)
     username = Column(String(50), unique=True, index=True, nullable=False)
     email = Column(String(255), unique=True, index=True, nullable=False)
     hashed_password = Column(String(255), nullable=False)
     lightning_coins = Column(Integer, default=50, nullable=False)
+    avatar_url = Column(String(500), nullable=True)
+    bio = Column(String(500), nullable=True)
     last_daily_login = Column(DateTime(timezone=True), nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
@@ -27,6 +28,9 @@ class User(Base):
     comments = relationship("Comment", back_populates="user", cascade="all, delete-orphan")
     creator_request = relationship("CreatorRequest", back_populates="user", uselist=False, cascade="all, delete-orphan")
     coin_transactions = relationship("CoinTransaction", back_populates="user", cascade="all, delete-orphan")
+    clan_membership = relationship("ClanMember", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    sent_friend_requests = relationship("Friendship", foreign_keys="Friendship.user_id", back_populates="user", cascade="all, delete-orphan")
+    received_friend_requests = relationship("Friendship", foreign_keys="Friendship.friend_id", back_populates="friend", cascade="all, delete-orphan")
 
 
 class UserSession(Base):

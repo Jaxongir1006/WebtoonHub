@@ -26,27 +26,36 @@ export const HomePage: React.FC = () => {
   const [genres, setGenres] = useState<Genre[]>([]);
   const [selectedGenre, setSelectedGenre] = useState<string | undefined>();
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
+    let cancelled = false;
     const fetchData = async () => {
       setLoading(true);
+      setLoadError(false);
       try {
-        const [wRes, gRes] = await Promise.all([
+        const [webtoonResult, genreResult] = await Promise.allSettled([
           webtoonsApi.listCatalog({ limit: 12, genre: selectedGenre }),
           genres.length === 0 ? webtoonsApi.listGenres() : Promise.resolve(genres)
         ]);
+        if (webtoonResult.status === 'rejected') throw webtoonResult.reason;
+        const wRes = webtoonResult.value;
+        if (cancelled) return;
         setWebtoons(wRes.items || []);
-        if (genres.length === 0 && gRes) {
-          setGenres(gRes);
+        if (genres.length === 0 && genreResult.status === 'fulfilled') {
+          setGenres(genreResult.value);
         }
       } catch (err) {
         console.error("Failed to load home page data", err);
+        if (!cancelled) setLoadError(true);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
     fetchData();
-  }, [selectedGenre]);
+    return () => { cancelled = true; };
+  }, [selectedGenre, retryCount]);
 
   const filteredWebtoons = webtoons;
 
@@ -58,8 +67,15 @@ export const HomePage: React.FC = () => {
           <div className="w-full h-96 rounded-3xl bg-studio-900 animate-pulse flex items-center justify-center text-studio-500 mb-12">
             <Loader2 className="w-8 h-8 animate-spin text-brand-500" />
           </div>
-        ) : (
+        ) : loadError ? null : (
           <HeroBanner webtoons={webtoons.slice(0, 3)} />
+        )}
+
+        {loadError && (
+          <div role="alert" className="mb-12 rounded-2xl border border-rose-500/30 bg-rose-500/10 px-6 py-8 text-center">
+            <p className="text-sm text-rose-200 mb-4">{t('common.error')}</p>
+            <button onClick={() => setRetryCount((count) => count + 1)} className="rounded-xl bg-brand-500 px-5 py-2.5 text-sm font-bold text-studio-950">{t('common.retry')}</button>
+          </div>
         )}
 
         {/* Daily Bonus Callout Strip (Faqat bugun olinmagan bo'lsa ko'rinadi) */}
@@ -125,7 +141,7 @@ export const HomePage: React.FC = () => {
                 <div key={i} className="aspect-[3/4] rounded-2xl bg-studio-900 animate-pulse" />
               ))}
             </div>
-          ) : filteredWebtoons.length === 0 ? (
+          ) : loadError ? null : filteredWebtoons.length === 0 ? (
             <div className="py-16 text-center text-studio-400">
               <BookOpen className="w-10 h-10 mx-auto text-studio-600 mb-2" />
               <p className="text-sm font-semibold">{t('home.emptyGenre')}</p>

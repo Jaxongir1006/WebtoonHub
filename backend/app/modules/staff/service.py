@@ -47,7 +47,7 @@ class StaffService:
             .options(
                 selectinload(StaffUser.role).selectinload(Role.permissions)
             )
-            .where(StaffUser.email == email)
+            .where((StaffUser.email == email) | (StaffUser.username == email))
         )
         result = await db.execute(stmt)
         staff = result.scalar_one_or_none()

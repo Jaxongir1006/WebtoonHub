@@ -23,7 +23,8 @@ Content-Type: multipart/form-data
 | `webtoon_id` | `integer` | Majburiy | Qaysi manhvaga tegishli |
 | `chapter_number` | `float` | Majburiy (masalan `1.0`, `2.5`) | Bob raqami |
 | `title` | `string` | Ixtiyoriy | Bob sarlavhasi |
-| `images` | `file[]` | Majburiy (kamida 1 ta fayl) | Rasmlar to‘plami |
+| `content_text` | `string` | Novel uchun majburiy | Novel bob matni (Markdown / Rich text) |
+| `images` | `file[]` | Manhwa/Manga uchun majburiy, Novel uchun ixtiyoriy | Rasmlar to‘plami |
 
 ---
 

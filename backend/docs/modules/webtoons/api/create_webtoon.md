@@ -21,7 +21,8 @@ Content-Type: multipart/form-data
 | Maydon | Tipi | Qoidalar | Tavsif |
 | :--- | :--- | :--- | :--- |
 | `title` | `string` | Majburiy, 2-255 belgi | Manhwa nomi |
-| `description` | `string` | Ixtiyoriy | Manhwa haqida tavsif |
+| `type` | `string` | Standart: `manhwa` | Kontent turi: `manhwa`, `manga`, `novel` |
+| `description` | `string` | Ixtiyoriy | Asar haqida tavsif |
 | `author_name` | `string` | Ixtiyoriy | Asl muallif nomi |
 | `status` | `string` | `ongoing` yoki `completed` | Chiqarilish holati |
 | `genre_ids` | `string` (JSON array) | Masalan: `[1, 3]` | Tanlangan janrlar ID lari |

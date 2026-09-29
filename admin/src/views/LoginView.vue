@@ -90,16 +90,17 @@
       <!-- Login Card -->
       <div class="glass-panel rounded-3xl p-6 sm:p-8 shadow-xl dark:shadow-2xl border border-slate-200 dark:border-white/10">
         <form @submit.prevent="handleLogin" class="space-y-4">
-          <!-- Email Field -->
+          <!-- Staff identifier -->
           <div>
             <label class="block text-xs font-semibold text-slate-700 dark:text-studio-300 uppercase tracking-wider mb-1.5">
               {{ $t('login.email_label') }}
             </label>
             <input
               v-model="email"
-              type="email"
+              type="text"
               required
-              placeholder="admin@webtoonhub.uz"
+              autocomplete="username"
+              placeholder="admin yoki name@example.com"
               class="w-full px-4 py-2.5 text-sm bg-white dark:bg-studio-900 border border-slate-200 dark:border-white/10 rounded-xl text-slate-900 dark:text-studio-100 placeholder-slate-400 dark:placeholder-studio-500 focus:outline-none focus:border-brand-500/70 focus:ring-1 focus:ring-brand-500/50 transition-all font-mono"
             />
           </div>
@@ -143,41 +144,6 @@
           </Button>
         </form>
 
-        <!-- Demo Accounts Quick Fill (1-click login) -->
-        <div class="mt-6 pt-6 border-t border-slate-200 dark:border-white/5">
-          <p class="text-[11px] font-bold text-slate-500 dark:text-studio-400 uppercase tracking-wider mb-2.5 text-center">
-            {{ $t('login.demo_accounts') }}
-          </p>
-
-          <div class="grid grid-cols-3 gap-2">
-            <button
-              type="button"
-              class="p-2 rounded-xl bg-slate-100 dark:bg-studio-900 hover:bg-brand-500/10 border border-slate-200 dark:border-white/5 hover:border-brand-500/30 text-center transition-all group"
-              @click="quickFill('admin@webtoonhub.uz', 'AdminPassword123')"
-            >
-              <span class="block text-xs font-bold text-slate-800 dark:text-white group-hover:text-brand-600 dark:group-hover:text-brand-300">Superadmin</span>
-              <span class="text-[10px] text-slate-500 dark:text-studio-500 font-mono">{{ $t('login.superadmin_desc') }}</span>
-            </button>
-
-            <button
-              type="button"
-              class="p-2 rounded-xl bg-slate-100 dark:bg-studio-900 hover:bg-cyan-500/10 border border-slate-200 dark:border-white/5 hover:border-cyan-500/30 text-center transition-all group"
-              @click="quickFill('creator@webtoonhub.uz', 'CreatorPassword123')"
-            >
-              <span class="block text-xs font-bold text-slate-800 dark:text-white group-hover:text-cyan-600 dark:group-hover:text-cyan-300">Creator</span>
-              <span class="text-[10px] text-slate-500 dark:text-studio-500 font-mono">{{ $t('login.creator_desc') }}</span>
-            </button>
-
-            <button
-              type="button"
-              class="p-2 rounded-xl bg-slate-100 dark:bg-studio-900 hover:bg-purple-500/10 border border-slate-200 dark:border-white/5 hover:border-purple-500/30 text-center transition-all group"
-              @click="quickFill('moderator@webtoonhub.uz', 'ModeratorPassword123')"
-            >
-              <span class="block text-xs font-bold text-slate-800 dark:text-white group-hover:text-purple-600 dark:group-hover:text-purple-300">Moderator</span>
-              <span class="text-[10px] text-slate-500 dark:text-studio-500 font-mono">{{ $t('login.moderator_desc') }}</span>
-            </button>
-          </div>
-        </div>
       </div>
 
       <!-- Footer Info -->
@@ -202,8 +168,8 @@ const { t } = useI18n()
 const authStore = useAuthStore()
 const systemStore = useSystemStore()
 
-const email = ref('admin@webtoonhub.uz')
-const password = ref('AdminPassword123')
+const email = ref('')
+const password = ref('')
 const isLoading = ref(false)
 const errorMessage = ref('')
 
@@ -235,12 +201,6 @@ function selectLang(code) {
 function selectTheme(theme) {
   systemStore.setTheme(theme)
   showThemeDropdown.value = false
-}
-
-function quickFill(e, p) {
-  email.value = e
-  password.value = p
-  errorMessage.value = ''
 }
 
 async function handleLogin() {

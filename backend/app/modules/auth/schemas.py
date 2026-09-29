@@ -24,6 +24,7 @@ class UserSummary(BaseModel):
     email: str
     username: str
     lightning_coins: int
+    avatar_url: Optional[str] = None
     daily_bonus_claimed: bool = False
     last_daily_login: Optional[datetime] = None
     created_at: Optional[datetime] = None
@@ -51,6 +52,9 @@ class UserProfileResponse(BaseModel):
     email: str
     username: str
     lightning_coins: int
+    avatar_url: Optional[str] = None
+    bio: Optional[str] = None
+    clan: Optional[Dict[str, Any]] = None
     active_frame: Optional[ActiveAsset] = None
     active_background: Optional[ActiveAsset] = None
     daily_bonus_claimed: bool = False

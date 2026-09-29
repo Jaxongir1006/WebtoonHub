@@ -25,10 +25,12 @@
     "id": 101,
     "webtoon_id": 1,
     "webtoon_title": "Yakkaxon Ko'tarilish",
+    "webtoon_type": "manhwa",
     "chapter_number": 1.0,
     "title": "Muqaddima: Qo'shaloq xandaq",
     "reward_coins": 5,
     "is_reward_claimed": false,
+    "content_text": null,
     "images": [
       {
         "id": 1,
@@ -46,6 +48,7 @@
   }
 }
 ```
+*Eslatma:* Agar `webtoon_type === 'novel'` bo'lsa, `content_text` maydonida Markdown / Rich text qaytadi, `images` esa bo'sh yoki ixtiyoriy illyustratsiyalardan iborat bo'ladi. Agar `webtoon_type === 'manga'` bo'lsa, rasmlar o'ngdan chapga gorizontal o'qish uchun mo'ljallanadi.
 
 ### 403 Forbidden (Bob hali chop etilmagan)
 ```json

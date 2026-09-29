@@ -38,5 +38,15 @@ export const shopApi = {
   async deleteItem(id) {
     const res = await apiClient.delete(`/shop/items/${id}`)
     return res.data
+  },
+
+  async uploadAsset(file, itemType = 'frame') {
+    const fd = new FormData()
+    fd.append('file', file)
+    fd.append('item_type', itemType)
+    const res = await apiClient.post('/shop/items/upload-asset', fd, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+    return res.data
   }
 }

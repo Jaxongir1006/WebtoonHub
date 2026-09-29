@@ -1,12 +1,12 @@
 from sqlalchemy import BigInteger, Column, DateTime, ForeignKey, String, UniqueConstraint, func
 from sqlalchemy.orm import relationship
-from app.core.database import Base
+from app.core.database import Base, BigIntId
 
 
 class Bookmark(Base):
     __tablename__ = "bookmarks"
 
-    id = Column(BigInteger, primary_key=True, index=True, autoincrement=True)
+    id = Column(BigIntId, primary_key=True, index=True, autoincrement=True)
     user_id = Column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     webtoon_id = Column(BigInteger, ForeignKey("webtoons.id", ondelete="CASCADE"), nullable=False, index=True)
     status = Column(String(20), default="reading", nullable=False, index=True) # reading, plan_to_read, completed, dropped

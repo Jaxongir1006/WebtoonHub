@@ -8,7 +8,7 @@ from sqlalchemy.orm import selectinload
 from app.core.config import settings
 from app.core.storage import StorageService
 from app.modules.shop.models import ShopItem, UserInventory
-from app.modules.shop.schemas import EquipResponse, ShopBuyResponse, ShopItemResponse
+from app.modules.shop.schemas import EquipResponse, InventoryItemResponse, ShopBuyResponse, ShopItemResponse
 from app.modules.users.models import User
 
 
@@ -44,6 +44,40 @@ class ShopService:
             )
             for item in items
         ]
+
+    @staticmethod
+    async def list_user_inventory(
+        db: AsyncSession,
+        user_id: int,
+        item_type: Optional[str] = None
+    ) -> List[InventoryItemResponse]:
+        query = (
+            select(UserInventory)
+            .options(selectinload(UserInventory.item))
+            .where(UserInventory.user_id == user_id)
+            .order_by(UserInventory.purchased_at.desc())
+        )
+        res = await db.execute(query)
+        inventories = res.scalars().all()
+
+        results = []
+        for inv in inventories:
+            if not inv.item:
+                continue
+            if item_type and inv.item.item_type != item_type:
+                continue
+            results.append(
+                InventoryItemResponse(
+                    id=inv.item.id,
+                    name=inv.item.name,
+                    item_type=inv.item.item_type,
+                    price_coins=inv.item.price_coins,
+                    asset_url=inv.item.asset_url,
+                    is_active=inv.is_active,
+                    purchased_at=inv.purchased_at
+                )
+            )
+        return results
 
     @staticmethod
     async def buy_item(db: AsyncSession, user_id: int, item_id: int) -> ShopBuyResponse:
@@ -204,6 +238,7 @@ class ShopService:
         item_id: int,
         name: Optional[str] = None,
         price_coins: Optional[int] = None,
+        asset_url: Optional[str] = None,
         is_available: Optional[bool] = None
     ) -> ShopItem:
         stmt = select(ShopItem).where(ShopItem.id == item_id)
@@ -216,6 +251,8 @@ class ShopService:
             item.name = name
         if price_coins is not None:
             item.price_coins = price_coins
+        if asset_url is not None and asset_url.strip():
+            item.asset_url = asset_url.strip()
         if is_available is not None:
             item.is_available = is_available
 

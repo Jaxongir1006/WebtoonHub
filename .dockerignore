@@ -1,0 +1,15 @@
+.git
+**/.env
+**/.env.*
+!**/.env.example
+**/.venv
+**/node_modules
+**/__pycache__
+**/*.pyc
+**/*.db
+**/*.sqlite*
+**/.local-seed-credentials.txt
+**/*.pre-migrations.db
+**/coverage
+**/.pytest_cache
+backend/.local-seed-credentials.txt

@@ -44,11 +44,12 @@ class WebtoonService:
         db: AsyncSession,
         page: int = 1,
         limit: int = 20,
+        type_filter: Optional[str] = None,
         genre_slug: Optional[str] = None,
         status_filter: Optional[str] = None,
         search_query: Optional[str] = None
     ) -> WebtoonCatalogResponse:
-        cache_key = f"webtoons:catalog:p{page}:l{limit}:g{genre_slug}:s{status_filter}:q{search_query}"
+        cache_key = f"webtoons:catalog:v2:p{page}:l{limit}:t{type_filter}:g{genre_slug}:s{status_filter}:q{search_query}"
         cached = await CacheService.get(cache_key)
         if cached:
             return WebtoonCatalogResponse(**cached)
@@ -58,6 +59,9 @@ class WebtoonService:
             selectinload(Webtoon.genres),
             selectinload(Webtoon.chapters)
         )
+
+        if type_filter:
+            query = query.where(Webtoon.type == type_filter)
 
         if genre_slug:
             query = query.join(Webtoon.genres).where(Genre.slug == genre_slug)
@@ -71,6 +75,8 @@ class WebtoonService:
 
         # Total count query
         count_stmt = select(func.count(func.distinct(Webtoon.id)))
+        if type_filter:
+            count_stmt = count_stmt.where(Webtoon.type == type_filter)
         if genre_slug:
             count_stmt = count_stmt.join(Webtoon.genres).where(Genre.slug == genre_slug)
         if status_filter:
@@ -93,13 +99,20 @@ class WebtoonService:
             # find latest published chapter
             pub_chapters = [c for c in w.chapters if c.status == "published"]
             latest_ch = None
+            first_ch = None
             if pub_chapters:
                 sorted_chs = sorted(pub_chapters, key=lambda c: c.chapter_number, reverse=True)
                 latest = sorted_chs[0]
+                first = sorted_chs[-1]
                 latest_ch = LatestChapterInfo(
                     id=latest.id,
                     chapter_number=float(latest.chapter_number),
                     created_at=latest.created_at
+                )
+                first_ch = LatestChapterInfo(
+                    id=first.id,
+                    chapter_number=float(first.chapter_number),
+                    created_at=first.created_at
                 )
 
             items.append(
@@ -107,12 +120,15 @@ class WebtoonService:
                     id=w.id,
                     title=w.title,
                     slug=w.slug,
+                    type=w.type or "manhwa",
+                    description=w.description,
                     cover_image_url=w.cover_image_url,
                     author_name=w.author_name,
                     status=w.status,
                     view_count=w.view_count,
                     genres=[g.name for g in w.genres],
-                    latest_chapter=latest_ch
+                    latest_chapter=latest_ch,
+                    first_chapter=first_ch
                 )
             )
 
@@ -180,6 +196,7 @@ class WebtoonService:
                 title=c.title,
                 reward_coins=c.reward_coins,
                 is_claimed=(c.id in claimed_chapter_ids),
+                content_text=c.content_text,
                 created_at=c.created_at
             )
             for c in sorted_pub
@@ -189,6 +206,7 @@ class WebtoonService:
             id=webtoon.id,
             title=webtoon.title,
             slug=webtoon.slug,
+            type=webtoon.type or "manhwa",
             description=webtoon.description,
             cover_image_url=webtoon.cover_image_url,
             author_name=webtoon.author_name,
@@ -260,11 +278,13 @@ class WebtoonService:
             id=chapter.id,
             webtoon_id=chapter.webtoon_id,
             webtoon_title=chapter.webtoon.title,
+            webtoon_type=chapter.webtoon.type or "manhwa",
             chapter_number=float(chapter.chapter_number),
             title=chapter.title,
             reward_coins=chapter.reward_coins,
             is_reward_claimed=is_claimed,
-            images=[ChapterImageItem.model_validate(img) for img in sorted_images],
+            content_text=chapter.content_text,
+            images=[ChapterImageItem(id=img.id, image_url=StorageService.optimized_image_url(img.image_url), order_index=img.order_index) for img in sorted_images],
             prev_chapter_id=prev_id,
             next_chapter_id=next_id
         )
@@ -278,7 +298,8 @@ class WebtoonService:
         status_val: str,
         genre_ids: List[int],
         cover_file: UploadFile,
-        staff_id: int
+        staff_id: int,
+        type_val: str = "manhwa"
     ) -> Webtoon:
         # Check slug uniqueness
         base_slug = slugify(title)
@@ -314,6 +335,7 @@ class WebtoonService:
         new_webtoon = Webtoon(
             title=title,
             slug=slug,
+            type=type_val,
             description=description,
             author_name=author_name,
             status=status_val,
@@ -335,14 +357,22 @@ class WebtoonService:
         webtoon_id: int,
         chapter_number: float,
         title: Optional[str],
-        images: List[UploadFile]
+        content_text: Optional[str] = None,
+        images: Optional[List[UploadFile]] = None
     ) -> Chapter:
         # Check webtoon exists
         w_stmt = select(Webtoon).where(Webtoon.id == webtoon_id)
         w_res = await db.execute(w_stmt)
         webtoon = w_res.scalar_one_or_none()
         if not webtoon:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manhwa topilmadi")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manhwa/Manga/Novel topilmadi")
+
+        if webtoon.type == "novel":
+            if not content_text or not content_text.strip():
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Novel bobida matn kiritilishi shart")
+        else:
+            if not images or len(images) == 0:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Bob rasmlari yuklanishi shart")
 
         # Check duplicate chapter number
         dup_stmt = select(Chapter).where(
@@ -353,36 +383,40 @@ class WebtoonService:
         if dup_res.scalar_one_or_none():
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail=f"Ushbu manhvada {chapter_number} raqamli bob allaqachon mavjud"
+                detail=f"Ushbu asarda {chapter_number} raqamli bob allaqachon mavjud"
             )
 
         new_chapter = Chapter(
             webtoon_id=webtoon_id,
             chapter_number=chapter_number,
             title=title,
+            content_text=content_text.strip() if content_text else None,
             status="pending",
             reward_coins=settings.CHAPTER_READ_COINS
         )
         db.add(new_chapter)
         await db.flush()
 
-        # Upload images and link
-        for idx, img_file in enumerate(images, start=1):
-            file_ext = img_file.filename.split(".")[-1].lower() if img_file.filename else "webp"
-            object_name = f"{webtoon_id}/{new_chapter.id}/{idx:03d}_{uuid.uuid4().hex[:6]}.{file_ext}"
-            content = await img_file.read()
-            img_url = StorageService.upload_file(
-                bucket_name=settings.MINIO_BUCKET_CHAPTERS,
-                object_name=object_name,
-                data=content,
-                content_type=img_file.content_type or "image/webp"
-            )
-            ch_img = ChapterImage(
-                chapter_id=new_chapter.id,
-                image_url=img_url,
-                order_index=idx
-            )
-            db.add(ch_img)
+        # Upload images and link (if provided)
+        if images:
+            for idx, img_file in enumerate(images, start=1):
+                if not img_file.filename:
+                    continue
+                file_ext = img_file.filename.split(".")[-1].lower() if img_file.filename else "webp"
+                object_name = f"{webtoon_id}/{new_chapter.id}/{idx:03d}_{uuid.uuid4().hex[:6]}.{file_ext}"
+                content = await img_file.read()
+                img_url = StorageService.upload_file(
+                    bucket_name=settings.MINIO_BUCKET_CHAPTERS,
+                    object_name=object_name,
+                    data=content,
+                    content_type=img_file.content_type or "image/webp"
+                )
+                ch_img = ChapterImage(
+                    chapter_id=new_chapter.id,
+                    image_url=img_url,
+                    order_index=idx
+                )
+                db.add(ch_img)
 
         await db.commit()
         await db.refresh(new_chapter)
@@ -428,6 +462,7 @@ class WebtoonService:
                 chapter_number=float(c.chapter_number),
                 title=c.title,
                 status=c.status,
+                content_text=c.content_text,
                 images_count=len(c.images),
                 created_at=c.created_at
             )
@@ -439,6 +474,7 @@ class WebtoonService:
         db: AsyncSession,
         webtoon_id: int,
         title: Optional[str] = None,
+        type_val: Optional[str] = None,
         description: Optional[str] = None,
         author_name: Optional[str] = None,
         status_val: Optional[str] = None,
@@ -453,6 +489,8 @@ class WebtoonService:
 
         if title is not None:
             webtoon.title = title
+        if type_val is not None:
+            webtoon.type = type_val
         if description is not None:
             webtoon.description = description
         if author_name is not None:
@@ -572,6 +610,7 @@ class WebtoonService:
                 title=c.title,
                 reward_coins=c.reward_coins,
                 status=c.status,
+                content_text=c.content_text,
                 images_count=len(c.images),
                 created_at=c.created_at
             )
@@ -589,6 +628,8 @@ class WebtoonService:
             chapter.chapter_number = data.chapter_number
         if data.title is not None:
             chapter.title = data.title
+        if hasattr(data, "content_text") and data.content_text is not None:
+            chapter.content_text = data.content_text
         if data.reward_coins is not None:
             chapter.reward_coins = data.reward_coins
         if data.status is not None:

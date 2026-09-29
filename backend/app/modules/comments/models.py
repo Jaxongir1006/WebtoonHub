@@ -1,12 +1,12 @@
 from sqlalchemy import BigInteger, Column, DateTime, ForeignKey, Text, func
 from sqlalchemy.orm import relationship
-from app.core.database import Base
+from app.core.database import Base, BigIntId
 
 
 class Comment(Base):
     __tablename__ = "comments"
 
-    id = Column(BigInteger, primary_key=True, index=True, autoincrement=True)
+    id = Column(BigIntId, primary_key=True, index=True, autoincrement=True)
     chapter_id = Column(BigInteger, ForeignKey("chapters.id", ondelete="CASCADE"), nullable=False, index=True)
     user_id = Column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     parent_id = Column(BigInteger, ForeignKey("comments.id", ondelete="CASCADE"), nullable=True, index=True)

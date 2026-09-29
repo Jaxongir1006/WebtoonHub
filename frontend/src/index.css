@@ -47,4 +47,27 @@
   .text-glow-brand {
     text-shadow: 0 0 16px rgba(245, 158, 11, 0.6);
   }
+
+  /* 3D Book Flip and Reader utilities */
+  .perspective-1500 {
+    perspective: 1500px;
+  }
+  .transform-style-3d {
+    transform-style: preserve-3d;
+  }
+  .backface-hidden {
+    backface-visibility: hidden;
+  }
+  .origin-left {
+    transform-origin: left center;
+  }
+  .origin-right {
+    transform-origin: right center;
+  }
+  .book-spine-shadow {
+    box-shadow: inset 18px 0 25px -10px rgba(0, 0, 0, 0.45);
+  }
+  .book-page-shadow {
+    box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5), 0 0 1px 1px rgba(255, 255, 255, 0.05);
+  }
 }

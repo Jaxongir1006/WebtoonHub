@@ -3,8 +3,10 @@ from zoneinfo import ZoneInfo
 from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.core.config import settings
+from app.modules.clans.models import ClanMember
 from app.modules.rewards.models import ReadReward
 from app.modules.rewards.schemas import ChapterRewardResponse, DailyCheckinResponse
 from app.modules.users.models import User
@@ -127,6 +129,18 @@ class RewardService:
             transaction_type="chapter_read",
             description=f"{chapter.title or str(chapter.chapter_number) + '-bob'} mutolaasi uchun"
         )
+
+        # Check clan membership to award Clan XP
+        clan_stmt = (
+            select(ClanMember)
+            .options(selectinload(ClanMember.clan))
+            .where(ClanMember.user_id == user.id)
+        )
+        cm = (await db.execute(clan_stmt)).scalar_one_or_none()
+        if cm and cm.clan:
+            clan_xp_gain = 25
+            cm.clan.xp += clan_xp_gain
+            cm.contribution_points += clan_xp_gain
 
         await db.commit()
         await db.refresh(user)

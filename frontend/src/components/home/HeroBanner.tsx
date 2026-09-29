@@ -5,18 +5,20 @@ import { SafeImage } from '../common/SafeImage';
 import { useLanguage } from '../../context/LanguageContext';
 import { Zap, BookOpen, Eye, ChevronRight, ChevronLeft } from 'lucide-react';
 import { formatNumber, getStatusLabel } from '../../utils/format';
+import { localizeGenre } from '../../utils/genres';
 
 interface HeroBannerProps {
   webtoons: WebtoonSummary[];
 }
 
 export const HeroBanner: React.FC<HeroBannerProps> = ({ webtoons }) => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [currentIndex, setCurrentIndex] = useState(0);
 
   // Auto rotate banner every 7 seconds
   useEffect(() => {
     if (webtoons.length <= 1) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     const interval = setInterval(() => {
       setCurrentIndex((prev) => (prev + 1) % webtoons.length);
     }, 7000);
@@ -25,7 +27,8 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ webtoons }) => {
 
   if (!webtoons || webtoons.length === 0) return null;
 
-  const current = webtoons[currentIndex];
+  const activeIndex = currentIndex % webtoons.length;
+  const current = webtoons[activeIndex];
 
   const handlePrev = () => {
     setCurrentIndex((prev) => (prev - 1 + webtoons.length) % webtoons.length);
@@ -56,7 +59,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ webtoons }) => {
           <div className="flex flex-wrap items-center gap-2">
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-brand-500 text-studio-950 shadow-glow-brand">
               <Zap className="w-3.5 h-3.5 fill-studio-950" />
-              <span>{t('home.popularToday')} #1</span>
+              <span>{t('home.popularToday')} #{activeIndex + 1}</span>
             </span>
 
             <span
@@ -66,7 +69,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ webtoons }) => {
                   : 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30'
               }`}
             >
-              {getStatusLabel(current.status)}
+              {getStatusLabel(current.status, t)}
             </span>
 
             <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-studio-800/80 backdrop-blur-md text-studio-300 border border-studio-700">
@@ -92,7 +95,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ webtoons }) => {
                 <span>•</span>
                 {current.genres.map((g, idx) => (
                   <span key={idx} className="text-brand-400 font-medium">
-                    #{g}
+                    #{localizeGenre(g, language)}
                   </span>
                 ))}
               </div>
@@ -101,18 +104,19 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ webtoons }) => {
 
           {/* Short description */}
           <p className="text-sm sm:text-base text-studio-300 line-clamp-3 leading-relaxed max-w-xl">
-            {current.description || current.synopsis || "Webtoon & manhwa rasmiy vertikal sifatli tarjima."}
+            {current.description || current.synopsis || t('home.whySubtitle')}
           </p>
+          {language !== 'uz' && <p className="text-xs text-studio-400">{t('home.contentLanguageNotice')}</p>}
 
           {/* Actions */}
           <div className="pt-2 flex flex-wrap items-center gap-4">
-            <Link
-              to={`/webtoons/${current.slug || current.id}`}
+            {current.first_chapter && <Link
+              to={`/chapters/${current.first_chapter.id}`}
               className="px-6 py-3.5 rounded-xl font-bold bg-gradient-to-r from-brand-500 to-amber-400 text-studio-950 hover:from-brand-400 hover:to-amber-300 active:scale-98 shadow-glow-brand transition-all flex items-center gap-2 text-sm sm:text-base"
             >
               <BookOpen className="w-5 h-5 fill-studio-950" />
               <span>{t('details.startReading')}</span>
-            </Link>
+            </Link>}
 
             <Link
               to={`/webtoons/${current.slug || current.id}`}
@@ -151,7 +155,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ webtoons }) => {
             <ChevronLeft className="w-4 h-4" />
           </button>
           <div className="text-xs font-mono font-bold text-studio-400 px-2">
-            {currentIndex + 1} / {webtoons.length}
+            {activeIndex + 1} / {webtoons.length}
           </div>
           <button
             onClick={handleNext}

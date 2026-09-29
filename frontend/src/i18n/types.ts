@@ -24,16 +24,22 @@ export interface TranslationSchema {
     completed: string;
     coins: string;
     coinsUnit: string;
+    free: string;
   };
   nav: {
+    menu: string;
     home: string;
     catalog: string;
     library: string;
     shop: string;
+    wheel: string;
     creator: string;
     login: string;
     register: string;
     profile: string;
+    inventory: string;
+    clans: string;
+    friends: string;
     logout: string;
     dailyBonus: string;
     bonusClaimed: string;
@@ -54,6 +60,7 @@ export interface TranslationSchema {
     featureUzTitle: string;
     featureUzDesc: string;
     emptyGenre: string;
+    contentLanguageNotice: string;
   };
   catalog: {
     title: string;
@@ -99,6 +106,12 @@ export interface TranslationSchema {
     read: string;
     noChapters: string;
   };
+  types: {
+    all: string;
+    manhwa: string;
+    manga: string;
+    novel: string;
+  };
   reader: {
     chapter: string;
     prevChapter: string;
@@ -126,6 +139,20 @@ export interface TranslationSchema {
     chapterCompleted: string;
     coinsClaimedPill: string;
     bonusPill: string;
+    mangaRTL: string;
+    mangaLTR: string;
+    readingDirection: string;
+    prevPage: string;
+    nextPage: string;
+    page: string;
+    fontSize: string;
+    fontSerif: string;
+    fontSans: string;
+    themeDark: string;
+    themeSepia: string;
+    themeLight: string;
+    words: string;
+    bookFlip: string;
   };
   shop: {
     title: string;
@@ -158,6 +185,57 @@ export interface TranslationSchema {
     howToEarnDaily: string;
     empty: string;
   };
+  inventory: {
+    title: string;
+    subtitle: string;
+    tabAll: string;
+    tabFrames: string;
+    tabBackgrounds: string;
+    activeBadge: string;
+    equip: string;
+    unequip: string;
+    empty: string;
+    emptyDesc: string;
+    goToShop: string;
+    purchasedOn: string;
+    lifetimeNotice: string;
+  };
+  wheel: {
+    guaranteedPrizes: string;
+    titlePart1: string;
+    titlePart2: string;
+    subtitle: string;
+    freeBadge: string;
+    costLabel: string;
+    soundOn: string;
+    soundOff: string;
+    todayFreeAvailable: string;
+    spinning: string;
+    loginToSpin: string;
+    freeSpinToday: string;
+    spinWithCoins: string;
+    yourBalance: string;
+    tabLiveWins: string;
+    tabMyHistory: string;
+    tabOdds: string;
+    colWinner: string;
+    colPrize: string;
+    noWinsYet: string;
+    loginToViewHistory: string;
+    noSpinsYet: string;
+    spentCoins: string;
+    freeSpin: string;
+    colSector: string;
+    colProbability: string;
+    guaranteedNotice: string;
+    congratulations: string;
+    jackpotPrize: string;
+    yourNewBalance: string;
+    profileAndInventory: string;
+    playAgain: string;
+    errorLoadingWheel: string;
+    errorLoadingDetail: string;
+  };
   library: {
     title: string;
     subtitle: string;
@@ -176,6 +254,8 @@ export interface TranslationSchema {
   };
   profile: {
     title: string;
+    myInventory: string;
+    myInventorySubtitle: string;
     memberSince: string;
     accountSettings: string;
     username: string;
@@ -290,6 +370,58 @@ export interface TranslationSchema {
     empty: string;
     sending: string;
     confirmDelete: string;
+  };
+  clans: {
+    title: string;
+    subtitle: string;
+    myClan: string;
+    createClan: string;
+    clanName: string;
+    clanTag: string;
+    description: string;
+    level: string;
+    members: string;
+    leader: string;
+    xpProgress: string;
+    upgradeLevel: string;
+    upgradeCost: string;
+    fullXpRequired: string;
+    upgradeSuccess: string;
+    joinClan: string;
+    leaveClan: string;
+    chatTab: string;
+    membersTab: string;
+    sendMessage: string;
+    kickMember: string;
+    recruiting: string;
+    closed: string;
+  };
+  friends: {
+    title: string;
+    subtitle: string;
+    myFriends: string;
+    requests: string;
+    searchPlaceholder: string;
+    addFriend: string;
+    accept: string;
+    reject: string;
+    remove: string;
+    emptyFriends: string;
+    emptyRequests: string;
+    viewProfile: string;
+  };
+  publicProfile: {
+    title: string;
+    memberSince: string;
+    addFriend: string;
+    removeFriend: string;
+    requestPending: string;
+    readingStats: string;
+    bookmarks: string;
+    readChapters: string;
+    commentsCount: string;
+    clanContribution: string;
+    noClan: string;
   };
   footer: {
     description: string;

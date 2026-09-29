@@ -96,45 +96,48 @@ export const initialWebtoons = [
     id: 1,
     title: 'Yakkaxon Ko\'tarilish (Solo Leveling)',
     slug: 'solo-leveling',
-    author_name: 'Chugong / DUBU',
+    type: 'manhwa',
+    author_name: 'Chugong & DUBU (REDICE Studio)',
     status: 'completed',
-    view_count: 48920,
-    cover_image_url: 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=600&auto=format&fit=crop&q=80',
-    description: 'Eng kuchsiz E-darajali ovchidan eng qudratli soyalar hukmdorigacha bo\'lgan hayratlanarli yo\'l...',
+    view_count: 98450,
+    cover_image_url: '/content/covers/solo-leveling.jpg',
+    description: 'O\'n yil muqaddam dunyo bo\'ylab sirli "Darvozalar" ochildi va insoniyat orasida sehrli qudratga ega "Ovchilar" paydo bo\'ldi. Seong Jinwoo butun insoniyatdagi eng zaif E-darajali ovchi hisoblanadi. Biroq D-darajali erosti xandaqidagi dahshatli sirli ibodatxonada unga yangi o\'yin tizimi taqdim etiladi.',
     genres: ['Jangari (Action)', 'Fantaziya (Fantasy)', 'Tizim / Reinkarnatsiya'],
     genre_ids: [1, 2, 7],
     uploader_staff_id: 1,
     created_at: '2026-09-01T12:00:00Z',
-    chapters_count: 3
+    chapters_count: 1
   },
   {
     id: 2,
-    title: 'Har Narsani Biluvchi O\'quvchi (ORV)',
-    slug: 'omniscient-reader',
-    author_name: 'Sing Shong / Sleepy-C',
-    status: 'ongoing',
-    view_count: 31250,
-    cover_image_url: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&auto=format&fit=crop&q=80',
-    description: 'Dunyo uzoq yillar davomida faqat bitta o\'quvchi o\'qigan roman senariysi bo\'yicha qulashni boshlaydi...',
-    genres: ['Jangari (Action)', 'Fantaziya (Fantasy)', 'Sarguzasht (Adventure)'],
-    genre_ids: [1, 2, 3],
-    uploader_staff_id: 2,
-    created_at: '2026-09-05T08:00:00Z',
-    chapters_count: 2
+    title: 'O\'lim Daftari (Death Note)',
+    slug: 'death-note',
+    type: 'manga',
+    author_name: 'Tsugumi Ohba & Takeshi Obata',
+    status: 'completed',
+    view_count: 84200,
+    cover_image_url: '/content/covers/death-note.jpg',
+    description: 'Yagami Light — Yaponiyaning eng iqtidorli namunali o\'quvchisi. Maktab hovlisidan topilgan sirli qora daftar unga istalgan insonning ismini yozish orqali uni o\'ldirish qudratini beradi. O\'lim xudosi Ryuk bilan yuzlashgan Light yangi dunyo xudosiga aylanishga intiladi.',
+    genres: ['Drama', 'Jangari (Action)'],
+    genre_ids: [1, 5],
+    uploader_staff_id: 1,
+    created_at: '2026-09-10T10:00:00Z',
+    chapters_count: 1
   },
   {
     id: 3,
-    title: 'Oxiratdan So\'ng Boshlanish (TBATE)',
-    slug: 'tbate',
-    author_name: 'TurtleMe / Fuyuki23',
+    title: 'Sirli Sirlar Hukmdori (Lord of Mysteries)',
+    slug: 'lord-of-mysteries',
+    type: 'novel',
+    author_name: 'Cuttlefish That Loves Diving',
     status: 'ongoing',
-    view_count: 24700,
-    cover_image_url: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?w=600&auto=format&fit=crop&q=80',
-    description: 'Qudratli qirol Grey sirli sehr va dahshatli maxluqlar dunyosida yangi bola bo\'lib qayta tug\'iladi...',
-    genres: ['Fantaziya (Fantasy)', 'Sarguzasht (Adventure)'],
-    genre_ids: [2, 3],
-    uploader_staff_id: 2,
-    created_at: '2026-09-12T14:30:00Z',
+    view_count: 67100,
+    cover_image_url: '/content/covers/lord-of-mysteries.jpg',
+    description: 'Bug\' mashinalari, qadimiy cherkovlar, viktoriya uslubidagi tumanli London xiyobonlari va g\'ayritabiiy okkultik maxluqlar uyg\'unlashgan sirli dunyo. Chjou Minrui uyg\'onib, o\'zini Klayn Moretti ismli yigit tanasida, qonga belangan revolver yonida ko\'radi. Qizil oy nuri ostida u Tarot kartalari va "Tentak" (The Fool) taxtiga tomon sirli sayohatini boshlaydi.',
+    genres: ['Fantaziya (Fantasy)', 'Drama'],
+    genre_ids: [2, 5],
+    uploader_staff_id: 1,
+    created_at: '2026-09-15T16:00:00Z',
     chapters_count: 1
   }
 ]
@@ -144,68 +147,62 @@ export const initialChapters = [
     id: 101,
     webtoon_id: 1,
     chapter_number: 1.0,
-    title: '1-bob: D-darajali xandaqdagi fojia',
+    title: '1-bob: Eng zaif E-darajali ovchi',
     status: 'published',
     reward_coins: 5,
     created_at: '2026-09-15T12:00:00Z',
     images: [
-      'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=800&auto=format&fit=crop&q=80',
-      'https://images.unsplash.com/photo-1563089145-599997674d42?w=800&auto=format&fit=crop&q=80',
-      'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?w=800&auto=format&fit=crop&q=80'
+      '/content/manhwa/solo-leveling/ch1/p01.jpg',
+      '/content/manhwa/solo-leveling/ch1/p02.jpg',
+      '/content/manhwa/solo-leveling/ch1/p03.jpg',
+      '/content/manhwa/solo-leveling/ch1/p04.jpg',
+      '/content/manhwa/solo-leveling/ch1/p05.jpg',
+      '/content/manhwa/solo-leveling/ch1/p06.jpg',
+      '/content/manhwa/solo-leveling/ch1/p07.jpg',
+      '/content/manhwa/solo-leveling/ch1/p08.jpg',
+      '/content/manhwa/solo-leveling/ch1/p09.jpg',
+      '/content/manhwa/solo-leveling/ch1/p10.jpg',
+      '/content/manhwa/solo-leveling/ch1/p11.jpg',
+      '/content/manhwa/solo-leveling/ch1/p12.jpg'
     ]
   },
   {
     id: 102,
-    webtoon_id: 1,
-    chapter_number: 2.0,
-    title: '2-bob: Qo\'shaloq xandaq va ibodatxona',
+    webtoon_id: 2,
+    chapter_number: 1.0,
+    title: '1-bob: Zerikish (Boredom)',
     status: 'published',
     reward_coins: 5,
     created_at: '2026-09-18T10:00:00Z',
     images: [
-      'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?w=800&auto=format&fit=crop&q=80',
-      'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=800&auto=format&fit=crop&q=80'
+      '/content/manga/death-note/ch1/p01.jpg',
+      '/content/manga/death-note/ch1/p02.jpg',
+      '/content/manga/death-note/ch1/p03.jpg',
+      '/content/manga/death-note/ch1/p04.jpg',
+      '/content/manga/death-note/ch1/p05.jpg',
+      '/content/manga/death-note/ch1/p06.jpg',
+      '/content/manga/death-note/ch1/p07.jpg',
+      '/content/manga/death-note/ch1/p08.jpg',
+      '/content/manga/death-note/ch1/p09.jpg',
+      '/content/manga/death-note/ch1/p10.jpg',
+      '/content/manga/death-note/ch1/p11.jpg',
+      '/content/manga/death-note/ch1/p12.jpg',
+      '/content/manga/death-note/ch1/p13.jpg',
+      '/content/manga/death-note/ch1/p14.jpg',
+      '/content/manga/death-note/ch1/p15.jpg',
+      '/content/manga/death-note/ch1/p16.jpg'
     ]
   },
   {
     id: 103,
-    webtoon_id: 1,
-    chapter_number: 3.0,
-    title: '3-bob: Birinchi amr — Rabbiyga sajda qiling',
-    status: 'pending',
-    reward_coins: 5,
-    created_at: '2026-09-26T20:30:00Z',
-    images: [
-      'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop&q=80',
-      'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=800&auto=format&fit=crop&q=80',
-      'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=800&auto=format&fit=crop&q=80'
-    ]
-  },
-  {
-    id: 104,
-    webtoon_id: 2,
+    webtoon_id: 3,
     chapter_number: 1.0,
-    title: '1-bob: Epilogdan boshlanish',
+    title: '1-bob: Qizil Oy va Uyg\'onish',
     status: 'published',
     reward_coins: 5,
-    created_at: '2026-09-20T16:00:00Z',
-    images: [
-      'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?w=800&auto=format&fit=crop&q=80',
-      'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?w=800&auto=format&fit=crop&q=80'
-    ]
-  },
-  {
-    id: 105,
-    webtoon_id: 2,
-    chapter_number: 2.0,
-    title: '2-bob: Metro vagonidagi birinchi stsenariy',
-    status: 'pending',
-    reward_coins: 5,
-    created_at: '2026-09-27T14:15:00Z',
-    images: [
-      'https://images.unsplash.com/photo-1563089145-599997674d42?w=800&auto=format&fit=crop&q=80',
-      'https://images.unsplash.com/photo-1534447677768-be436bb09401?w=800&auto=format&fit=crop&q=80'
-    ]
+    content_text: `# 1-bob: Qizil Oy va Uyg'onish\n\nBosh suyagi go'yo o'tkir pichoq bilan tilkalangandek qattiq og'rirdi.\n\nQorong'ulik qa'ridan asta-sekin hushiga kelayotgan Chjou Minrui ongining tub-tubida jaranglayotgan g'alati ovozlarni eshitdi. Bu ovozlar shivirlashga, minglab odamlarning bir vaqtning o'zida telbalarcha pichirlashiga o'xshardi:\n\n> *"Tentak... Omad va sir-asrorlar hukmdori... Kulrang tuman ustidagi boqiy imperator..."*\n\nChjou Minrui ko'zlarini ochishga urindi, biroq qovoqlari qo'rg'oshin quygandek og'irlashib ketgan edi. Qon hidi — achchiq, nordon va temir ta'mini eslatuvchi qo'lansa hid butun xonani chulg'ab olgandi.\n\nNihoyat, kuchini to'plab ko'zlarini qiya ochdi.\n\nUning nigohi g'alati, umrida hech ko'rmagan manzaraga tushdi. Bu uning zamonaviy ijarada yashaydigan shinam xonasi emasdi.\n\n---\n\n### I. G'alati Xona va Qon Izlari\n\nXonaning devorlari eskirgan sarg'ish gulqog'ozlar bilan qoplangan, burchakda esa misdan yasalgan ingichka quvurli gaz chirog'i miltillab yonardi. Stol ustida qadimgi uslubdagi patqalam, to'ntarilgan siyohdon va ochilgan qalin charm muqovali daftar yotardi.\n\nLekin eng dahshatlisi — stol chetida yaltirab turgan qora metall buyum edi.\n\n— Bu... revolver?! — Chjou Minrui titrab ketdi.\n\nU qo'lini asta ko'tarib, o'ng chakkasini ushlab ko'rdi. Barmoqlari nimadir quyuq, yopishqoq va iliq suyuqlikka tegdi. Qo'liga qaradi: qon!\n\nUning o'ng chakkasida teshik bor edi. O'q kalla suyagini yorib o'tgan, miya to'qimalariga shikast yetkazgan bo'lishi kerak edi. Ammo nega u hali ham tirik? Nega u nafas olyapti va fikrlay olyapti?!\n\n---\n\n### II. Begona Xotiralar: Klayn Moretti\n\nXotiralar toshqin daryodek uning ongini qamrab oldi:\n\n*Bu shaxsning ismi — Klayn Moretti.*\n*U Loen Qirolligining Aksen okrugi, Tingen shahrida yashovchi 22 yoshli yigit.*\n*U yaqindagina Khoy Universitetining tarix fakultetini tamomlagan edi.*\n*Uning katta akasi Benson kompaniyada mirza bo'lib ishlaydi, kichik singlisi Melissa esa texnik bilim yurtida o'qiydi...*\n\n— Men... boshqa dunyoga tushib qoldimmi? — Chjou Minrui karaxt ahvolda shivirladi.\n\n---\n\n### III. Stol Ustidagi Qora Sir\n\nKlayn chuqur nafas oldi va gavdasini zo'rg'a rostlab o'rnidan turdi. Stol tomon yaqinlashib, qon sachragan daftarga qaradi.\n\nDaftarda Loen tilining qadimiy kalligrafik yozuvida so'nggi jumla qoldirilgan edi:\n\n> **"Hammamiz o'lamiz. Hech kim omon qolmaydi, shu jumladan men ham."**\n\nKlaynning yuragi orqaga tortib ketdi. Stol ustidagi revolver 6 o'qli, po'lat barabanli klassik politsiya quroli edi. Baraban ochilganida, bitta gilza bo'sh ekanligi ko'rindi.\n\nKlayn deraza tomon burildi. Pardani ohista chetga surdi.\n\nTashqarida tumanli, bug' motorlari shovqini ostidagi shahar osmonida dahshatli va aqlbovar qilmas manzara namoyon bo'ldi:\n\nOsmon markazida ulkan, qon kabi qip-qizil to'lin oy porlab turardi!\n\n---\n\n### IV. Ko'zgudagi Mo''jiza\n\nXona burchagidagi singan ko'zgu oldiga borib, o'z aksiga boqdi.\n\nKo'zgudan qora sochli, chuqur jigarrang ko'zli, ozg'in, ammo ma'noli yuz tuzilishiga ega ziyoli yigit boqib turardi. Uning o'ng chakkasidagi daxshatli o'q yarasi qonab turgan bo'lsa-da, qizil oy nuri ostida yara qirralari o'z-o'zidan birikayotgan, go'yo ko'rinmas iplar bilan tikilayotgandek edi.\n\nBesh daqiqa ichida ochiq yara qotib, faqatgina qoraygan chandiqqa aylandi.\n\nKlayn Moretti tirik qolgan edi. Uning yangi hayoti, sir-sinoatlar, qadimiy xudolar, Beyonderlar va Tarot Kengashi tomon ilk qadami aynan shu qonli tunning qizil yog'dusida boshlandi...`,
+    created_at: '2026-09-28T10:00:00Z',
+    images: []
   }
 ]
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { webtoonsApi } from '../api/webtoons';
 import { Genre, WebtoonSummary } from '../types';
@@ -12,42 +12,54 @@ export const CatalogPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const searchParam = searchParams.get('search') || '';
+  const typeParam = (searchParams.get('type') as 'manhwa' | 'manga' | 'novel') || '';
   const genreParam = searchParams.get('genre') || '';
   const statusParam = (searchParams.get('status') as 'ongoing' | 'completed') || '';
-  const pageParam = parseInt(searchParams.get('page') || '1', 10);
+  const requestedPage = parseInt(searchParams.get('page') || '1', 10);
+  const pageParam = Number.isFinite(requestedPage) && requestedPage > 0 ? requestedPage : 1;
 
   const [genres, setGenres] = useState<Genre[]>([]);
   const [webtoons, setWebtoons] = useState<WebtoonSummary[]>([]);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+  const requestId = useRef(0);
 
   // Local state for search input
   const [searchInput, setSearchInput] = useState(searchParam);
+
+  useEffect(() => setSearchInput(searchParam), [searchParam]);
 
   useEffect(() => {
     webtoonsApi.listGenres().then(setGenres).catch(console.error);
   }, []);
 
   const fetchCatalog = useCallback(async () => {
+    const currentRequest = ++requestId.current;
     setLoading(true);
+    setLoadError(false);
     try {
       const data = await webtoonsApi.listCatalog({
         page: pageParam,
         limit: 18,
+        type: typeParam || undefined,
         search: searchParam || undefined,
         genre: genreParam || undefined,
         status: statusParam || undefined,
       });
+      if (currentRequest !== requestId.current) return;
       setWebtoons(data.items || []);
       setTotal(data.total || 0);
       setTotalPages(data.pages || 1);
     } catch (err) {
       console.error("Failed to load catalog", err);
+      if (currentRequest === requestId.current) setLoadError(true);
     } finally {
-      setLoading(false);
+      if (currentRequest === requestId.current) setLoading(false);
     }
-  }, [pageParam, searchParam, genreParam, statusParam]);
+  }, [pageParam, typeParam, searchParam, genreParam, statusParam, retryCount]);
 
   useEffect(() => {
     fetchCatalog();
@@ -79,7 +91,7 @@ export const CatalogPage: React.FC = () => {
     setSearchParams({});
   };
 
-  const hasActiveFilters = !!searchParam || !!genreParam || !!statusParam;
+  const hasActiveFilters = !!searchParam || !!genreParam || !!statusParam || !!typeParam;
 
   return (
     <div className="min-h-screen">
@@ -123,6 +135,33 @@ export const CatalogPage: React.FC = () => {
 
         {/* Filters Bar */}
         <div className="bg-studio-900/60 border border-studio-800 rounded-3xl p-5 mb-8 space-y-4">
+          {/* Content Type Filter */}
+          <div className="flex flex-wrap items-center gap-2 pb-3 border-b border-studio-800/80">
+            <span className="text-xs font-semibold text-studio-400 mr-1">Format:</span>
+            {[
+              { label: t('types.all'), value: '' },
+              { label: t('types.manhwa'), value: 'manhwa' },
+              { label: t('types.manga'), value: 'manga' },
+              { label: t('types.novel'), value: 'novel' },
+            ].map((tp) => {
+              const isSelected = typeParam === tp.value;
+              return (
+                <button
+                  key={tp.value}
+                  type="button"
+                  onClick={() => updateFilters({ type: tp.value || undefined })}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                    isSelected
+                      ? 'bg-brand-500 text-studio-950 shadow-glow-brand'
+                      : 'bg-studio-800/80 text-studio-300 hover:text-white hover:bg-studio-700'
+                  }`}
+                >
+                  {tp.label}
+                </button>
+              );
+            })}
+          </div>
+
           {/* Genre list */}
           <div>
             <div className="text-xs font-semibold text-studio-400 mb-2">{t('common.genres')}:</div>
@@ -174,18 +213,23 @@ export const CatalogPage: React.FC = () => {
         </div>
 
         {/* Results Counter */}
-        <div className="flex items-center justify-between mb-6 text-xs text-studio-400 font-semibold">
+        {!loadError && <div className="flex items-center justify-between mb-6 text-xs text-studio-400 font-semibold">
           <span>{t('common.all')}: <b className="text-white">{total}</b></span>
           {totalPages > 1 && (
             <span>{pageParam} / {totalPages}</span>
           )}
-        </div>
+        </div>}
 
         {/* Webtoons Grid */}
         {loading ? (
           <div className="py-24 flex flex-col items-center justify-center text-studio-400 gap-3">
             <Loader2 className="w-8 h-8 animate-spin text-brand-500" />
             <span className="text-sm">{t('common.loading')}</span>
+          </div>
+        ) : loadError ? (
+          <div role="alert" className="py-16 text-center bg-studio-900/40 border border-rose-500/30 rounded-3xl p-8 max-w-md mx-auto">
+            <h3 className="font-bold text-white text-base mb-3">{t('common.error')}</h3>
+            <button onClick={() => setRetryCount((count) => count + 1)} className="px-4 py-2 rounded-xl bg-brand-500 text-studio-950 font-bold text-sm">{t('common.retry')}</button>
           </div>
         ) : webtoons.length === 0 ? (
           <div className="py-20 text-center bg-studio-900/40 border border-studio-800 rounded-3xl p-8 max-w-md mx-auto">

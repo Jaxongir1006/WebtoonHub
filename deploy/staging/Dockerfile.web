@@ -1,0 +1,10 @@
+FROM nginx:1.27-alpine
+
+COPY deploy/staging/nginx.conf /etc/nginx/conf.d/default.conf
+COPY frontend/dist /usr/share/nginx/html
+COPY admin/dist /usr/share/nginx/admin
+RUN rm -rf /usr/share/nginx/html/content \
+    /usr/share/nginx/html/assets/frames \
+    /usr/share/nginx/html/assets/backgrounds
+
+EXPOSE 8080 8081

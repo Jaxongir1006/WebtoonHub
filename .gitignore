@@ -64,3 +64,15 @@ uploads/
 .coverage
 htmlcov/
 .pytest_cache/
+
+# Local SQLite databases and their WAL files
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+.local-seed-credentials.txt
+
+# Runtime uploads and local sample media are never source code.
+backend/public_content/
+frontend/public/content/

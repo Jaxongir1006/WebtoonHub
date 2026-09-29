@@ -8,6 +8,7 @@ import { WebtoonDetail, BookmarkStatus, BookmarkItem } from '../types';
 import { SafeImage } from '../components/common/SafeImage';
 import { BookmarkButton } from '../components/webtoons/BookmarkButton';
 import { formatNumber, getStatusLabel } from '../utils/format';
+import { localizeGenre } from '../utils/genres';
 import { formatDate } from '../utils/date';
 import {
   BookOpen,
@@ -144,6 +145,20 @@ export const WebtoonDetailPage: React.FC = () => {
                   {getStatusLabel(webtoon.status, t)}
                 </span>
 
+                {webtoon.type && (
+                  <span
+                    className={`px-3 py-1 rounded-full text-xs font-black tracking-wide uppercase shadow-sm ${
+                      webtoon.type === 'novel'
+                        ? 'bg-purple-600 text-white'
+                        : webtoon.type === 'manga'
+                        ? 'bg-sky-600 text-white'
+                        : 'bg-brand-500 text-studio-950'
+                    }`}
+                  >
+                    {t(`types.${webtoon.type}` as any) || webtoon.type}
+                  </span>
+                )}
+
                 <span className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-studio-900 border border-studio-800 text-studio-300">
                   <Eye className="w-3.5 h-3.5 text-studio-400" />
                   <span>{formatNumber(webtoon.view_count)} {t('common.views')}</span>
@@ -174,7 +189,7 @@ export const WebtoonDetailPage: React.FC = () => {
                         key={idx}
                         className="text-xs font-semibold px-2 py-0.5 rounded-lg bg-brand-500/10 text-brand-400"
                       >
-                        {g}
+                        {localizeGenre(g, language)}
                       </span>
                     ))}
                   </div>
@@ -190,6 +205,7 @@ export const WebtoonDetailPage: React.FC = () => {
                   <p className="text-xs sm:text-sm text-studio-200 leading-relaxed max-w-3xl whitespace-pre-line">
                     {webtoon.description}
                   </p>
+                  {language !== 'uz' && <p className="mt-2 text-xs text-studio-400">{t('home.contentLanguageNotice')}</p>}
                 </div>
               )}
 

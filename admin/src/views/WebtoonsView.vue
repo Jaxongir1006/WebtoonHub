@@ -57,6 +57,17 @@
       </div>
 
       <div class="flex flex-wrap items-center gap-3 w-full md:w-auto">
+        <!-- Format (Type) Filter -->
+        <select
+          v-model="selectedType"
+          class="px-3 py-2 text-xs bg-white dark:bg-studio-900 border border-slate-200 dark:border-white/10 rounded-xl text-slate-800 dark:text-studio-200 focus:outline-none shadow-sm dark:shadow-none font-medium"
+        >
+          <option value="all">Barcha Formatlar</option>
+          <option value="manhwa">📱 Manhwa (Vertikal)</option>
+          <option value="manga">📖 Manga (RTL)</option>
+          <option value="novel">📜 Novel (Matnli)</option>
+        </select>
+
         <!-- Status Filter -->
         <select
           v-model="selectedStatus"
@@ -119,11 +130,21 @@
             />
             <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
 
-            <!-- Status Badge -->
-            <div class="absolute top-3 left-3">
+            <!-- Status & Format Badges -->
+            <div class="absolute top-3 left-3 flex flex-col gap-1.5 items-start">
               <Badge :variant="item.status === 'completed' ? 'success' : 'primary'" :dot="true">
                 {{ item.status === 'completed' ? $t('webtoons.completed') : $t('webtoons.ongoing') }}
               </Badge>
+              <span
+                :class="[
+                  'px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider shadow-sm backdrop-blur-md',
+                  item.type === 'novel' ? 'bg-emerald-500/90 text-slate-950 font-black' :
+                  item.type === 'manga' ? 'bg-rose-500/90 text-white' :
+                  'bg-indigo-600/90 text-white'
+                ]"
+              >
+                {{ item.type === 'novel' ? 'Novel' : item.type === 'manga' ? 'Manga' : 'Manhwa' }}
+              </span>
             </div>
 
             <!-- View Count Badge -->
@@ -204,7 +225,8 @@
         <table class="w-full text-left text-sm">
           <thead class="bg-slate-100 dark:bg-studio-900/80 text-xs uppercase font-bold text-slate-600 dark:text-studio-400 border-b border-slate-200 dark:border-white/5">
             <tr>
-              <th class="px-5 py-3.5">Manhwa</th>
+              <th class="px-5 py-3.5">Loyiha</th>
+              <th class="px-5 py-3.5">Format</th>
               <th class="px-5 py-3.5">{{ $t('webtoons.author') }}</th>
               <th class="px-5 py-3.5">{{ $t('common.status') }}</th>
               <th class="px-5 py-3.5">{{ $t('webtoons.chapters_count') }}</th>
@@ -222,6 +244,18 @@
                   </router-link>
                   <p class="text-xs text-slate-400 dark:text-studio-500 font-mono">{{ item.slug }}</p>
                 </div>
+              </td>
+              <td class="px-5 py-3">
+                <span
+                  :class="[
+                    'px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider inline-block',
+                    item.type === 'novel' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' :
+                    item.type === 'manga' ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' :
+                    'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
+                  ]"
+                >
+                  {{ item.type === 'novel' ? 'Novel' : item.type === 'manga' ? 'Manga' : 'Manhwa' }}
+                </span>
               </td>
               <td class="px-5 py-3 text-slate-600 dark:text-studio-300 text-xs">{{ item.author_name }}</td>
               <td class="px-5 py-3">
@@ -300,6 +334,7 @@ const systemStore = useSystemStore()
 
 const isGrid = ref(true)
 const searchQuery = ref('')
+const selectedType = ref('all')
 const selectedStatus = ref('all')
 const selectedGenre = ref('all')
 
@@ -339,6 +374,9 @@ const filteredWebtoons = computed(() => {
       w.title.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
       w.author_name?.toLowerCase().includes(searchQuery.value.toLowerCase())
 
+    const matchesType =
+      selectedType.value === 'all' || (w.type || 'manhwa') === selectedType.value
+
     const matchesStatus =
       selectedStatus.value === 'all' || w.status === selectedStatus.value
 
@@ -351,7 +389,7 @@ const filteredWebtoons = computed(() => {
       }
     }
 
-    return matchesSearch && matchesStatus && matchesGenre
+    return matchesSearch && matchesType && matchesStatus && matchesGenre
   })
 })
 
@@ -379,26 +417,23 @@ async function onWebtoonSaved(savedItem) {
       await webtoonsApi.updateWebtoon(savedItem.id, savedItem)
       systemStore.addToast({
         type: 'success',
-        title: 'Manhwa yangilandi',
+        title: 'Loyiha yangilandi',
         message: `"${savedItem.title}" muvaffaqiyatli saqlandi`
       })
     } else {
       const formData = new FormData()
       formData.append('title', savedItem.title)
+      formData.append('type', savedItem.type || 'manhwa')
       if (savedItem.description) formData.append('description', savedItem.description)
       if (savedItem.author_name) formData.append('author_name', savedItem.author_name)
       formData.append('status', savedItem.status || 'ongoing')
       formData.append('genre_ids', JSON.stringify(savedItem.genre_ids || []))
-      if (savedItem.cover_file) {
-        formData.append('cover_image', savedItem.cover_file)
-      } else {
-        const dummyBlob = new Blob([new Uint8Array([0xFF, 0xD8, 0xFF, 0xE0])], { type: 'image/jpeg' })
-        formData.append('cover_image', dummyBlob, 'cover.jpg')
-      }
+      if (!savedItem.cover_image_file) throw new Error('Muqova rasmini tanlang')
+      formData.append('cover_image', savedItem.cover_image_file)
       await webtoonsApi.createWebtoon(formData)
       systemStore.addToast({
         type: 'success',
-        title: 'Manhwa yaratildi',
+        title: 'Loyiha yaratildi',
         message: `"${savedItem.title}" muvaffaqiyatli katalogga qo'shildi`
       })
     }
@@ -407,19 +442,19 @@ async function onWebtoonSaved(savedItem) {
     systemStore.addToast({
       type: 'error',
       title: 'Xatolik',
-      message: err.message || 'Manhvani saqlashda xatolik yuz berdi'
+      message: err.message || 'Loyihani saqlashda xatolik yuz berdi'
     })
   }
 }
 
 async function deleteWebtoon(id) {
-  if (confirm('Rostdan ham ushbu manhva va uning barcha boblarini o\'chirmoqchimisiz?')) {
+  if (confirm('Rostdan ham ushbu loyiha va uning barcha boblarini o\'chirmoqchimisiz?')) {
     try {
       await webtoonsApi.deleteWebtoon(id)
       systemStore.addToast({
         type: 'info',
-        title: 'Manhwa o\'chirildi',
-        message: 'Manhwa va uning barcha ma\'lumotlari bazadan o\'chirildi'
+        title: 'Loyiha o\'chirildi',
+        message: 'Loyiha va uning barcha ma\'lumotlari bazadan o\'chirildi'
       })
       await loadData()
     } catch (err) {
@@ -438,11 +473,13 @@ async function onChapterUploaded(data) {
     formData.append('webtoon_id', data.webtoon_id)
     formData.append('chapter_number', data.chapter_number)
     if (data.title) formData.append('title', data.title)
+    if (data.reward_coins) formData.append('reward_coins', data.reward_coins)
+    if (data.content_text) formData.append('content_text', data.content_text)
+
     if (data.rawFiles && data.rawFiles.length > 0) {
       data.rawFiles.forEach((f) => formData.append('images', f))
-    } else {
-      const dummyBlob = new Blob([new Uint8Array([0xFF, 0xD8, 0xFF, 0xE0])], { type: 'image/jpeg' })
-      formData.append('images', dummyBlob, 'page_01.jpg')
+    } else if (!data.content_text?.trim()) {
+      throw new Error('Bob uchun rasm yoki matn kiriting')
     }
     await webtoonsApi.uploadChapter(formData)
     await loadData()

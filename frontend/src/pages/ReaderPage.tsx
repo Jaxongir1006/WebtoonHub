@@ -5,8 +5,42 @@ import { ChapterReaderData, ChapterSummary, ChapterImage } from '../types';
 import { ReaderNav } from '../components/reader/ReaderNav';
 import { RewardClaimCard } from '../components/reader/RewardClaimCard';
 import { ChapterComments } from '../components/comments/ChapterComments';
+import { MangaReader } from '../components/reader/MangaReader';
+import { NovelReader } from '../components/reader/NovelReader';
 import { useLanguage } from '../context/LanguageContext';
 import { Loader2, AlertCircle, ChevronLeft, ChevronRight, BookOpen } from 'lucide-react';
+
+const ChapterPanel: React.FC<{ image: ChapterImage; eager: boolean }> = ({ image, eager }) => {
+  const { t } = useLanguage();
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  const source = attempt === 0
+    ? image.image_url
+    : `${image.image_url}${image.image_url.includes('?') ? '&' : '?'}retry=${attempt}`;
+
+  if (failed) {
+    return (
+      <div role="alert" className="w-full py-16 px-4 bg-studio-900 border border-studio-800 text-center text-sm text-studio-300 my-1">
+        <p className="font-bold text-amber-400 mb-1">{t('reader.pageLoadError', { order: image.order_index })}</p>
+        <p className="mb-4">{t('reader.pageNetworkError')}</p>
+        <button type="button" onClick={(event) => { event.stopPropagation(); setAttempt((current) => current + 1); setFailed(false); }} className="px-4 py-2 rounded-xl bg-brand-500 text-studio-950 font-bold">
+          {t('common.retry')}
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={source}
+      alt={`Page ${image.order_index}`}
+      className="w-full h-auto block select-none pointer-events-none"
+      loading={eager ? 'eager' : 'lazy'}
+      decoding="async"
+      onError={() => setFailed(true)}
+    />
+  );
+};
 
 export const ReaderPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -54,7 +88,7 @@ export const ReaderPage: React.FC = () => {
     }
   }, [id, fetchChapter]);
 
-  // Scroll listener for progress and auto-hiding header
+  // Scroll listener for progress and auto-hiding header (for vertical manhwa reader)
   useEffect(() => {
     const handleScroll = () => {
       const totalHeight = document.documentElement.scrollHeight - window.innerHeight;
@@ -80,6 +114,10 @@ export const ReaderPage: React.FC = () => {
 
   const toggleNav = () => {
     setNavVisible((prev) => !prev);
+  };
+
+  const handleClaimSuccess = () => {
+    setData((prev) => (prev ? { ...prev, is_reward_claimed: true } : null));
   };
 
   if (loading) {
@@ -109,6 +147,32 @@ export const ReaderPage: React.FC = () => {
     );
   }
 
+  // 1. Novel / Ranobe Reader (Book Flip Mode)
+  if (data.webtoon_type === 'novel' || (data.content_text && (!data.images || data.images.length === 0))) {
+    return (
+      <NovelReader
+        key={data.id}
+        data={data}
+        allChapters={allChapters}
+        onClaimSuccess={handleClaimSuccess}
+      />
+    );
+  }
+
+  // 2. Manga Reader (Horizontal RTL/LTR Page Reader)
+  if (data.webtoon_type === 'manga') {
+    return (
+      <MangaReader
+        key={data.id}
+        data={data}
+        allChapters={allChapters}
+        onClaimSuccess={handleClaimSuccess}
+      />
+    );
+  }
+
+  // 3. Default Vertical Manhwa Webtoon Reader
+
   return (
     <div className="min-h-screen bg-black text-white relative">
       {/* Floating Reader Navigation */}
@@ -128,23 +192,8 @@ export const ReaderPage: React.FC = () => {
         {data.images && data.images.length > 0 ? (
           [...data.images]
             .sort((a: ChapterImage, b: ChapterImage) => a.order_index - b.order_index)
-            .map((img: ChapterImage) => (
-              <img
-                key={img.id || img.order_index}
-                src={img.image_url}
-                alt={`Page ${img.order_index}`}
-                className="w-full h-auto block select-none pointer-events-none"
-                loading="lazy"
-                onError={(e) => {
-                  const target = e.currentTarget;
-                  target.onerror = null;
-                  target.style.display = 'none';
-                  const fallbackDiv = document.createElement('div');
-                  fallbackDiv.className = 'w-full py-16 px-4 bg-studio-900 border border-studio-800 text-center text-xs text-studio-400 my-1';
-                  fallbackDiv.innerHTML = `<span class="text-amber-400 font-bold block mb-1">${t('reader.pageLoadError', { order: img.order_index })}</span><span class="text-studio-500 text-[11px]">${t('reader.pageNetworkError')}</span>`;
-                  target.parentNode?.insertBefore(fallbackDiv, target);
-                }}
-              />
+            .map((img: ChapterImage, index: number) => (
+              <ChapterPanel key={img.id || img.order_index} image={img} eager={index === 0} />
             ))
         ) : (
           <div className="py-32 px-4 text-center text-studio-400">

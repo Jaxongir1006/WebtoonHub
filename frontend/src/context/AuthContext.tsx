@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { authApi } from '../api/auth';
 import { UserProfile } from '../types';
 import { getApiErrorMessage } from '../api/client';
+import axios from 'axios';
 
 interface AuthContextType {
   user: UserProfile | null;
@@ -32,10 +33,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(profile);
     } catch (err) {
       console.warn("Could not load user profile:", err);
-      // token may be invalid
-      localStorage.removeItem('webtoonhub_access_token');
-      localStorage.removeItem('webtoonhub_refresh_token');
-      setUser(null);
+      // A temporary network or server error must not discard a valid session.
+      if (axios.isAxiosError(err) && [401, 403].includes(err.response?.status || 0)) {
+        localStorage.removeItem('webtoonhub_access_token');
+        localStorage.removeItem('webtoonhub_refresh_token');
+        setUser(null);
+      }
     }
   }, []);
 
@@ -68,7 +71,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const response = await authApi.register({ email, username, password });
       // After registration, auto-login without immediately dismissing the modal
-      await login(email, password, false);
+      const loginResult = await login(email, password, false);
+      if (!loginResult.success) return loginResult;
       return {
         success: true,
         message: response.message || "Ro'yxatdan muvaffaqiyatli o'tdingiz. Hisobingizga 50 Chaqmoq qo'shildi!"

@@ -1,8 +1,12 @@
+import os
+import uuid
 from typing import Optional
 from fastapi import APIRouter, Depends, File, Form, Query, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.database import get_db
+from app.core.storage import StorageService
 from app.modules.auth.dependencies import get_current_user, get_optional_user
 from app.modules.shop.schemas import ShopItemUpdateRequest
 from app.modules.shop.service import ShopService
@@ -29,7 +33,21 @@ async def list_shop_items(
     }
 
 
-# 2. Buy Shop Item with Chaqmoq
+# 2. Get User Inventory
+@client_router.get("/inventory", status_code=status.HTTP_200_OK)
+async def get_my_inventory(
+    item_type: Optional[str] = Query(None, pattern=r"^(frame|background)$"),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    items = await ShopService.list_user_inventory(db, user_id=user.id, item_type=item_type)
+    return {
+        "success": True,
+        "data": items
+    }
+
+
+# 3. Buy Shop Item with Chaqmoq
 @client_router.post("/buy/{item_id}", status_code=status.HTTP_200_OK)
 async def buy_item(
     item_id: int,
@@ -132,6 +150,7 @@ async def update_shop_item(
         item_id=id,
         name=data.name,
         price_coins=data.price_coins,
+        asset_url=data.asset_url,
         is_available=data.is_available
     )
     return {
@@ -140,9 +159,39 @@ async def update_shop_item(
             "id": item.id,
             "name": item.name,
             "price_coins": item.price_coins,
+            "asset_url": item.asset_url,
             "is_available": item.is_available
         },
         "message": "Buyum muvaffaqiyatli yangilandi"
+    }
+
+
+# 7.1 Upload Shop Asset File (Staff)
+@staff_router.post("/items/upload-asset", status_code=status.HTTP_200_OK)
+@staff_router.post("/shop/items/upload-asset", status_code=status.HTTP_200_OK)
+async def upload_shop_asset(
+    file: UploadFile = File(...),
+    item_type: str = Form("frame"),
+    _staff: StaffUser = Depends(require_permission("shop:manage")),
+):
+    ext = os.path.splitext(file.filename or "")[1].lower() or ".png"
+    folder = "frames" if item_type == "frame" else "backgrounds"
+    object_name = f"{folder}/asset_{uuid.uuid4().hex[:10]}{ext}"
+    content = await file.read()
+    content_type = "image/svg+xml" if ext == ".svg" else (file.content_type or "image/png")
+
+    asset_url = StorageService.upload_file(
+        bucket_name=settings.MINIO_BUCKET_SHOP,
+        object_name=object_name,
+        data=content,
+        content_type=content_type
+    )
+    return {
+        "success": True,
+        "data": {
+            "asset_url": asset_url
+        },
+        "message": "Fayl muvaffaqiyatli yuklandi"
     }
 
 

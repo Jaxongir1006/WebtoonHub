@@ -38,6 +38,7 @@ async def list_genres(db: AsyncSession = Depends(get_db)):
 async def list_catalog(
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100),
+    type: Optional[str] = Query(None, pattern=r"^(manhwa|manga|novel)$"),
     genre: Optional[str] = None,
     status: Optional[str] = Query(None, pattern=r"^(ongoing|completed)$"),
     search: Optional[str] = None,
@@ -47,6 +48,7 @@ async def list_catalog(
         db=db,
         page=page,
         limit=limit,
+        type_filter=type,
         genre_slug=genre,
         status_filter=status,
         search_query=search
@@ -93,6 +95,7 @@ async def read_chapter(
 @staff_router.post("/webtoons", status_code=status.HTTP_201_CREATED)
 async def create_webtoon(
     title: str = Form(...),
+    type: str = Form("manhwa"),
     description: Optional[str] = Form(None),
     author_name: Optional[str] = Form(None),
     status: str = Form("ongoing"),
@@ -123,7 +126,8 @@ async def create_webtoon(
         status_val=status,
         genre_ids=parsed_genre_ids,
         cover_file=cover_image,
-        staff_id=staff.id
+        staff_id=staff.id,
+        type_val=type
     )
     return {
         "success": True,
@@ -131,10 +135,11 @@ async def create_webtoon(
             "id": webtoon.id,
             "title": webtoon.title,
             "slug": webtoon.slug,
+            "type": webtoon.type,
             "cover_image_url": webtoon.cover_image_url,
             "status": webtoon.status
         },
-        "message": "Yangi manhva muvaffaqiyatli yaratildi"
+        "message": "Yangi asar muvaffaqiyatli yaratildi"
     }
 
 
@@ -143,6 +148,7 @@ async def create_webtoon(
 async def list_staff_webtoons(
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100),
+    type: Optional[str] = Query(None, pattern=r"^(manhwa|manga|novel)$"),
     genre: Optional[str] = None,
     status: Optional[str] = Query(None, pattern=r"^(ongoing|completed)$"),
     search: Optional[str] = None,
@@ -152,6 +158,7 @@ async def list_staff_webtoons(
         db=db,
         page=page,
         limit=limit,
+        type_filter=type,
         genre_slug=genre,
         status_filter=status,
         search_query=search
@@ -180,7 +187,8 @@ async def upload_chapter(
     webtoon_id: int = Form(...),
     chapter_number: float = Form(...),
     title: Optional[str] = Form(None),
-    images: List[UploadFile] = File(...),
+    content_text: Optional[str] = Form(None),
+    images: Optional[List[UploadFile]] = File(None),
     _staff: StaffUser = Depends(require_permission("chapters:create")),
     db: AsyncSession = Depends(get_db)
 ):
@@ -189,8 +197,10 @@ async def upload_chapter(
         webtoon_id=webtoon_id,
         chapter_number=chapter_number,
         title=title,
+        content_text=content_text,
         images=images
     )
+    images_count = len(images) if images else 0
     return {
         "success": True,
         "data": {
@@ -199,10 +209,11 @@ async def upload_chapter(
             "chapter_number": chapter.chapter_number,
             "title": chapter.title,
             "status": chapter.status,
-            "images_count": len(images),
+            "content_text": chapter.content_text,
+            "images_count": images_count,
             "reward_coins": chapter.reward_coins
         },
-        "message": "Bob rasmlari muvaffaqiyatli yuklandi va tekshiruvga yuborildi"
+        "message": "Bob muvaffaqiyatli yuklandi va tekshiruvga yuborildi"
     }
 
 
@@ -276,6 +287,7 @@ async def read_staff_chapter(
 async def update_webtoon(
     id: int,
     title: Optional[str] = Form(None),
+    type: Optional[str] = Form(None),
     description: Optional[str] = Form(None),
     author_name: Optional[str] = Form(None),
     status: Optional[str] = Form(None),
@@ -302,6 +314,7 @@ async def update_webtoon(
         db=db,
         webtoon_id=id,
         title=title,
+        type_val=type,
         description=description,
         author_name=author_name,
         status_val=status,
@@ -314,10 +327,11 @@ async def update_webtoon(
             "id": updated.id,
             "title": updated.title,
             "slug": updated.slug,
+            "type": updated.type,
             "status": updated.status,
             "cover_image_url": updated.cover_image_url
         },
-        "message": "Manhwa ma'lumotlari muvaffaqiyatli yangilandi"
+        "message": "Asar ma'lumotlari muvaffaqiyatli yangilandi"
     }
 
 

@@ -1,12 +1,12 @@
 from sqlalchemy import BigInteger, Column, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import relationship
-from app.core.database import Base
+from app.core.database import Base, BigIntId
 
 
 class ReadReward(Base):
     __tablename__ = "read_rewards"
 
-    id = Column(BigInteger, primary_key=True, index=True, autoincrement=True)
+    id = Column(BigIntId, primary_key=True, index=True, autoincrement=True)
     user_id = Column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     chapter_id = Column(BigInteger, ForeignKey("chapters.id", ondelete="CASCADE"), nullable=False, index=True)
     coins_earned = Column(Integer, default=5, nullable=False)
@@ -23,7 +23,7 @@ class ReadReward(Base):
 class CoinTransaction(Base):
     __tablename__ = "coin_transactions"
 
-    id = Column(BigInteger, primary_key=True, index=True, autoincrement=True)
+    id = Column(BigIntId, primary_key=True, index=True, autoincrement=True)
     user_id = Column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     amount = Column(Integer, nullable=False)  # musbat: kirim, manfiy: chiqim
     transaction_type = Column(String(50), nullable=False, index=True)  # register_bonus, daily_checkin, chapter_read, shop_purchase, admin_adjustment, admin_gift

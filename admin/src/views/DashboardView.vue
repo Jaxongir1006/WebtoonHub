@@ -123,9 +123,9 @@
       </StatCard>
     </div>
 
-    <!-- Main Grid: Charts & Activity Deck -->
+    <!-- Main Grid: Activity & moderation -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <!-- Activity / Read Rewards Chart Simulator -->
+      <!-- Daily activity reporting is not available yet. -->
       <div class="lg:col-span-2 glass-card rounded-3xl p-6 border border-slate-200 dark:border-white/10">
         <div class="flex items-center justify-between mb-6">
           <div>
@@ -133,52 +133,16 @@
               <svg class="w-5 h-5 text-brand-500 dark:text-brand-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
               </svg>
-              {{ $t('dashboard.activity_title') }}
+              Faoliyat hisoboti
             </h3>
             <p class="text-xs text-slate-500 dark:text-studio-400 mt-0.5">
-              {{ $t('dashboard.activity_sub') }}
+              Yuqoridagi ko'rsatkichlar jonli ma'lumotlardan olinadi.
             </p>
           </div>
-          <Badge variant="primary" :dot="true">{{ $t('dashboard.realtime_cache') }}</Badge>
         </div>
 
-        <!-- Custom Interactive Bar Graph -->
-        <div class="space-y-4">
-          <div class="grid grid-cols-7 gap-2 sm:gap-4 h-48 items-end pt-4 pb-2 border-b border-slate-200 dark:border-white/10">
-            <div
-              v-for="bar in activityBars"
-              :key="bar.day"
-              class="flex flex-col items-center gap-2 h-full justify-end group"
-            >
-              <div class="w-full max-w-[36px] bg-slate-200 dark:bg-studio-800 rounded-t-xl overflow-hidden relative transition-all duration-300 group-hover:scale-105 flex flex-col justify-end">
-                <div
-                  :style="{ height: `${bar.percent}%` }"
-                  class="w-full bg-gradient-to-t from-brand-600 to-brand-400 rounded-t-xl relative group-hover:shadow-glow-brand transition-all"
-                >
-                  <span class="absolute -top-7 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded bg-black/90 text-[10px] font-mono font-bold text-brand-300 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
-                    {{ bar.val }} ⚡
-                  </span>
-                </div>
-              </div>
-              <span class="text-xs font-mono text-slate-600 dark:text-studio-400 font-semibold group-hover:text-brand-500">
-                {{ bar.day }}
-              </span>
-            </div>
-          </div>
-
-          <div class="flex items-center justify-between text-xs text-slate-500 dark:text-studio-400 pt-2">
-            <div class="flex items-center gap-4">
-              <span class="flex items-center gap-1.5">
-                <span class="w-2.5 h-2.5 rounded-full bg-brand-500" />
-                {{ $t('dashboard.claimed_coins') }}
-              </span>
-              <span class="flex items-center gap-1.5">
-                <span class="w-2.5 h-2.5 rounded-full bg-slate-400 dark:bg-studio-600" />
-                {{ $t('dashboard.chapter_views') }}
-              </span>
-            </div>
-            <span class="font-mono text-slate-700 dark:text-studio-300">{{ $t('dashboard.avg_response') }}: <strong>42 ms</strong> (Redis)</span>
-          </div>
+        <div class="h-48 flex items-center justify-center rounded-2xl border border-dashed border-slate-200 dark:border-white/10 bg-slate-50/50 dark:bg-studio-900/30 text-sm text-slate-500 dark:text-studio-400 text-center px-6">
+          Kunlik faoliyat grafigi hali mavjud emas.
         </div>
       </div>
 
@@ -300,16 +264,6 @@ const pendingRequestsCount = computed(() => stats.value.pending_creator_requests
 const totalReaders = computed(() => stats.value.total_readers)
 const totalLightningInCirculation = computed(() => stats.value.total_coins_in_circulation)
 
-const activityBars = [
-  { day: 'Mon', val: 420, percent: 55 },
-  { day: 'Tue', val: 560, percent: 70 },
-  { day: 'Wed', val: 380, percent: 45 },
-  { day: 'Thu', val: 690, percent: 85 },
-  { day: 'Fri', val: 820, percent: 95 },
-  { day: 'Sat', val: 940, percent: 100 },
-  { day: 'Sun', val: 760, percent: 88 }
-]
-
 async function loadStats() {
   try {
     const res = await analyticsApi.getDashboardStats()
@@ -331,17 +285,14 @@ async function onWebtoonCreated(formData) {
   try {
     const fd = new FormData()
     fd.append('title', formData.title)
+    fd.append('type', formData.type || 'manhwa')
     fd.append('description', formData.description || '')
     fd.append('author_name', formData.author_name || '')
     fd.append('status', formData.status || 'ongoing')
-    fd.append('genre_ids', JSON.stringify(formData.genre_ids || [1]))
+    fd.append('genre_ids', JSON.stringify(formData.genre_ids || []))
 
-    if (formData.cover_image_file) {
-      fd.append('cover_image', formData.cover_image_file)
-    } else {
-      const dummyBlob = new Blob([new Uint8Array([0xFF, 0xD8, 0xFF, 0xE0])], { type: 'image/jpeg' })
-      fd.append('cover_image', dummyBlob, 'cover.jpg')
-    }
+    if (!formData.cover_image_file) throw new Error('Muqova rasmini tanlang')
+    fd.append('cover_image', formData.cover_image_file)
 
     await webtoonsApi.createWebtoon(fd)
     await loadStats()
@@ -365,12 +316,12 @@ async function onChapterUploaded(data) {
     formData.append('webtoon_id', data.webtoon_id)
     formData.append('chapter_number', data.chapter_number)
     if (data.title) formData.append('title', data.title)
+    if (data.content_text) formData.append('content_text', data.content_text)
 
     if (data.rawFiles && data.rawFiles.length > 0) {
       data.rawFiles.forEach((f) => formData.append('images', f))
-    } else {
-      const dummyBlob = new Blob([new Uint8Array([0xFF, 0xD8, 0xFF, 0xE0])], { type: 'image/jpeg' })
-      formData.append('images', dummyBlob, 'page_01.jpg')
+    } else if (!data.content_text?.trim()) {
+      throw new Error('Bob uchun rasm yoki matn kiriting')
     }
 
     await webtoonsApi.uploadChapter(formData)

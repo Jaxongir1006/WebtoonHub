@@ -44,6 +44,16 @@
           <Badge :variant="webtoon.status === 'completed' ? 'success' : 'primary'" :dot="true">
             {{ webtoon.status === 'completed' ? $t('webtoons.completed') : $t('webtoons.ongoing') }}
           </Badge>
+          <span
+            :class="[
+              'px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider',
+              webtoon.type === 'novel' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' :
+              webtoon.type === 'manga' ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' :
+              'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
+            ]"
+          >
+            {{ webtoon.type === 'novel' ? 'Novel (Ranobe)' : webtoon.type === 'manga' ? 'Manga (RTL)' : 'Manhwa (Vertikal)' }}
+          </span>
           <span class="text-xs font-mono text-slate-400 dark:text-studio-400">slug: {{ webtoon.slug }}</span>
         </div>
 
@@ -80,7 +90,7 @@
       <div class="px-6 py-4 border-b border-slate-100 dark:border-white/5 flex items-center justify-between">
         <div>
           <h3 class="font-bold text-slate-900 dark:text-white text-base">Boblar Ro'yxati</h3>
-          <p class="text-xs text-slate-500 dark:text-studio-400 mt-0.5">Ushbu manhvaga tegishli barcha chop etilgan va tekshiruvdagi boblar</p>
+          <p class="text-xs text-slate-500 dark:text-studio-400 mt-0.5">Ushbu loyihaga tegishli barcha chop etilgan va tekshiruvdagi boblar</p>
         </div>
         <Badge variant="primary">{{ chapters.length }} ta bob</Badge>
       </div>
@@ -110,7 +120,15 @@
                 </Badge>
               </h4>
               <p class="text-xs text-slate-500 dark:text-studio-400 mt-1 flex items-center gap-3 flex-wrap">
-                <span>🖼 {{ ch.images?.length || 0 }} ta rasm</span>
+                <span v-if="ch.content_text">
+                  📝 {{ getWordCount(ch.content_text) }} ta so'z
+                </span>
+                <span v-if="ch.images?.length > 0">
+                  🖼 {{ ch.images?.length || 0 }} ta rasm
+                </span>
+                <span v-if="!ch.content_text && (!ch.images || ch.images.length === 0)">
+                  📄 Bo'sh bob
+                </span>
                 <span>•</span>
                 <span class="px-2 py-0.5 rounded-lg bg-brand-500/15 text-brand-600 dark:text-brand-400 font-mono font-bold text-[11px] border border-brand-500/30">
                   ⚡ +{{ ch.reward_coins || 5 }} Chaqmoq
@@ -127,7 +145,7 @@
               class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-studio-800 hover:bg-slate-200 dark:hover:bg-studio-700 text-slate-700 dark:text-studio-200 hover:text-slate-900 dark:hover:text-white transition-colors flex items-center gap-1"
               @click="previewChapter(ch)"
             >
-              Ko'rish ({{ ch.images?.length || 0 }})
+              Ko'rish
             </button>
 
             <!-- EDIT CHAPTER BUTTON -->
@@ -166,13 +184,23 @@
     <Modal
       v-model="showPreviewModal"
       :title="previewTitle"
-      description="Vertikal o'qish tasvirlari oqimi"
-      max-width="2xl"
+      :description="previewChapterData?.content_text ? 'Novel bobining matni va formatlanishi' : 'Bob tasvirlari oqimi'"
+      max-width="3xl"
     >
-      <div class="space-y-2 max-h-[70vh] overflow-y-auto bg-black p-2 rounded-xl">
+      <!-- Text content preview if novel -->
+      <div v-if="previewChapterData?.content_text" class="space-y-4 max-h-[70vh] overflow-y-auto bg-studio-950 p-6 rounded-2xl border border-white/10">
+        <div class="prose prose-invert max-w-none text-sm text-studio-100 font-serif leading-relaxed" v-html="renderPreviewMarkdown(previewChapterData.content_text)" />
+      </div>
+
+      <!-- Images stream if comic or images available -->
+      <div v-else-if="previewImages.length > 0" class="space-y-2 max-h-[70vh] overflow-y-auto bg-black p-2 rounded-xl">
         <div v-for="(img, idx) in previewImages" :key="idx" class="w-full">
-          <img :src="img" :alt="`Page ${idx + 1}`" class="w-full h-auto object-contain block" />
+          <img :src="typeof img === 'string' ? img : img.image_url" :alt="`Page ${idx + 1}`" class="w-full h-auto object-contain block" />
         </div>
+      </div>
+
+      <div v-else class="p-8 text-center text-studio-400 text-sm">
+        Ushbu bobda kontent mavjud emas
       </div>
     </Modal>
 
@@ -249,6 +277,31 @@ const selectedChapter = ref(null)
 const showPreviewModal = ref(false)
 const previewTitle = ref('')
 const previewImages = ref([])
+const previewChapterData = ref(null)
+
+function getWordCount(text) {
+  if (!text) return 0
+  const words = text.trim().split(/\s+/)
+  return words[0] === '' ? 0 : words.length
+}
+
+function renderPreviewMarkdown(text) {
+  if (!text) return ''
+  const escaped = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+
+  return '<p class="mb-4 leading-relaxed">' + escaped
+    .replace(/^### (.*$)/gim, '</p><h3 class="text-base font-bold text-white mt-4 mb-2 font-sans">$1</h3><p class="mb-4 leading-relaxed">')
+    .replace(/^## (.*$)/gim, '</p><h2 class="text-lg font-bold text-white mt-5 mb-2 font-sans">$1</h2><p class="mb-4 leading-relaxed">')
+    .replace(/^# (.*$)/gim, '</p><h1 class="text-xl font-extrabold text-brand-400 mt-5 mb-3 pb-1 border-b border-white/10 font-sans">$1</h1><p class="mb-4 leading-relaxed">')
+    .replace(/^\> (.*$)/gim, '</p><blockquote class="border-l-4 border-brand-500 pl-4 py-1.5 my-3 italic text-studio-300 bg-brand-500/10 rounded-r font-sans">$1</blockquote><p class="mb-4 leading-relaxed">')
+    .replace(/\*\*(.*?)\*\*/g, '<strong class="font-bold text-white">$1</strong>')
+    .replace(/\*(.*?)\*/g, '<em class="italic text-studio-200">$1</em>')
+    .replace(/\n\n/g, '</p><p class="mb-4 leading-relaxed">')
+    .replace(/\n/g, '<br/>') + '</p>'
+}
 
 function getStatusVariant(status) {
   switch (status) {
@@ -278,7 +331,8 @@ function formatDate(iso) {
 }
 
 function previewChapter(ch) {
-  previewTitle.value = `${webtoon.value?.title} — ${ch.chapter_number}-bob`
+  previewTitle.value = `${webtoon.value?.title} — ${ch.chapter_number}-bob: ${ch.title || ''}`
+  previewChapterData.value = ch
   previewImages.value = ch.images || []
   showPreviewModal.value = true
 }
@@ -368,11 +422,13 @@ async function onChapterUploaded(data) {
     formData.append('webtoon_id', data.webtoon_id || webtoonId.value)
     formData.append('chapter_number', data.chapter_number)
     if (data.title) formData.append('title', data.title)
+    if (data.reward_coins) formData.append('reward_coins', data.reward_coins)
+    if (data.content_text) formData.append('content_text', data.content_text)
+
     if (data.rawFiles && data.rawFiles.length > 0) {
       data.rawFiles.forEach((f) => formData.append('images', f))
-    } else {
-      const dummyBlob = new Blob([new Uint8Array([0xFF, 0xD8, 0xFF, 0xE0])], { type: 'image/jpeg' })
-      formData.append('images', dummyBlob, 'page_01.jpg')
+    } else if (!data.content_text?.trim()) {
+      throw new Error('Bob uchun rasm yoki matn kiriting')
     }
     await webtoonsApi.uploadChapter(formData)
     await loadWebtoon()

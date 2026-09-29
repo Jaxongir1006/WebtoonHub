@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User } from 'lucide-react';
 
 interface AvatarFrameProps {
@@ -18,16 +18,36 @@ export const AvatarFrame: React.FC<AvatarFrameProps> = ({
 }) => {
   const [frameError, setFrameError] = useState(false);
 
-  React.useEffect(() => {
+  useEffect(() => {
     setFrameError(false);
   }, [frameUrl]);
 
   const sizeDimensions = {
-    xs: { container: 'w-7 h-7', avatar: 'w-5 h-5 text-[10px]', frameScale: 'scale-125' },
-    sm: { container: 'w-9 h-9', avatar: 'w-7 h-7 text-xs', frameScale: 'scale-125' },
-    md: { container: 'w-12 h-12', avatar: 'w-9 h-9 text-sm', frameScale: 'scale-130' },
-    lg: { container: 'w-16 h-16', avatar: 'w-12 h-12 text-base', frameScale: 'scale-135' },
-    xl: { container: 'w-24 h-24', avatar: 'w-18 h-18 text-xl', frameScale: 'scale-140' },
+    xs: {
+      container: 'w-8 h-8',
+      fontSize: 'text-[10px]',
+      frameScale: 'scale-[1.25]',
+    },
+    sm: {
+      container: 'w-10 h-10',
+      fontSize: 'text-xs',
+      frameScale: 'scale-[1.25]',
+    },
+    md: {
+      container: 'w-14 h-14',
+      fontSize: 'text-sm',
+      frameScale: 'scale-[1.28]',
+    },
+    lg: {
+      container: 'w-20 h-20',
+      fontSize: 'text-base',
+      frameScale: 'scale-[1.3]',
+    },
+    xl: {
+      container: 'w-32 h-32',
+      fontSize: 'text-2xl',
+      frameScale: 'scale-[1.32]',
+    },
   }[size];
 
   const firstLetter = username.charAt(0).toUpperCase();
@@ -43,29 +63,42 @@ export const AvatarFrame: React.FC<AvatarFrameProps> = ({
   const charCode = username.charCodeAt(0) || 0;
   const gradient = bgColors[charCode % bgColors.length];
 
+  const hasActiveFrame = Boolean(frameUrl && !frameError);
+
   return (
-    <div className={`relative flex items-center justify-center shrink-0 ${sizeDimensions.container} ${className}`}>
-      {/* Base Avatar */}
+    <div
+      className={`relative flex items-center justify-center shrink-0 ${sizeDimensions.container} ${className}`}
+    >
+      {/* Base Avatar Circle - sits perfectly inside frame hole when frame is active */}
       <div
-        className={`rounded-full flex items-center justify-center font-bold text-white shadow-inner overflow-hidden bg-gradient-to-br ${gradient} ${sizeDimensions.avatar}`}
+        className={`rounded-full flex items-center justify-center font-bold text-white shadow-inner overflow-hidden bg-gradient-to-br ${gradient} ${
+          hasActiveFrame
+            ? 'w-[72%] h-[72%] shadow-md ring-1 ring-white/10'
+            : 'w-full h-full ring-2 ring-studio-700/60'
+        } ${sizeDimensions.fontSize}`}
       >
         {avatarUrl ? (
-          <img src={avatarUrl} alt={username} className="w-full h-full object-cover" />
+          <img
+            src={avatarUrl}
+            alt={username}
+            className="w-full h-full object-cover select-none"
+            loading="lazy"
+          />
         ) : (
-          <span>{firstLetter || <User className="w-3/5 h-3/5" />}</span>
+          <span>{firstLetter || <User className="w-1/2 h-1/2" />}</span>
         )}
       </div>
 
       {/* Equipped Frame Overlay */}
-      {frameUrl && !frameError ? (
+      {hasActiveFrame ? (
         <img
-          src={frameUrl}
+          src={frameUrl!}
           alt="Avatar Frame"
-          className={`absolute inset-0 pointer-events-none select-none w-full h-full object-contain ${sizeDimensions.frameScale} drop-shadow-md z-10`}
+          className={`absolute inset-0 pointer-events-none select-none w-full h-full object-contain ${sizeDimensions.frameScale} drop-shadow-lg z-10`}
           onError={() => setFrameError(true)}
         />
-      ) : frameUrl ? (
-        // Fallback frame decorative glowing border
+      ) : frameUrl && frameError ? (
+        // Fallback decorative glowing border if frame asset fails
         <div className="absolute inset-0 rounded-full border-2 border-brand-500/80 animate-pulse-subtle pointer-events-none" />
       ) : null}
     </div>

@@ -1,0 +1,110 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  frontends:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: |
+            frontend/package-lock.json
+            admin/package-lock.json
+      - run: npm ci && npm run build
+        working-directory: frontend
+        env:
+          VITE_API_URL: https://api-webtoonhub.duckdns.org/api/v1
+          VITE_ADMIN_URL: https://admin-webtoonhub.duckdns.org/
+      - run: npm ci && npm run build
+        working-directory: admin
+        env:
+          VITE_API_URL: https://api-webtoonhub.duckdns.org/api/v1/staff
+          VITE_BASE_PATH: /
+
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - run: python -m pip install -r requirements.txt aiosqlite
+      - run: python -m unittest discover -s tests
+        env:
+          APP_ENV: test
+          DATABASE_URL: sqlite+aiosqlite:///./ci.db
+      - run: python -m alembic -x db_url=sqlite+pysqlite:///./ci.db upgrade head
+        env:
+          APP_ENV: test
+          DATABASE_URL: sqlite+aiosqlite:///./ci.db
+      - run: python -m alembic -x db_url=sqlite+pysqlite:///./ci.db check
+        env:
+          APP_ENV: test
+          DATABASE_URL: sqlite+aiosqlite:///./ci.db
+
+  deploy:
+    if: github.event_name == 'push'
+    needs: [frontends, backend]
+    runs-on: ubuntu-latest
+    concurrency:
+      group: webtoonhub-staging-deploy
+      cancel-in-progress: false
+    environment:
+      name: staging
+      url: https://webtoonhub.duckdns.org/
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: |
+            frontend/package-lock.json
+            admin/package-lock.json
+      - name: Build reader
+        working-directory: frontend
+        env:
+          VITE_API_URL: https://api-webtoonhub.duckdns.org/api/v1
+          VITE_ADMIN_URL: https://admin-webtoonhub.duckdns.org/
+        run: npm ci && npm run build
+      - name: Build admin
+        working-directory: admin
+        env:
+          VITE_API_URL: https://api-webtoonhub.duckdns.org/api/v1/staff
+          VITE_BASE_PATH: /
+        run: npm ci && npm run build
+      - name: Build release images
+        run: |
+          docker build -f deploy/staging/Dockerfile.api -t "webtoonhub-staging-api:${GITHUB_SHA}" .
+          docker build -f deploy/staging/Dockerfile.web -t "webtoonhub-staging-web:${GITHUB_SHA}" .
+      - name: Configure restricted VPS access
+        env:
+          DEPLOY_KEY: ${{ secrets.VPS_DEPLOY_KEY }}
+          DEPLOY_HOST_KEY: ${{ secrets.VPS_SSH_KNOWN_HOSTS }}
+        run: |
+          test -n "$DEPLOY_KEY"
+          test -n "$DEPLOY_HOST_KEY"
+          install -m 700 -d "$RUNNER_TEMP/deploy-ssh"
+          printf '%s\n' "$DEPLOY_KEY" > "$RUNNER_TEMP/deploy-ssh/id_ed25519"
+          printf '%s\n' "$DEPLOY_HOST_KEY" > "$RUNNER_TEMP/deploy-ssh/known_hosts"
+          chmod 600 "$RUNNER_TEMP/deploy-ssh/id_ed25519" "$RUNNER_TEMP/deploy-ssh/known_hosts"
+      - name: Upload images and release
+        run: |
+          ssh_options=(-i "$RUNNER_TEMP/deploy-ssh/id_ed25519" -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$RUNNER_TEMP/deploy-ssh/known_hosts" -o BatchMode=yes)
+          docker save "webtoonhub-staging-api:${GITHUB_SHA}" "webtoonhub-staging-web:${GITHUB_SHA}" | gzip -1 | ssh "${ssh_options[@]}" root@189.74.97.228 "load ${GITHUB_SHA}"
+          ssh "${ssh_options[@]}" root@189.74.97.228 "release ${GITHUB_SHA}"

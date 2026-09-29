@@ -1,0 +1,10 @@
+[Unit]
+Description=Nightly WebtoonHub staging backup
+
+[Timer]
+OnCalendar=*-*-* 03:20:00
+Persistent=true
+Unit=webtoonhub-staging-backup.service
+
+[Install]
+WantedBy=timers.target

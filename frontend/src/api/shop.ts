@@ -1,5 +1,5 @@
 import { apiClient } from './client';
-import { ApiResponse, ShopItem } from '../types';
+import { ApiResponse, ShopItem, InventoryItem } from '../types';
 
 export interface BuyResponseData {
   item_id: number;
@@ -17,6 +17,13 @@ export interface EquipResponseData {
 export const shopApi = {
   async listItems(itemType?: 'frame' | 'background') {
     const res = await apiClient.get<ApiResponse<ShopItem[]>>('/shop/items', {
+      params: itemType ? { item_type: itemType } : undefined
+    });
+    return res.data.data;
+  },
+
+  async getMyInventory(itemType?: 'frame' | 'background') {
+    const res = await apiClient.get<ApiResponse<InventoryItem[]>>('/shop/inventory', {
       params: itemType ? { item_type: itemType } : undefined
     });
     return res.data.data;

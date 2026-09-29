@@ -13,8 +13,11 @@ async def init_db() -> None:
     async with engine.begin() as conn:
         logger.info("Creating database tables...")
         await conn.run_sync(Base.metadata.create_all)
-        # Ensure new column exists on creator_requests
-        await conn.execute(text("ALTER TABLE creator_requests ADD COLUMN IF NOT EXISTS admin_feedback TEXT;"))
+        # Ensure new columns exist in PostgreSQL
+        if not engine.url.drivername.startswith("sqlite"):
+            await conn.execute(text("ALTER TABLE creator_requests ADD COLUMN IF NOT EXISTS admin_feedback TEXT;"))
+            await conn.execute(text("ALTER TABLE webtoons ADD COLUMN IF NOT EXISTS type VARCHAR(20) NOT NULL DEFAULT 'manhwa';"))
+            await conn.execute(text("ALTER TABLE chapters ADD COLUMN IF NOT EXISTS content_text TEXT;"))
         logger.info("All tables and columns created successfully!")
 
 

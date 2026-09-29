@@ -183,7 +183,7 @@ export const CreatorApplyPage: React.FC = () => {
               {existingRequest.status === 'approved' && (
                 <div className="pt-4">
                   <a
-                    href="http://localhost:5174"
+                    href={import.meta.env.VITE_ADMIN_URL || (import.meta.env.DEV ? 'http://localhost:5174' : '/studio/')}
                     target="_blank"
                     rel="noreferrer"
                     className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-brand-500 text-studio-950 font-bold text-xs hover:bg-brand-400 shadow-glow-brand transition-all"

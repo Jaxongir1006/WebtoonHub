@@ -64,6 +64,35 @@
         />
       </div>
 
+      <!-- Novel Text Content Section -->
+      <div class="space-y-2">
+        <div class="flex items-center justify-between">
+          <label class="block text-xs font-semibold text-slate-700 dark:text-studio-300 uppercase tracking-wider">
+            📜 Novel Bob Matni (Markdown)
+          </label>
+          <div class="flex items-center gap-3">
+            <span v-if="form.content_text" class="text-xs font-mono text-studio-400">
+              {{ wordCount }} so'z
+            </span>
+            <button
+              v-if="!showTextEditor && !form.content_text"
+              type="button"
+              class="text-xs text-brand-600 dark:text-brand-400 font-semibold hover:underline"
+              @click="showTextEditor = true"
+            >
+              + Matn kiritish (Novel)
+            </button>
+          </div>
+        </div>
+        <textarea
+          v-if="showTextEditor || form.content_text"
+          v-model="form.content_text"
+          rows="8"
+          placeholder="Novel matnini shu yerga yozing yoki tahrirlang (Markdown qo'llab-quvvatlanadi)..."
+          class="w-full px-3.5 py-2.5 text-xs bg-white dark:bg-studio-950 border border-slate-200 dark:border-white/10 rounded-xl text-slate-900 dark:text-studio-100 font-mono leading-relaxed focus:outline-none focus:border-brand-500/70"
+        />
+      </div>
+
       <!-- Images Management Section -->
       <div>
         <div class="flex items-center justify-between mb-2">
@@ -141,7 +170,7 @@
 </template>
 
 <script setup>
-import { reactive, watch, ref } from 'vue'
+import { reactive, watch, ref, computed } from 'vue'
 import Modal from '../common/Modal.vue'
 import Button from '../common/Button.vue'
 
@@ -156,13 +185,21 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue', 'save'])
 
 const isSubmitting = ref(false)
+const showTextEditor = ref(false)
 
 const form = reactive({
   chapter_number: 1.0,
   title: '',
   reward_coins: 5,
   status: 'published',
+  content_text: '',
   images: []
+})
+
+const wordCount = computed(() => {
+  if (!form.content_text) return 0
+  const words = form.content_text.trim().split(/\s+/)
+  return words[0] === '' ? 0 : words.length
 })
 
 watch(
@@ -173,6 +210,8 @@ watch(
       form.title = ch.title || ''
       form.reward_coins = ch.reward_coins || 5
       form.status = ch.status || 'published'
+      form.content_text = ch.content_text || ''
+      showTextEditor.value = !!ch.content_text
       form.images = ch.images ? [...ch.images] : []
     }
   },
