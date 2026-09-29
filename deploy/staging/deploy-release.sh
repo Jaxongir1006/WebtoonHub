@@ -44,9 +44,22 @@ done
 [ "$attempt" -lt 30 ] || { docker compose -f "$stack_dir/compose.yml" logs --tail=80 api; exit 1; }
 
 docker compose -f "$stack_dir/compose.yml" up -d --no-build --pull never --no-deps --force-recreate web
-curl -fsS --retry 12 --retry-delay 2 --retry-connrefused http://127.0.0.1:18082/api/v1/health >/dev/null
-curl -fsS --retry 12 --retry-delay 2 --retry-connrefused http://127.0.0.1:18080/ >/dev/null
-curl -fsS --retry 12 --retry-delay 2 --retry-connrefused http://127.0.0.1:18081/ >/dev/null
+wait_http() {
+    url=$1
+    attempt=0
+    while [ "$attempt" -lt 30 ]; do
+        if curl --max-time 5 -fsS -o /dev/null "$url" 2>/dev/null; then
+            return 0
+        fi
+        attempt=$((attempt + 1))
+        sleep 2
+    done
+    echo "HTTP check failed: $url" >&2
+    return 1
+}
+wait_http http://127.0.0.1:18082/api/v1/health
+wait_http http://127.0.0.1:18080/
+wait_http http://127.0.0.1:18081/
 
 printf '%s\n' "$sha" > "$stack_dir/deployed-sha"
 trap - EXIT
