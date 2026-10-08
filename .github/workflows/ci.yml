@@ -133,7 +133,7 @@ jobs:
             e2e/playwright-report/
 
   deploy:
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' && vars.VPS_AUTODEPLOY == 'true'
     needs: [frontends, backend, backend_postgres, browser_integration]
     runs-on: ubuntu-latest
     concurrency:

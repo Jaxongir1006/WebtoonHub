@@ -61,6 +61,11 @@ actual reader and admin origins before testing browser flows or email links.
 
 ## Render setup
 
+The GitHub workflow continues running all checks. Its legacy VPS deployment job
+now runs only when the repository variable `VPS_AUTODEPLOY` is explicitly `true`.
+Keep that variable unset for this deployment; Render and Vercel deploy from their
+own connected GitHub projects.
+
 1. Create a Free workspace, connect this GitHub repository, and select
    **New > Blueprint** using the root `render.yaml` file.
 2. The Blueprint creates `webtoonhub-cache` (Free Key Value) and `webtoonhub-api`
