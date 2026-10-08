@@ -1,7 +1,7 @@
 # Free deployment preparation
 
 Target services: Supabase PostgreSQL and Storage, Render FastAPI and Redis,
-and separate Vercel reader and admin projects. Deployment is still in progress.
+and separate Vercel reader and admin projects. All services are deployed.
 
 Backend URL: `https://webtoonhub-api.onrender.com`. Its production health check
 passed after the initial Render deployment.
@@ -25,7 +25,8 @@ Project reference: `mtzdzuetxohglhpxkztv`.
   a different runtime database role will require an explicit access design.
 - `webtoonhub-media` and `webtoonhub-imports` are private Storage buckets with
   a 50 MiB object limit. The first accepts supported image types; the second
-  accepts WebP chapter import pages. No files or accounts have been imported.
+  accepts WebP chapter import pages. Existing development content and reader
+  accounts have not been imported. The first staff superadmin has been created.
 
 Do not rerun the initial schema against this project. Future schema changes should
 use the existing Alembic migration workflow and retain backend-only table access.
@@ -90,7 +91,8 @@ Render's Free filesystem is ephemeral, services sleep after 15 minutes of idle
 time, and the next request can take about a minute to wake up. Its Free Redis
 cache may lose data on restart; durable application records remain in PostgreSQL.
 Email delivery still needs a provider reachable from Render: outbound SMTP ports
-25, 465 and 587 are blocked. Initial admin setup is still pending.
+25, 465 and 587 are blocked. Password-reset and welcome email delivery remain
+unconfigured.
 
 ## Vercel setup
 
@@ -123,6 +125,22 @@ then verify login, browser page refresh, uploads and unpublished chapter preview
 The root Blueprint now contains these actual public origins so Blueprint sync can
 apply them automatically. Private database and Supabase credentials remain manual
 environment variables.
+
+## Verification and account setup
+
+- Both deployed apps load, and deep links return their SPA entry documents.
+- Render's production health check passes, including PostgreSQL and private buckets.
+- CORS preflights succeed for both exact Vercel origins after Blueprint sync.
+- First superadmin login and identity checks pass with 19 permissions. Browser
+  login displays the connected admin dashboard; verification sessions are revoked.
+- A temporary image uploaded through the production staff API displays through
+  both Vercel `/content` routes. The image was removed after verification.
+- Administrator credentials are stored only in the Git-ignored
+  `deploy/free/.env.admin.local` file. No deployment secrets are committed.
+
+The production catalog starts empty. The owner chose to add content through the
+deployed admin rather than import local development content. Render Free cold starts and
+Supabase Free limits still apply; email delivery needs separate configuration.
 
 References: [Vercel Vite routing](https://vercel.com/docs/frameworks/frontend/vite),
 [External rewrites](https://vercel.com/docs/routing/rewrites).
