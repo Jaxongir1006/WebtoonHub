@@ -1,7 +1,7 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 
 class StaffLoginRequest(BaseModel):
@@ -22,6 +22,8 @@ class RoleItem(BaseModel):
     id: int
     name: str
     description: Optional[str] = None
+    system_key: Optional[str] = None
+    scope: str = 'global'
     permissions: List[PermissionItem] = []
 
     class Config:
@@ -64,6 +66,11 @@ class StaffSessionItem(BaseModel):
     is_current: bool = False
     last_active_at: datetime
     created_at: datetime
+
+    @field_validator('last_active_at', 'created_at')
+    @classmethod
+    def explicit_utc(cls, value):
+        return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value
 
     class Config:
         from_attributes = True
@@ -108,7 +115,7 @@ class ReaderListResponse(BaseModel):
 
 
 class ReaderUpdateRequest(BaseModel):
-    lightning_coins: Optional[int] = Field(None, ge=0)
+    model_config = {"extra": "forbid"}
     is_active: Optional[bool] = None
 
 
@@ -116,6 +123,7 @@ class DashboardStatsResponse(BaseModel):
     total_readers: int
     total_webtoons: int
     total_chapters: int
+    published_chapters: int = 0
     pending_chapters: int
     pending_creator_requests: int
     total_comments: int
@@ -142,6 +150,7 @@ class UpdateSystemSettingsRequest(BaseModel):
 
 
 class RoleUpdateRequest(BaseModel):
+    model_config = {"extra": "forbid"}
     name: Optional[str] = Field(None, min_length=2, max_length=50)
     description: Optional[str] = None
     permission_ids: Optional[List[int]] = None

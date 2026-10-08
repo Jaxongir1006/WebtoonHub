@@ -13,6 +13,8 @@ class WebtoonBookmarkInfo(BaseModel):
     slug: str
     cover_image_url: str
     status: str
+    type: str = "manhwa"
+    first_chapter: Optional[dict] = None
 
     class Config:
         from_attributes = True
@@ -22,3 +24,4 @@ class BookmarkItemResponse(BaseModel):
     webtoon: WebtoonBookmarkInfo
     reading_status: str
     updated_at: datetime
+    reading_progress: Optional[dict] = None

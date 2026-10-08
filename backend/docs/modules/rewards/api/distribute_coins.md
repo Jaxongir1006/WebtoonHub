@@ -1,37 +1,26 @@
-# 📄 API: Ommaviy Tangalar Tarqatish (Distribute Coins)
+# Distribute coins
 
-## Umumiy Ma'lumot
-* **Metod:** `POST`
-* **Yo'l:** `/api/v1/staff/coins/distribute`
-* **Avtorizatsiya:** Majburiy (`Bearer <staff_token>`)
-* **Talab etiladigan ruxsat:** `users:manage`
-* **Tavsif:** Barcha faol foydalanuvchilarga yoki tanlangan ro'yxatdagi o'quvchilarga bir vaqtda bayram / rag'bat bonusi tarqatish.
+`POST /api/v1/staff/coins/distribute` requires a staff bearer token and `coins:distribute` permission. The operation awards the same positive integer amount to every matching active reader and records one ledger transaction per recipient.
 
----
-
-## So'rov Parametrlari (Request)
-
-### Sarlavhalar (Headers):
 ```http
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+Authorization: Bearer <staff_access_token>
 Content-Type: application/json
+Idempotency-Key: 866c116b-7601-4fb6-b47e-3cc5b08cfc06
 ```
 
-### So'rov Tanasi (Request Body):
 ```json
 {
   "amount": 30,
-  "reason": "Yangi yil bayrami munosabati bilan sovg'a",
+  "reason": "Holiday gift",
   "all_active_users": true,
   "target_user_ids": []
 }
 ```
 
----
+`amount` must be at least 1 and `reason` must contain 2–255 characters. `all_active_users` defaults to true. For selected recipients, set it to false and provide a nonempty `target_user_ids` list. Inactive readers are excluded in both modes. Recipient order and duplicate IDs are normalized for operation identity.
 
-## Javoblar (Responses)
+`Idempotency-Key` is required: 8–128 ASCII letters, digits, `_` or `-`. Create a new key for each deliberate distribution. Retry an unknown transport outcome with the same key and payload; an accepted retry returns the original recipient count and amount without distributing again, even if the active-reader population has changed. Reusing the key for another payload or financial endpoint returns 409. Missing/invalid keys, invalid fields or no selected IDs return 422. See [operation reliability](../../../04_OPERATION_RELIABILITY.md).
 
-### 200 OK (Muvaffaqiyatli)
 ```json
 {
   "success": true,
@@ -39,8 +28,8 @@ Content-Type: application/json
     "rewarded_users_count": 1420,
     "amount_per_user": 30,
     "total_coins_distributed": 42600,
-    "reason": "Yangi yil bayrami munosabati bilan sovg'a"
+    "reason": "Holiday gift"
   },
-  "message": "Tangalar muvaffaqiyatli tarqatildi"
+  "message": "Chaqmoqlar foydalanuvchilarga muvaffaqiyatli tarqatildi"
 }
 ```

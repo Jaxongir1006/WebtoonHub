@@ -1,46 +1,48 @@
 <template>
-  <Modal
+  <Modal ref="draftDialog" :draft="form"
+    :busy="isSubmitting"
     :model-value="modelValue"
-    :title="isEdit ? 'Xodimni Tahrirlash' : 'Yangi Xodim Qo\'shish'"
-    :description="isEdit ? `${staff?.username} ma'lumotlarini o'zgartirish` : 'Admin paneliga kirish huquqiga ega yangi xodim yaratish'"
+    :title="isEdit ? $t('staff.s062') : $t('staff.s063')"
+    :description="isEdit ? $t('staff.s064', { value0: staff?.username }) : $t('staff.s065')"
     max-width="md"
     @update:model-value="$emit('update:modelValue', $event)"
   >
-    <form @submit.prevent="handleSubmit" class="space-y-4">
+    <form @submit.prevent="handleSubmit">
+      <fieldset :disabled="isSubmitting" class="space-y-4">
+      <p v-if="submitError" role="alert" class="text-sm text-rose-600 dark:text-rose-300">{{ submitError }}</p>
       <!-- Username -->
       <div>
-        <label class="block text-xs font-semibold text-slate-700 dark:text-studio-300 uppercase tracking-wider mb-1.5">
-          Taxallus (Username) *
-        </label>
+        <label for="StaffUserModal-field-1" class="block text-xs font-semibold text-slate-700 dark:text-studio-300 uppercase tracking-wider mb-1.5"> {{ $t('staff.s066') }} </label>
         <input
+          id="StaffUserModal-field-1"
           v-model="form.username"
           type="text"
           required
-          placeholder="Masalan: translator_aziz"
+          :placeholder="$t('staff.s067')"
           class="w-full px-3.5 py-2 text-sm bg-slate-50 dark:bg-studio-900 border border-slate-200 dark:border-white/10 rounded-xl text-slate-900 dark:text-studio-100 focus:outline-none focus:border-brand-500/70"
         />
       </div>
 
       <!-- Email -->
       <div>
-        <label class="block text-xs font-semibold text-slate-700 dark:text-studio-300 uppercase tracking-wider mb-1.5">
-          Email Manzili *
-        </label>
+        <label for="StaffUserModal-field-2" class="block text-xs font-semibold text-slate-700 dark:text-studio-300 uppercase tracking-wider mb-1.5"> {{ $t('staff.s068') }} </label>
         <input
+          id="StaffUserModal-field-2"
           v-model="form.email"
           type="email"
           required
-          placeholder="aziz@webtoonhub.uz"
+          :placeholder="$t('staff.s069')"
           class="w-full px-3.5 py-2 text-sm bg-slate-50 dark:bg-studio-900 border border-slate-200 dark:border-white/10 rounded-xl text-slate-900 dark:text-studio-100 focus:outline-none focus:border-brand-500/70"
         />
       </div>
 
       <!-- Password -->
       <div>
-        <label class="block text-xs font-semibold text-slate-700 dark:text-studio-300 uppercase tracking-wider mb-1.5">
-          {{ isEdit ? 'Yangi Parol (Bo\'sh qoldirilsa o\'zgarmaydi)' : 'Parol *' }}
+        <label for="StaffUserModal-field-3" class="block text-xs font-semibold text-slate-700 dark:text-studio-300 uppercase tracking-wider mb-1.5">
+          {{ isEdit ? $t('staff.s070') : $t('staff.s071') }}
         </label>
         <input
+          id="StaffUserModal-field-3"
           v-model="form.password"
           type="password"
           :required="!isEdit"
@@ -51,25 +53,22 @@
 
       <!-- Role Selection -->
       <div>
-        <label class="block text-xs font-semibold text-slate-700 dark:text-studio-300 uppercase tracking-wider mb-1.5">
-          Biriktirilgan Rol *
-        </label>
+        <label for="StaffUserModal-field-4" class="block text-xs font-semibold text-slate-700 dark:text-studio-300 uppercase tracking-wider mb-1.5"> {{ $t('staff.s072') }} </label>
         <select
-          v-model="form.role_id"
+          id="StaffUserModal-field-4"
+          v-model.number="form.role_id"
           required
           class="w-full px-3.5 py-2 text-sm bg-slate-50 dark:bg-studio-900 border border-slate-200 dark:border-white/10 rounded-xl text-slate-900 dark:text-studio-100 focus:outline-none focus:border-brand-500/70 font-mono"
         >
+          <option disabled value="">{{ $t('common.choose_role') }}</option>
           <option v-for="r in roles" :key="r.id" :value="r.id">
-            {{ r.name }} ({{ r.permissions_count || r.permission_ids?.length || 0 }} ta ruxsat)
-          </option>
+            {{ r.name }} ({{ r.permissions_count || r.permission_ids?.length || 0 }} {{ $t('staff.s073') }} </option>
         </select>
       </div>
 
       <!-- Active Status Toggle (if editing) -->
-      <div v-if="isEdit && staff?.username !== 'superadmin'">
-        <label class="block text-xs font-semibold text-slate-700 dark:text-studio-300 uppercase tracking-wider mb-1.5">
-          Faollik Holati
-        </label>
+      <div v-if="isEdit && !isSystemRole(staff?.role, 'superadmin')">
+        <label class="block text-xs font-semibold text-slate-700 dark:text-studio-300 uppercase tracking-wider mb-1.5"> {{ $t('staff.s074') }} </label>
         <div class="grid grid-cols-2 gap-2">
           <button
             type="button"
@@ -81,8 +80,7 @@
             ]"
             @click="form.is_active = true"
           >
-            <span>✓</span> Faol
-          </button>
+            <span>✓</span> {{ $t('staff.s075') }} </button>
           <button
             type="button"
             :class="[
@@ -93,31 +91,33 @@
             ]"
             @click="form.is_active = false"
           >
-            <span>🚫</span> To'xtatilgan
-          </button>
+            <span>🚫</span> {{ $t('staff.s076') }} </button>
         </div>
       </div>
 
       <!-- Actions -->
       <div class="flex items-center justify-end gap-3 pt-3 border-t border-slate-200 dark:border-white/5">
-        <Button variant="ghost" size="sm" @click="$emit('update:modelValue', false)">
-          Bekor qilish
-        </Button>
+        <Button variant="ghost" size="sm" :disabled="isSubmitting" @click="$refs.draftDialog.close()"> {{ $t('staff.s019') }} </Button>
         <Button type="submit" variant="primary" size="sm" :loading="isSubmitting">
-          {{ isEdit ? 'Saqlash' : 'Xodimni Yaratish' }}
+          {{ isEdit ? $t('staff.s077') : $t('staff.s078') }}
         </Button>
       </div>
+
+      </fieldset>
     </form>
   </Modal>
 </template>
 
 <script setup>
 import { reactive, ref, computed, watch } from 'vue'
+import { getErrorMessage } from '../../utils/forms'
+import { isSystemRole } from '../../utils/permissions'
 import Modal from '../common/Modal.vue'
 import Button from '../common/Button.vue'
 
 const props = defineProps({
   modelValue: Boolean,
+  onSave: { type: Function, required: true },
   staff: {
     type: Object,
     default: null
@@ -130,6 +130,7 @@ const props = defineProps({
 
 const emit = defineEmits(['update:modelValue', 'save'])
 const isSubmitting = ref(false)
+const submitError = ref('')
 
 const isEdit = computed(() => !!props.staff)
 const roles = computed(() => props.roles)
@@ -138,39 +139,46 @@ const form = reactive({
   username: '',
   email: '',
   password: '',
-  role_id: 2,
+  role_id: '',
   is_active: true
 })
 
 watch(
-  () => props.staff,
-  (newStaff) => {
+  () => [props.staff, props.modelValue],
+  ([newStaff, open]) => {
+    if (!open) return
+    submitError.value = ''
     if (newStaff) {
       form.username = newStaff.username || ''
       form.email = newStaff.email || ''
       form.password = ''
-      form.role_id = newStaff.role_id || roles.value[0]?.id || 2
+      form.role_id = newStaff.role_id ?? ''
       form.is_active = newStaff.is_active ?? true
     } else {
       form.username = ''
       form.email = ''
       form.password = ''
-      form.role_id = roles.value[0]?.id || 2
+      form.role_id = ''
       form.is_active = true
     }
   },
   { immediate: true }
 )
 
-function handleSubmit() {
+async function handleSubmit() {
+  if (isSubmitting.value) return
+  submitError.value = ''
   isSubmitting.value = true
-  setTimeout(() => {
-    emit('save', {
+  try {
+    await props.onSave({
       ...(props.staff ? { id: props.staff.id } : {}),
       ...form
     })
-    isSubmitting.value = false
     emit('update:modelValue', false)
-  }, 250)
+  } catch (error) {
+    submitError.value = getErrorMessage(error)
+  } finally {
+    isSubmitting.value = false
+  }
 }
 </script>

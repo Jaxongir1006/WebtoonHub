@@ -100,19 +100,23 @@ class CreatorRequestService:
         # If approved, grant Creator role in staff_users table
         if new_status == "approved" and req.user:
             # Find creator role
-            r_stmt = select(Role).where(Role.name == "creator")
+            r_stmt = select(Role).where(Role.system_key == "creator")
             r_res = await db.execute(r_stmt)
             creator_role = r_res.scalar_one_or_none()
             if not creator_role:
                 raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="'creator' roli topilmadi")
 
             # Check if staff user already exists with this email
-            s_stmt = select(StaffUser).where(StaffUser.email == req.user.email)
+            s_stmt = select(StaffUser).options(selectinload(StaffUser.role)).where(StaffUser.email == req.user.email)
             s_res = await db.execute(s_stmt)
             staff_user = s_res.scalar_one_or_none()
 
             if not staff_user:
+                duplicate_username = await db.scalar(select(StaffUser.id).where(StaffUser.username == req.user.username))
+                if duplicate_username:
+                    raise HTTPException(409, "This username is already used by an independent staff account")
                 staff_user = StaffUser(
+                    user_id=req.user.id,
                     username=req.user.username,
                     email=req.user.email,
                     hashed_password=req.user.hashed_password,
@@ -121,7 +125,11 @@ class CreatorRequestService:
                 )
                 db.add(staff_user)
             else:
-                staff_user.role_id = creator_role.id
+                if staff_user.user_id not in (None, req.user.id):
+                    raise HTTPException(409, 'This studio identity is already linked')
+                if staff_user.role.system_key != 'creator':
+                    raise HTTPException(409, 'Existing staff account cannot be replaced by creator approval')
+                staff_user.user_id = req.user.id
                 staff_user.is_active = True
 
         await db.commit()

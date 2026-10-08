@@ -6,19 +6,21 @@ from app.core.config import settings
 
 
 def hash_password(password: str) -> str:
-    """Hash plain password using native bcrypt"""
-    pwd_bytes = password.encode("utf-8")[:72]
-    salt = bcrypt.gensalt()
-    return bcrypt.hashpw(pwd_bytes, salt).decode("utf-8")
+    import hashlib, secrets, base64
+    salt = secrets.token_bytes(16)
+    digest = hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt, 600000)
+    return 'pbkdf2_sha256$600000$' + base64.b64encode(salt).decode() + '$' + base64.b64encode(digest).decode()
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verify plain password against hashed password using native bcrypt"""
+    import hashlib, hmac, base64
     try:
-        pwd_bytes = plain_password.encode("utf-8")[:72]
-        hash_bytes = hashed_password.encode("utf-8")
-        return bcrypt.checkpw(pwd_bytes, hash_bytes)
-    except Exception:
+        if hashed_password.startswith('pbkdf2_sha256$'):
+            _, iterations, salt, expected = hashed_password.split('$')
+            actual = hashlib.pbkdf2_hmac('sha256', plain_password.encode('utf-8'), base64.b64decode(salt), int(iterations))
+            return hmac.compare_digest(actual, base64.b64decode(expected))
+        return bcrypt.checkpw(plain_password.encode('utf-8')[:72], hashed_password.encode('utf-8'))
+    except (ValueError, TypeError):
         return False
 
 

@@ -1,5 +1,5 @@
 from typing import Optional
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Header, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -91,6 +91,7 @@ async def list_coin_transactions(
 async def adjust_reader_coins(
     id: int,
     data: AdjustUserCoinsRequest,
+    operation_key: str = Header(..., alias='Idempotency-Key', min_length=8, max_length=128, pattern=r'^[A-Za-z0-9_-]+$'),
     staff: StaffUser = Depends(require_permission("coins:adjust")),
     db: AsyncSession = Depends(get_db)
 ):
@@ -99,7 +100,8 @@ async def adjust_reader_coins(
         staff_id=staff.id,
         user_id=id,
         amount_delta=data.get_delta(),
-        reason=data.reason
+        reason=data.reason,
+        operation_key=operation_key
     )
     return {
         "success": True,
@@ -139,6 +141,7 @@ async def list_economy_transactions_alias(
 @staff_router.post("/coins/distribute", status_code=status.HTTP_200_OK)
 async def distribute_coins(
     data: DistributeCoinsRequest,
+    operation_key: str = Header(..., alias='Idempotency-Key', min_length=8, max_length=128, pattern=r'^[A-Za-z0-9_-]+$'),
     staff: StaffUser = Depends(require_permission("coins:distribute")),
     db: AsyncSession = Depends(get_db)
 ):
@@ -148,7 +151,8 @@ async def distribute_coins(
         amount=data.amount,
         reason=data.reason,
         all_active_users=data.all_active_users,
-        target_user_ids=data.target_user_ids
+        target_user_ids=data.target_user_ids,
+        operation_key=operation_key
     )
     return {
         "success": True,

@@ -1,17 +1,14 @@
 <template>
   <div class="space-y-6">
+    <LoadState :error="loadError" @retry="loadWheels()" />
     <!-- Top Action Header -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
       <div>
         <h2 class="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
-          <svg class="w-6 h-6 text-brand-500 dark:text-brand-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg class="w-6 h-6 text-brand-700 dark:text-brand-500 dark:text-brand-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v13m0-13V3m0 5l4 4m-4-4l-4 4m13-1a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          Omad Charxi (Ruletka) Studiyasi
-        </h2>
-        <p class="text-xs text-slate-500 dark:text-studio-400 mt-1">
-          Foydalanuvchilar uchun omad charxlarini yaratish, sektorlar, yutuq ehtimolliklari va narxlarni boshqarish
-        </p>
+          </svg> {{ $t('staff.s548') }} </h2>
+        <p class="text-xs text-slate-500 dark:text-studio-400 mt-1"> {{ $t('staff.s549') }} </p>
       </div>
 
       <div class="flex items-center gap-3">
@@ -21,34 +18,26 @@
         >
           <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4" />
-          </svg>
-          Yangi Charx Yaratish
-        </button>
+          </svg> {{ $t('staff.s550') }} </button>
       </div>
     </div>
 
     <!-- Loading State -->
-    <div v-if="loading" class="p-12 text-center text-slate-400">
-      <div class="w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-      Charxlar ma'lumotlari yuklanmoqda...
-    </div>
+    <div v-if="loading" class="p-12 text-center text-slate-600 dark:text-studio-400">
+      <div class="w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" /> {{ $t('staff.s551') }} </div>
 
     <div v-else-if="wheels.length === 0" class="glass-card rounded-2xl p-12 text-center border border-slate-200 dark:border-white/5">
-      <div class="w-16 h-16 rounded-2xl bg-amber-500/10 text-amber-500 flex items-center justify-center mx-auto mb-4">
+      <div class="w-16 h-16 rounded-2xl bg-amber-500/10 text-amber-700 dark:text-amber-500 flex items-center justify-center mx-auto mb-4">
         <svg class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
         </svg>
       </div>
-      <h3 class="text-base font-bold text-slate-900 dark:text-white mb-1">Hozircha omad charxi mavjud emas</h3>
-      <p class="text-xs text-slate-500 dark:text-studio-400 max-w-sm mx-auto mb-4">
-        O'quvchilaringiz chaqmoq sarflab yutuq olishlari uchun yangi omad charxi yarating.
-      </p>
+      <h3 class="text-base font-bold text-slate-900 dark:text-white mb-1"> {{ $t('staff.s552') }} </h3>
+      <p class="text-xs text-slate-500 dark:text-studio-400 max-w-sm mx-auto mb-4"> {{ $t('staff.s553') }} </p>
       <button
         class="px-4 py-2 rounded-xl text-xs font-bold bg-brand-500 text-slate-950 hover:bg-brand-400"
         @click="openCreateWheelModal"
-      >
-        Ilk Charxni Yaratish
-      </button>
+      > {{ $t('staff.s554') }} </button>
     </div>
 
     <div v-else class="space-y-6">
@@ -57,6 +46,7 @@
         <div
           v-for="w in wheels"
           :key="w.id"
+          role="button" tabindex="0" :aria-pressed="selectedWheel?.id === w.id" :aria-label="w.title"
           :class="[
             'glass-card rounded-2xl p-4 border transition-all cursor-pointer relative overflow-hidden flex flex-col justify-between',
             selectedWheel?.id === w.id
@@ -64,11 +54,13 @@
               : 'border-slate-200 dark:border-white/5 hover:border-slate-300 dark:hover:border-white/15'
           ]"
           @click="selectWheel(w)"
+          @keydown.enter.prevent="selectWheel(w)"
+          @keydown.space.prevent="selectWheel(w)"
         >
           <div class="flex items-start justify-between gap-3 mb-3">
             <div class="flex items-center gap-3">
               <div
-                class="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-lg text-white shrink-0 shadow-sm"
+                class="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-lg text-slate-900 dark:text-white shrink-0 shadow-sm"
                 :style="{ backgroundColor: w.color || '#F59E0B' }"
               >
                 ⚡
@@ -77,25 +69,24 @@
                 <h4 class="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-1.5">
                   {{ w.title }}
                 </h4>
-                <p class="text-[11px] text-slate-400">
-                  {{ w.cost_coins }} ⚡ Chaqmoq / aylantirish
-                </p>
+                <p class="text-[11px] text-slate-600 dark:text-studio-400">
+                  {{ w.cost_coins }} {{ $t('staff.s555') }} </p>
               </div>
             </div>
             <span
               :class="[
                 'px-2 py-0.5 rounded-full text-[10px] font-bold font-mono tracking-wider uppercase',
-                w.is_active ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' : 'bg-slate-500/10 text-slate-400 border border-slate-500/20'
+                w.is_active ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-500 border border-emerald-500/20' : 'bg-slate-500/10 text-slate-600 dark:text-studio-400 border border-slate-500/20'
               ]"
             >
-              {{ w.is_active ? 'Faol' : 'O\'chirilgan' }}
+              {{ w.is_active ? $t('staff.s075') : $t('common.disabled') }}
             </span>
           </div>
 
-          <div class="flex items-center justify-between text-xs pt-3 border-t border-slate-100 dark:border-white/5 font-mono text-slate-400">
-            <span>Sektorlar: <strong>{{ w.items?.length || 0 }} ta</strong></span>
-            <span>Aylantirishlar: <strong>{{ w.total_spins_count || 0 }}</strong></span>
-            <span v-if="w.has_daily_free_spin" class="text-amber-500 font-bold">1x Kunlik Bepul</span>
+          <div class="flex items-center justify-between text-xs pt-3 border-t border-slate-100 dark:border-white/5 font-mono text-slate-600 dark:text-studio-400">
+            <span> {{ $t('staff.s556') }} <strong>{{ w.items?.length || 0 }} {{ $t('staff.s202') }} </strong></span>
+            <span> {{ $t('staff.s557') }} <strong>{{ w.total_spins_count || 0 }}</strong></span>
+            <span v-if="w.has_daily_free_spin" class="text-amber-700 dark:text-amber-500 font-bold"> {{ $t('staff.s558') }} </span>
           </div>
         </div>
       </div>
@@ -108,11 +99,8 @@
           <div class="glass-card rounded-2xl p-6 border border-slate-200 dark:border-white/5 flex flex-col items-center">
             <div class="w-full flex items-center justify-between mb-4">
               <h3 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <span>🎯</span> Jonli Ko'rinish
-              </h3>
-              <span class="text-[11px] font-mono text-slate-400">
-                Jami og'irlik: {{ totalWeight }} ({{ selectedWheel.items?.length || 0 }} sektor)
-              </span>
+                <span>🎯</span> {{ $t('staff.s559') }} </h3>
+              <span class="text-[11px] font-mono text-slate-600 dark:text-studio-400"> {{ $t('staff.s560') }} {{ totalWeight }} ({{ selectedWheel.items?.length || 0 }} {{ $t('staff.s561') }} </span>
             </div>
 
             <!-- SVG Slices Wheel Simulator -->
@@ -121,7 +109,7 @@
               <div class="absolute inset-0 rounded-full border-4 border-amber-500/30 shadow-[0_0_25px_rgba(245,158,11,0.2)] pointer-events-none" />
 
               <svg class="w-full h-full transform -rotate-90" viewBox="0 0 200 200">
-                <g v-if="selectedWheel.items && selectedWheel.items.length > 0">
+                <g v-if="selectedWheel.items && selectedWheel.items.length> 0">
                   <path
                     v-for="(slice, idx) in computedWheelSlices"
                     :key="slice.id"
@@ -159,19 +147,19 @@
             <!-- Wheel Configuration Summary Info -->
             <div class="w-full mt-5 pt-4 border-t border-slate-200 dark:border-white/5 space-y-2 text-xs">
               <div class="flex justify-between items-center">
-                <span class="text-slate-400">Aylantirish narxi:</span>
-                <span class="font-bold font-mono text-amber-500">{{ selectedWheel.cost_coins }} ⚡ Chaqmoq</span>
+                <span class="text-slate-600 dark:text-studio-400"> {{ $t('staff.s563') }} </span>
+                <span class="font-bold font-mono text-amber-700 dark:text-amber-500">{{ selectedWheel.cost_coins }} {{ $t('staff.s018') }} </span>
               </div>
               <div class="flex justify-between items-center">
-                <span class="text-slate-400">Kunlik bepul imkoniyat:</span>
-                <span :class="selectedWheel.has_daily_free_spin ? 'text-emerald-400 font-bold' : 'text-slate-500'">
-                  {{ selectedWheel.has_daily_free_spin ? 'Mavjud (1x / kun)' : 'Yo\'q' }}
+                <span class="text-slate-600 dark:text-studio-400"> {{ $t('staff.s564') }} </span>
+                <span :class="selectedWheel.has_daily_free_spin ? 'text-emerald-700 dark:text-emerald-400 font-bold' : 'text-slate-500'">
+                  {{ selectedWheel.has_daily_free_spin ? $t('staff.s565') : $t('common.no') }}
                 </span>
               </div>
               <div class="flex justify-between items-center">
-                <span class="text-slate-400">Holati:</span>
-                <span :class="selectedWheel.is_active ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'">
-                  {{ selectedWheel.is_active ? 'Foydalanuvchilarga ochiq' : 'Nofaol' }}
+                <span class="text-slate-600 dark:text-studio-400"> {{ $t('staff.s566') }} </span>
+                <span :class="selectedWheel.is_active ? 'text-emerald-700 dark:text-emerald-400 font-bold' : 'text-rose-700 dark:text-rose-400 font-bold'">
+                  {{ selectedWheel.is_active ? $t('staff.s567') : $t('staff.s568') }}
                 </span>
               </div>
             </div>
@@ -180,34 +168,25 @@
               <button
                 class="flex-1 py-2 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-studio-800 hover:bg-slate-200 dark:hover:bg-studio-700 text-slate-800 dark:text-slate-200 transition-all"
                 @click="openEditWheelModal(selectedWheel)"
-              >
-                Charx Sozlamalari
-              </button>
+              > {{ $t('staff.s569') }} </button>
               <button
-                class="px-3 py-2 rounded-xl text-xs font-semibold bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 transition-all"
-                title="Charxni o'chirish"
+                class="px-3 py-2 rounded-xl text-xs font-semibold bg-rose-500/10 hover:bg-rose-500/20 text-rose-700 dark:text-rose-500 transition-all"
+                :title="$t('staff.s570')" :aria-label="$t('staff.s570')"
                 @click="deleteWheel(selectedWheel.id)"
-              >
-                O'chirish
-              </button>
+              > {{ $t('staff.s132') }} </button>
             </div>
           </div>
 
+          <LoadState :error="spinsError" @retry="loadSpinsHistory(selectedWheel.id)" />
           <!-- Recent Spins Log on this Wheel -->
           <div class="glass-card rounded-2xl p-5 border border-slate-200 dark:border-white/5">
-            <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center justify-between">
-              <span>So'nggi Yutuqlar Tarixi</span>
-              <button class="text-brand-500 hover:underline text-[11px]" @click="loadSpinsHistory(selectedWheel.id)">
-                Yangilash
-              </button>
+            <h4 class="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-studio-400 mb-3 flex items-center justify-between">
+              <span> {{ $t('staff.s571') }} </span>
+              <button class="text-brand-700 dark:text-brand-500 hover:underline text-[11px]" @click="loadSpinsHistory(selectedWheel.id)"> {{ $t('staff.s061') }} </button>
             </h4>
 
-            <div v-if="spinsLoading" class="py-6 text-center text-xs text-slate-400">
-              Yuklanmoqda...
-            </div>
-            <div v-else-if="wheelSpins.length === 0" class="py-6 text-center text-xs text-slate-500 font-mono">
-              Hali hech kim aylantirmagan
-            </div>
+            <div v-if="spinsLoading" class="py-6 text-center text-xs text-slate-600 dark:text-studio-400"> {{ $t('staff.s186') }} </div>
+            <div v-else-if="wheelSpins.length === 0" class="py-6 text-center text-xs text-slate-500 font-mono"> {{ $t('staff.s572') }} </div>
             <div v-else class="space-y-2 max-h-60 overflow-y-auto pr-1">
               <div
                 v-for="spin in wheelSpins"
@@ -217,20 +196,18 @@
                 <div>
                   <div class="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
                     <span>@{{ spin.user_name }}</span>
-                    <span v-if="spin.is_free_spin" class="px-1.5 py-0.2 text-[9px] bg-emerald-500/10 text-emerald-400 rounded-full font-mono">
-                      BEPUL
-                    </span>
+                    <span v-if="spin.is_free_spin" class="px-1.5 py-0.2 text-[9px] bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 rounded-full font-mono"> {{ $t('staff.s573') }} </span>
                   </div>
-                  <div class="text-[11px] text-slate-400">
+                  <div class="text-[11px] text-slate-600 dark:text-studio-400">
                     {{ formatDate(spin.created_at) }}
                   </div>
                 </div>
                 <div class="text-right">
-                  <div class="font-bold text-amber-500">
+                  <div class="font-bold text-amber-700 dark:text-amber-500">
                     {{ spin.reward_label }}
                   </div>
-                  <div class="text-[10px] text-slate-400 font-mono">
-                    {{ spin.cost_paid > 0 ? `-${spin.cost_paid} ⚡` : 'Bepul' }}
+                  <div class="text-[10px] text-slate-600 dark:text-studio-400 font-mono">
+                    {{ spin.cost_paid> 0 ? $t('staff.s574', { value0: spin.cost_paid }) : $t('common.free') }}
                   </div>
                 </div>
               </div>
@@ -244,11 +221,8 @@
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
               <div>
                 <h3 class="text-base font-extrabold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
-                  <span>🎡</span> Sektorlar va Yutuqlar Siyosati
-                </h3>
-                <p class="text-xs text-slate-500 dark:text-studio-400 mt-0.5">
-                  Har bir sektorning rangi, turi, og'irligi va yutish foizini belgilang
-                </p>
+                  <span>🎡</span> {{ $t('staff.s575') }} </h3>
+                <p class="text-xs text-slate-500 dark:text-studio-400 mt-0.5"> {{ $t('staff.s576') }} </p>
               </div>
 
               <div class="flex items-center gap-2">
@@ -259,9 +233,7 @@
                   :disabled="saving"
                   @click="populatePresetSectors(selectedWheel.id)"
                 >
-                  <span>⚡</span>
-                  Standart 8 Sektorni Yuklash
-                </button>
+                  <span>⚡</span> {{ $t('staff.s577') }} </button>
 
                 <button
                   class="px-3.5 py-2 rounded-xl text-xs font-bold bg-brand-500 hover:bg-brand-400 text-slate-950 transition-all flex items-center gap-1.5 shadow-sm"
@@ -269,9 +241,7 @@
                 >
                   <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4" />
-                  </svg>
-                  Yangi Sektor Qo'shish
-                </button>
+                  </svg> {{ $t('staff.s578') }} </button>
               </div>
             </div>
 
@@ -279,13 +249,13 @@
             <div class="overflow-x-auto">
               <table class="w-full text-left text-xs">
                 <thead>
-                  <tr class="border-b border-slate-200 dark:border-white/10 text-slate-400 uppercase text-[10px] font-mono tracking-wider">
-                    <th class="pb-3 pl-2">Tartib</th>
-                    <th class="pb-3">Sektor</th>
-                    <th class="pb-3">Mukofot turi</th>
-                    <th class="pb-3">Ehtimollik (%)</th>
-                    <th class="pb-3">Jackpot?</th>
-                    <th class="pb-3 text-right pr-2">Amallar</th>
+                  <tr class="border-b border-slate-200 dark:border-white/10 text-slate-600 dark:text-studio-400 uppercase text-[10px] font-mono tracking-wider">
+                    <th class="pb-3 pl-2"> {{ $t('staff.s579') }} </th>
+                    <th class="pb-3"> {{ $t('staff.s580') }} </th>
+                    <th class="pb-3"> {{ $t('staff.s581') }} </th>
+                    <th class="pb-3"> {{ $t('staff.s582') }} </th>
+                    <th class="pb-3"> {{ $t('staff.s583') }} </th>
+                    <th class="pb-3 text-right pr-2"> {{ $t('staff.s265') }} </th>
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100 dark:divide-white/5">
@@ -295,7 +265,7 @@
                     class="hover:bg-slate-50/50 dark:hover:bg-white/[0.02] transition-colors group"
                   >
                     <!-- Order Index & Color Dot -->
-                    <td class="py-3 pl-2 font-mono text-slate-400">
+                    <td class="py-3 pl-2 font-mono text-slate-600 dark:text-studio-400">
                       <div class="flex items-center gap-2">
                         <span class="w-2.5 h-2.5 rounded-full shrink-0" :style="{ backgroundColor: item.color }" />
                         #{{ idx + 1 }}
@@ -316,11 +286,11 @@
 
                     <!-- Reward Details -->
                     <td class="py-3">
-                      <div v-if="item.reward_type === 'coins'" class="flex items-center gap-1.5 font-mono text-amber-500 font-bold">
-                        <span>⚡ +{{ item.reward_coins }} Chaqmoq</span>
+                      <div v-if="item.reward_type === 'coins'" class="flex items-center gap-1.5 font-mono text-amber-700 dark:text-amber-500 font-bold">
+                        <span>⚡ +{{ item.reward_coins }} {{ $t('staff.s104') }} </span>
                       </div>
-                      <div v-else class="flex items-center gap-1.5 text-purple-400 font-medium">
-                        <span>🎁 {{ item.shop_item?.name || 'Do\'kon Buyumi' }}</span>
+                      <div v-else class="flex items-center gap-1.5 text-purple-700 dark:text-purple-400 font-medium">
+                        <span>🎁 {{ item.shop_item?.name || $t('staff.s584') }}</span>
                       </div>
                     </td>
 
@@ -334,7 +304,7 @@
                           />
                         </div>
                         <span class="font-bold text-slate-700 dark:text-slate-200">{{ item.probability_percent }}%</span>
-                        <span class="text-[10px] text-slate-400">({{ item.weight }})</span>
+                        <span class="text-[10px] text-slate-600 dark:text-studio-400">({{ item.weight }})</span>
                       </div>
                     </td>
 
@@ -342,11 +312,9 @@
                     <td class="py-3">
                       <span
                         v-if="item.is_jackpot"
-                        class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/10 text-rose-500 border border-rose-500/20"
-                      >
-                        🔥 JACKPOT
-                      </span>
-                      <span v-else class="text-slate-400 text-[11px]">-</span>
+                        class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/10 text-rose-700 dark:text-rose-500 border border-rose-500/20"
+                      > {{ $t('staff.s585') }} </span>
+                      <span v-else class="text-slate-600 dark:text-studio-400 text-[11px]">-</span>
                     </td>
 
                     <!-- Actions -->
@@ -354,7 +322,7 @@
                       <div class="flex items-center justify-end gap-1 opacity-80 group-hover:opacity-100">
                         <button
                           class="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-studio-800 text-slate-500 dark:text-studio-400 hover:text-slate-900 dark:hover:text-white transition-colors"
-                          title="Tahrirlash"
+                          :title="$t('staff.s164')" :aria-label="$t('staff.s164')"
                           @click="openEditSectorModal(item)"
                         >
                           <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -362,8 +330,8 @@
                           </svg>
                         </button>
                         <button
-                          class="p-1.5 rounded-lg hover:bg-rose-500/10 text-slate-400 hover:text-rose-500 transition-colors"
-                          title="O'chirish"
+                          class="p-1.5 rounded-lg hover:bg-rose-500/10 text-slate-600 dark:text-studio-400 hover:text-rose-500 transition-colors"
+                          :title="$t('staff.s132')" :aria-label="$t('staff.s132')"
                           @click="deleteSector(item.id)"
                         >
                           <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -378,15 +346,13 @@
             </div>
 
             <!-- Empty Slices Warning -->
-            <div v-if="!selectedWheel.items || selectedWheel.items.length === 0" class="py-12 text-center text-slate-400 space-y-4">
-              <div class="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-500 flex items-center justify-center mx-auto text-xl">
+            <div v-if="!selectedWheel.items || selectedWheel.items.length === 0" class="py-12 text-center text-slate-600 dark:text-studio-400 space-y-4">
+              <div class="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-700 dark:text-amber-500 flex items-center justify-center mx-auto text-xl">
                 🎡
               </div>
               <div>
-                <h4 class="font-bold text-slate-900 dark:text-white text-sm">Bu charxda hozircha yutuq sektorlari yo'q</h4>
-                <p class="text-xs text-slate-500 dark:text-studio-400 mt-1 max-w-sm mx-auto">
-                  Charx to'g'ri ishlashi va o'quvchilarga yutuq berishi uchun kamida 4-8 ta sektor bo'lishi kerak.
-                </p>
+                <h4 class="font-bold text-slate-900 dark:text-white text-sm"> {{ $t('staff.s586') }} </h4>
+                <p class="text-xs text-slate-500 dark:text-studio-400 mt-1 max-w-sm mx-auto"> {{ $t('staff.s587') }} </p>
               </div>
               <div class="flex flex-wrap items-center justify-center gap-3 pt-1">
                 <button
@@ -395,17 +361,13 @@
                   :disabled="saving"
                   @click="populatePresetSectors(selectedWheel.id)"
                 >
-                  <span>⚡</span>
-                  Standart 8 Sektorni Yuklash (Tavsiya)
-                </button>
+                  <span>⚡</span> {{ $t('staff.s588') }} </button>
                 <button
                   type="button"
                   class="px-4 py-2 rounded-xl text-xs font-bold bg-slate-100 dark:bg-studio-800 hover:bg-slate-200 dark:hover:bg-studio-700 text-slate-800 dark:text-slate-200 transition-all flex items-center gap-1.5"
                   @click="openCreateSectorModal"
                 >
-                  <span>+</span>
-                  O'zim Qatnashaman
-                </button>
+                  <span>+</span> {{ $t('staff.s589') }} </button>
               </div>
             </div>
           </div>
@@ -416,32 +378,32 @@
     <!-- ======================================================= -->
     <!-- MODAL: Wheel Create / Edit                              -->
     <!-- ======================================================= -->
-    <div
-      v-if="showWheelModal"
-      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm"
-      @click.self="showWheelModal = false"
-    >
-      <div class="glass-card rounded-2xl p-6 border border-slate-200 dark:border-white/10 w-full max-w-lg shadow-2xl space-y-4">
+    <Modal :draft="wheelForm" ref="showWheelModalDialog" v-model="showWheelModal" :busy="saving" :title="$t('common.details')" max-width="2xl">
+      <div class="space-y-4">
         <h3 class="text-base font-extrabold text-slate-900 dark:text-white">
-          {{ editingWheel ? 'Omad Charxini Tahrirlash' : 'Yangi Omad Charxi Yaratish' }}
+          {{ editingWheel ? $t('staff.s590') : $t('staff.s591') }}
         </h3>
 
-        <form class="space-y-4" @submit.prevent="saveWheel">
+        <form @submit.prevent="saveWheel">
+      <fieldset :disabled="saving" class="space-y-4">
+          <p v-if="formError" role="alert" class="text-sm text-rose-600 dark:text-rose-300">{{ formError }}</p>
           <div>
-            <label class="block text-xs font-semibold text-slate-700 dark:text-studio-300 mb-1">Nomi</label>
+            <label for="WheelManagementView-field-1" class="block text-xs font-semibold text-slate-700 dark:text-studio-300 mb-1"> {{ $t('staff.s592') }} </label>
             <input
+              id="WheelManagementView-field-1"
               v-model="wheelForm.title"
               type="text"
               required
-              placeholder="Masalan: VIP Omad Charxi"
+              :placeholder="$t('staff.s593')"
               class="w-full px-3 py-2 rounded-xl text-xs bg-slate-50 dark:bg-studio-900 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white outline-none focus:border-brand-500"
             />
           </div>
 
           <div class="grid grid-cols-2 gap-3">
             <div>
-              <label class="block text-xs font-semibold text-slate-700 dark:text-studio-300 mb-1">Narxi (⚡ Chaqmoq)</label>
+              <label for="WheelManagementView-field-2" class="block text-xs font-semibold text-slate-700 dark:text-studio-300 mb-1"> {{ $t('staff.s594') }} </label>
               <input
+                id="WheelManagementView-field-2"
                 v-model.number="wheelForm.cost_coins"
                 type="number"
                 min="0"
@@ -450,8 +412,9 @@
               />
             </div>
             <div>
-              <label class="block text-xs font-semibold text-slate-700 dark:text-studio-300 mb-1">Asosiy Rangi</label>
+              <label for="WheelManagementView-field-3" class="block text-xs font-semibold text-slate-700 dark:text-studio-300 mb-1"> {{ $t('staff.s595') }} </label>
               <input
+                id="WheelManagementView-field-3"
                 v-model="wheelForm.color"
                 type="color"
                 class="w-full h-9 rounded-xl cursor-pointer bg-transparent border border-slate-200 dark:border-white/10 p-0.5"
@@ -460,36 +423,33 @@
           </div>
 
           <div>
-            <label class="block text-xs font-semibold text-slate-700 dark:text-studio-300 mb-1">Tavsif (ixtiyoriy)</label>
+            <label for="WheelManagementView-field-4" class="block text-xs font-semibold text-slate-700 dark:text-studio-300 mb-1"> {{ $t('staff.s596') }} </label>
             <textarea
+              id="WheelManagementView-field-4"
               v-model="wheelForm.description"
               rows="2"
-              placeholder="Charx haqida qisqacha ma'lumot..."
+              :placeholder="$t('staff.s597')"
               class="w-full px-3 py-2 rounded-xl text-xs bg-slate-50 dark:bg-studio-900 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white outline-none focus:border-brand-500"
             />
           </div>
 
           <div class="space-y-2 pt-1">
-            <label class="flex items-center gap-2 cursor-pointer">
+            <label for="WheelManagementView-field-5" class="flex items-center gap-2 cursor-pointer">
               <input
                 v-model="wheelForm.has_daily_free_spin"
                 type="checkbox"
-                class="rounded border-slate-300 text-brand-500 focus:ring-brand-500"
+                class="rounded border-slate-300 text-brand-700 dark:text-brand-500 focus:ring-brand-500"
               />
-              <span class="text-xs text-slate-700 dark:text-studio-300 font-medium">
-                Kuniga 1 marta BEPUL aylantirish imkoniyati (00:00 da yangilanadi)
-              </span>
+              <span class="text-xs text-slate-700 dark:text-studio-300 font-medium"> {{ $t('staff.s598') }} </span>
             </label>
 
             <label class="flex items-center gap-2 cursor-pointer">
               <input
                 v-model="wheelForm.is_active"
                 type="checkbox"
-                class="rounded border-slate-300 text-brand-500 focus:ring-brand-500"
+                class="rounded border-slate-300 text-brand-700 dark:text-brand-500 focus:ring-brand-500"
               />
-              <span class="text-xs text-slate-700 dark:text-studio-300 font-medium">
-                Charx faol va saytda ko'rinadi
-              </span>
+              <span class="text-xs text-slate-700 dark:text-studio-300 font-medium"> {{ $t('staff.s599') }} </span>
             </label>
           </div>
 
@@ -497,94 +457,96 @@
             <button
               type="button"
               class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-studio-400 hover:bg-slate-100 dark:hover:bg-studio-800"
-              @click="showWheelModal = false"
-            >
-              Bekor qilish
-            </button>
+              :disabled="saving" :aria-label="$t('common.close')" @click="$refs.showWheelModalDialog.close()"
+            > {{ $t('staff.s019') }} </button>
             <button
               type="submit"
               :disabled="saving"
               class="px-4 py-2 rounded-xl text-xs font-bold bg-brand-500 text-slate-950 hover:bg-brand-400 shadow-sm"
             >
-              {{ saving ? 'Saqlanmoqda...' : 'Saqlash' }}
+              {{ saving ? $t('common.saving') : $t('staff.s077') }}
             </button>
           </div>
-        </form>
+
+      </fieldset>
+    </form>
       </div>
-    </div>
+    </Modal>
 
     <!-- ======================================================= -->
     <!-- MODAL: Sector Create / Edit                             -->
     <!-- ======================================================= -->
-    <div
-      v-if="showSectorModal"
-      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm"
-      @click.self="showSectorModal = false"
-    >
-      <div class="glass-card rounded-2xl p-6 border border-slate-200 dark:border-white/10 w-full max-w-lg shadow-2xl space-y-4">
+    <Modal :draft="sectorForm" ref="showSectorModalDialog" v-model="showSectorModal" :busy="saving" :title="$t('common.details')" max-width="2xl">
+      <div class="space-y-4">
         <h3 class="text-base font-extrabold text-slate-900 dark:text-white">
-          {{ editingSector ? 'Sektorni Tahrirlash' : 'Yangi Sektor Qo\'shish' }}
+          {{ editingSector ? $t('staff.s600') : $t('staff.s578') }}
         </h3>
 
-        <form class="space-y-4" @submit.prevent="saveSector">
+        <form @submit.prevent="saveSector">
+      <fieldset :disabled="saving" class="space-y-4">
+          <p v-if="formError" role="alert" class="text-sm text-rose-600 dark:text-rose-300">{{ formError }}</p>
           <div>
-            <label class="block text-xs font-semibold text-slate-700 dark:text-studio-300 mb-1">Sektor Matni (Label)</label>
+            <label for="WheelManagementView-field-5" class="block text-xs font-semibold text-slate-700 dark:text-studio-300 mb-1"> {{ $t('staff.s601') }} </label>
             <input
+              id="WheelManagementView-field-5"
               v-model="sectorForm.label"
               type="text"
               required
-              placeholder="Masalan: +50 ⚡ yoki Oltin Ramka"
+              :placeholder="$t('staff.s602')"
               class="w-full px-3 py-2 rounded-xl text-xs bg-slate-50 dark:bg-studio-900 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white outline-none focus:border-brand-500"
             />
           </div>
 
           <div class="grid grid-cols-2 gap-3">
             <div>
-              <label class="block text-xs font-semibold text-slate-700 dark:text-studio-300 mb-1">Mukofot turi</label>
+              <label for="WheelManagementView-field-6" class="block text-xs font-semibold text-slate-700 dark:text-studio-300 mb-1"> {{ $t('staff.s581') }} </label>
               <select
+                id="WheelManagementView-field-6"
                 v-model="sectorForm.reward_type"
                 class="w-full px-3 py-2 rounded-xl text-xs bg-slate-50 dark:bg-studio-900 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white outline-none focus:border-brand-500"
               >
-                <option value="coins">⚡ Chaqmoq Tangalari</option>
-                <option value="shop_item">🎁 Do'kon Buyumi (Ramka/Fon)</option>
+                <option value="coins"> {{ $t('staff.s603') }} </option>
+                <option value="shop_item"> {{ $t('staff.s604') }} </option>
               </select>
             </div>
 
             <div v-if="sectorForm.reward_type === 'coins'">
-              <label class="block text-xs font-semibold text-slate-700 dark:text-studio-300 mb-1">Tanga miqdori (⚡)</label>
+              <label for="WheelManagementView-field-7" class="block text-xs font-semibold text-slate-700 dark:text-studio-300 mb-1"> {{ $t('staff.s605') }} </label>
               <input
+                id="WheelManagementView-field-7"
                 v-model.number="sectorForm.reward_coins"
                 type="number"
                 min="0"
                 required
-                placeholder="0 yoki undan ko'p"
+                :placeholder="$t('staff.s606')"
                 class="w-full px-3 py-2 rounded-xl text-xs bg-slate-50 dark:bg-studio-900 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white outline-none focus:border-brand-500"
               />
             </div>
 
             <div v-else>
-              <label class="block text-xs font-semibold text-slate-700 dark:text-studio-300 mb-1">Do'kon Buyumini tanlang</label>
+              <LoadState :loading="shopLoading" :error="shopError" @retry="loadShopItems" />
+              <label for="WheelManagementView-field-8" class="block text-xs font-semibold text-slate-700 dark:text-studio-300 mb-1"> {{ $t('staff.s607') }} </label>
               <select
-                v-if="availableShopItems.length > 0"
+                id="WheelManagementView-field-8"
+                v-if="availableShopItems.length> 0"
                 v-model.number="sectorForm.shop_item_id"
                 required
                 class="w-full px-3 py-2 rounded-xl text-xs bg-slate-50 dark:bg-studio-900 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white outline-none focus:border-brand-500"
               >
-                <option :value="null" disabled>Buyumni tanlang</option>
+                <option :value="null" disabled> {{ $t('staff.s608') }} </option>
                 <option v-for="item in availableShopItems" :key="item.id" :value="item.id">
                   {{ item.name }} ({{ item.price_coins }} ⚡)
                 </option>
               </select>
-              <div v-else class="text-[11px] text-amber-500 p-2 rounded-lg bg-amber-500/10">
-                Do'konda hozircha buyum yo'q
-              </div>
+              <div v-else-if="!shopLoading && !shopError" class="text-[11px] text-amber-700 dark:text-amber-500 p-2 rounded-lg bg-amber-500/10"> {{ $t('staff.s609') }} </div>
             </div>
           </div>
 
           <div class="grid grid-cols-2 gap-3">
             <div>
-              <label class="block text-xs font-semibold text-slate-700 dark:text-studio-300 mb-1">Ehtimollik Og'irligi (Weight)</label>
+              <label for="WheelManagementView-field-9" class="block text-xs font-semibold text-slate-700 dark:text-studio-300 mb-1"> {{ $t('staff.s610') }} </label>
               <input
+                id="WheelManagementView-field-9"
                 v-model.number="sectorForm.weight"
                 type="number"
                 min="1"
@@ -592,13 +554,13 @@
                 required
                 class="w-full px-3 py-2 rounded-xl text-xs bg-slate-50 dark:bg-studio-900 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white outline-none focus:border-brand-500"
               />
-              <p class="text-[10px] text-slate-400 mt-0.5">Yuqori raqam = tushish ehtimoli yuqori</p>
+              <p class="text-[10px] text-slate-600 dark:text-studio-400 mt-0.5"> {{ $t('staff.s611') }} </p>
             </div>
 
             <div>
-              <label class="block text-xs font-semibold text-slate-700 dark:text-studio-300 mb-1">Sektor Rangi</label>
+              <label for="WheelManagementView-label-30290" class="block text-xs font-semibold text-slate-700 dark:text-studio-300 mb-1"> {{ $t('staff.s612') }} </label>
               <div class="flex items-center gap-2">
-                <input
+                <input id="WheelManagementView-label-30290"
                   v-model="sectorForm.color"
                   type="color"
                   class="w-12 h-9 rounded-xl cursor-pointer bg-transparent border border-slate-200 dark:border-white/10 p-0.5"
@@ -614,13 +576,13 @@
 
           <!-- Color Presets -->
           <div>
-            <label class="block text-[11px] font-semibold text-slate-400 mb-1.5">Ranglar to'plami:</label>
+            <label class="block text-[11px] font-semibold text-slate-600 dark:text-studio-400 mb-1.5"> {{ $t('staff.s613') }} </label>
             <div class="flex flex-wrap gap-2">
               <button
                 v-for="c in colorPalette"
                 :key="c"
                 type="button"
-                class="w-6 h-6 rounded-full border border-white/20 transition-transform hover:scale-110"
+                class="w-6 h-6 rounded-full border border-slate-200 dark:border-white/20 transition-transform hover:scale-110"
                 :style="{ backgroundColor: c }"
                 @click="sectorForm.color = c"
               />
@@ -632,11 +594,9 @@
               <input
                 v-model="sectorForm.is_jackpot"
                 type="checkbox"
-                class="rounded border-slate-300 text-rose-500 focus:ring-rose-500"
+                class="rounded border-slate-300 text-rose-700 dark:text-rose-500 focus:ring-rose-500"
               />
-              <span class="text-xs text-rose-500 font-bold">
-                🔥 Bu JACKPOT sektori (maxsus effektlar bilan chiqadi)
-              </span>
+              <span class="text-xs text-rose-700 dark:text-rose-500 font-bold"> {{ $t('staff.s614') }} </span>
             </label>
           </div>
 
@@ -644,28 +604,34 @@
             <button
               type="button"
               class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-studio-400 hover:bg-slate-100 dark:hover:bg-studio-800"
-              @click="showSectorModal = false"
-            >
-              Bekor qilish
-            </button>
+              :disabled="saving" :aria-label="$t('common.close')" @click="$refs.showSectorModalDialog.close()"
+            > {{ $t('staff.s019') }} </button>
             <button
               type="submit"
               :disabled="saving"
               class="px-4 py-2 rounded-xl text-xs font-bold bg-brand-500 text-slate-950 hover:bg-brand-400 shadow-sm"
             >
-              {{ saving ? 'Saqlanmoqda...' : 'Saqlash' }}
+              {{ saving ? $t('common.saving') : $t('staff.s077') }}
             </button>
           </div>
-        </form>
+
+      </fieldset>
+    </form>
       </div>
-    </div>
+    </Modal>
   </div>
 </template>
 
 <script setup>
+import i18n from '../i18n/index.js'
+const tr = (...args) => i18n.global.t(...args)
+
 import { ref, computed, onMounted } from 'vue'
 import { wheelApi } from '../api/wheel'
 import { shopApi } from '../api/shop'
+import LoadState from '../components/common/LoadState.vue'
+import { getErrorMessage } from '../utils/forms'
+import Modal from '../components/common/Modal.vue'
 import { useSystemStore } from '../stores/system'
 
 const systemStore = useSystemStore()
@@ -674,7 +640,11 @@ const wheels = ref([])
 const selectedWheel = ref(null)
 const wheelSpins = ref([])
 const availableShopItems = ref([])
+const shopLoading = ref(false)
+const shopError = ref('')
 
+const loadError = ref('')
+const formError = ref('')
 const loading = ref(true)
 const spinsLoading = ref(false)
 const saving = ref(false)
@@ -755,13 +725,13 @@ const computedWheelSlices = computed(() => {
 
 function truncateLabel(text) {
   if (!text) return ''
-  return text.length > 12 ? text.substring(0, 10) + '..' : text
+  return text.length> 12 ? text.substring(0, 10) + '..' : text
 }
 
 function formatDate(iso) {
   if (!iso) return ''
   const d = new Date(iso)
-  return d.toLocaleDateString('uz-UZ', {
+  return d.toLocaleDateString(i18n.global.locale.value, {
     day: '2-digit',
     month: '2-digit',
     hour: '2-digit',
@@ -773,10 +743,11 @@ async function loadWheels(preferredWheelId = null, isSilent = false) {
   if (!isSilent) {
     loading.value = true
   }
+  loadError.value = ''
   try {
     const res = await wheelApi.getStaffWheels()
     wheels.value = res.data || []
-    if (wheels.value.length > 0) {
+    if (wheels.value.length> 0) {
       if (preferredWheelId) {
         selectedWheel.value = wheels.value.find((w) => w.id === preferredWheelId) || wheels.value[0]
       } else if (!selectedWheel.value) {
@@ -791,35 +762,37 @@ async function loadWheels(preferredWheelId = null, isSilent = false) {
       selectedWheel.value = null
     }
   } catch (err) {
+    loadError.value = getErrorMessage(err)
     systemStore.addToast({
       type: 'error',
-      title: 'Xatolik',
-      message: 'Charxlar ro\'yxatini yuklashda xatolik yuz berdi'
+      title: tr('staff.s024'),
+      message: tr('staff.s616')
     })
   } finally {
     loading.value = false
   }
 }
 
+const spinsError = ref('')
+let spinsSequence = 0
 async function loadSpinsHistory(wheelId) {
-  spinsLoading.value = true
+  const sequence = ++spinsSequence
+  spinsLoading.value = true; spinsError.value = ''; wheelSpins.value = []
   try {
-    const res = await wheelApi.getWheelSpins(wheelId, 25)
-    wheelSpins.value = res.data || []
-  } catch (err) {
-    // ignore
-  } finally {
-    spinsLoading.value = false
-  }
+    const result = await wheelApi.getWheelSpins(wheelId, 25)
+    if (sequence === spinsSequence && selectedWheel.value?.id === wheelId) wheelSpins.value = result.data || []
+  } catch (error) { if (sequence === spinsSequence) spinsError.value = getErrorMessage(error) }
+  finally { if (sequence === spinsSequence) spinsLoading.value = false }
 }
 
 async function loadShopItems() {
+  shopLoading.value = true; shopError.value = ''
   try {
     const res = await shopApi.getItems()
     availableShopItems.value = res.data || []
   } catch (err) {
-    // ignore
-  }
+    shopError.value = getErrorMessage(err)
+  } finally { shopLoading.value = false }
 }
 
 function selectWheel(w) {
@@ -854,6 +827,9 @@ function openEditWheelModal(w) {
 }
 
 async function saveWheel() {
+  formError.value = ''
+  if (saving.value) return
+  formError.value = ''
   saving.value = true
   try {
     let targetWheelId = editingWheel.value ? editingWheel.value.id : null
@@ -861,29 +837,30 @@ async function saveWheel() {
       await wheelApi.updateWheel(editingWheel.value.id, wheelForm.value)
       systemStore.addToast({
         type: 'success',
-        title: 'Muvaffaqiyatli',
-        message: 'Charx ma\'lumotlari yangilandi'
+        title: tr('staff.s296'),
+        message: tr('staff.s617')
       })
     } else {
       const res = await wheelApi.createWheel(wheelForm.value)
       targetWheelId = res.data?.id
       systemStore.addToast({
         type: 'success',
-        title: 'Muvaffaqiyatli',
-        message: 'Yangi omad charxi yaratildi'
+        title: tr('staff.s296'),
+        message: tr('staff.s618')
       })
     }
     showWheelModal.value = false
     await loadWheels(targetWheelId, true)
   } catch (err) {
+    formError.value = getErrorMessage(err)
     const errorMsg =
       err.response?.data?.error?.details?.[0]?.issue ||
       err.response?.data?.error?.message ||
       err.response?.data?.detail ||
-      'Charxni saqlashda xatolik yuz berdi'
+      tr('staff.s619')
     systemStore.addToast({
       type: 'error',
-      title: 'Xatolik',
+      title: tr('staff.s024'),
       message: errorMsg
     })
   } finally {
@@ -892,33 +869,34 @@ async function saveWheel() {
 }
 
 async function deleteWheel(id) {
-  if (confirm('Ushbu charxni va barcha yutuq sektorlarini butunlay o\'chirmoqchimisiz?')) {
+  if (confirm(tr('staff.s620'))) {
     try {
       await wheelApi.deleteWheel(id)
       systemStore.addToast({
         type: 'info',
-        title: 'O\'chirildi',
-        message: 'Charx tizimdan o\'chirildi'
+        title: tr('staff.s303'),
+        message: tr('staff.s621')
       })
       selectedWheel.value = null
       await loadWheels()
     } catch (err) {
       systemStore.addToast({
         type: 'error',
-        title: 'Xatolik',
-        message: 'Charxni o\'chirishda xatolik yuz berdi'
+        title: tr('staff.s024'),
+        message: tr('staff.s622')
       })
     }
   }
 }
 
 function openCreateSectorModal() {
+  loadShopItems()
   editingSector.value = null
   sectorForm.value = {
     label: '',
     reward_type: 'coins',
     reward_coins: 50,
-    shop_item_id: availableShopItems.value[0]?.id || null,
+    shop_item_id: null,
     color: '#0F766E',
     text_color: '#FFFFFF',
     weight: 15,
@@ -928,22 +906,26 @@ function openCreateSectorModal() {
 }
 
 function openEditSectorModal(item) {
+  loadShopItems()
   editingSector.value = item
   sectorForm.value = {
     label: item.label,
     reward_type: item.reward_type,
     reward_coins: item.reward_coins ?? 0,
-    shop_item_id: item.shop_item_id || availableShopItems.value[0]?.id || null,
+    shop_item_id: item.shop_item_id ?? null,
     color: item.color || '#0F766E',
     text_color: item.text_color || '#FFFFFF',
-    weight: item.weight || 10,
+    weight: item.weight ?? 10,
     is_jackpot: Boolean(item.is_jackpot)
   }
   showSectorModal.value = true
 }
 
 async function saveSector() {
+  formError.value = ''
   if (!selectedWheel.value) return
+  if (saving.value) return
+  formError.value = ''
   saving.value = true
   try {
     const payload = {
@@ -953,7 +935,7 @@ async function saveSector() {
       shop_item_id: sectorForm.value.reward_type === 'shop_item' ? sectorForm.value.shop_item_id : null,
       color: sectorForm.value.color,
       text_color: sectorForm.value.text_color || '#FFFFFF',
-      weight: Number(sectorForm.value.weight) || 1,
+      weight: Number(sectorForm.value.weight),
       is_jackpot: Boolean(sectorForm.value.is_jackpot),
       order_index: editingSector.value ? editingSector.value.order_index : (selectedWheel.value.items?.length || 0)
     }
@@ -961,8 +943,8 @@ async function saveSector() {
     if (payload.reward_type === 'shop_item' && !payload.shop_item_id) {
       systemStore.addToast({
         type: 'warning',
-        title: 'Diqqat',
-        message: 'Do\'kon buyumi mukofoti uchun buyumni tanlang'
+        title: tr('staff.s623'),
+        message: tr('staff.s624')
       })
       saving.value = false
       return
@@ -972,28 +954,29 @@ async function saveSector() {
       await wheelApi.updateWheelItem(editingSector.value.id, payload)
       systemStore.addToast({
         type: 'success',
-        title: 'Muvaffaqiyatli',
-        message: 'Sektor muvaffaqiyatli yangilandi'
+        title: tr('staff.s296'),
+        message: tr('staff.s625')
       })
     } else {
       await wheelApi.createWheelItem(selectedWheel.value.id, payload)
       systemStore.addToast({
         type: 'success',
-        title: 'Muvaffaqiyatli',
-        message: 'Yangi yutuq sektori qo\'shildi'
+        title: tr('staff.s296'),
+        message: tr('staff.s626')
       })
     }
     showSectorModal.value = false
     await loadWheels(selectedWheel.value.id, true)
   } catch (err) {
+    formError.value = getErrorMessage(err)
     const errorMsg =
       err.response?.data?.error?.details?.[0]?.issue ||
       err.response?.data?.error?.message ||
       err.response?.data?.detail ||
-      'Sektorni saqlashda xatolik yuz berdi'
+      tr('staff.s627')
     systemStore.addToast({
       type: 'error',
-      title: 'Xatolik',
+      title: tr('staff.s024'),
       message: errorMsg
     })
   } finally {
@@ -1007,15 +990,15 @@ async function populatePresetSectors(wheelId) {
     await wheelApi.populatePresetItems(wheelId)
     systemStore.addToast({
       type: 'success',
-      title: 'Muvaffaqiyatli',
-      message: 'Standart 8 ta sektor charxga joylandi'
+      title: tr('staff.s296'),
+      message: tr('staff.s628')
     })
     await loadWheels(wheelId, true)
   } catch (err) {
     systemStore.addToast({
       type: 'error',
-      title: 'Xatolik',
-      message: err.response?.data?.error?.message || 'Standart sektorlarni yuklashda xatolik yuz berdi'
+      title: tr('staff.s024'),
+      message: err.response?.data?.error?.message || tr('staff.s629')
     })
   } finally {
     saving.value = false
@@ -1023,20 +1006,20 @@ async function populatePresetSectors(wheelId) {
 }
 
 async function deleteSector(itemId) {
-  if (confirm('Ushbu yutuq sektorini o\'chirmoqchimisiz?')) {
+  if (confirm(tr('staff.s630'))) {
     try {
       await wheelApi.deleteWheelItem(itemId)
       systemStore.addToast({
         type: 'info',
-        title: 'O\'chirildi',
-        message: 'Sektor o\'chirildi'
+        title: tr('staff.s303'),
+        message: tr('staff.s631')
       })
       await loadWheels(selectedWheel.value?.id, true)
     } catch (err) {
       systemStore.addToast({
         type: 'error',
-        title: 'Xatolik',
-        message: 'Sektorni o\'chirishda xatolik yuz berdi'
+        title: tr('staff.s024'),
+        message: tr('staff.s632')
       })
     }
   }

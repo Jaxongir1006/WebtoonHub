@@ -22,13 +22,13 @@
             :class="[
               'w-full text-left px-2.5 py-1.5 rounded-lg flex items-center justify-between font-medium transition-colors',
               systemStore.currentLocale === l.code
-                ? 'bg-brand-500/15 text-brand-600 dark:text-brand-300 font-bold'
+                ? 'bg-brand-500/15 text-brand-700 dark:text-brand-300 font-bold'
                 : 'text-slate-700 dark:text-studio-300 hover:bg-slate-100 dark:hover:bg-studio-800'
             ]"
             @click="selectLang(l.code)"
           >
             <span>{{ l.flag }} {{ l.label }}</span>
-            <span v-if="systemStore.currentLocale === l.code" class="text-brand-500">✓</span>
+            <span v-if="systemStore.currentLocale === l.code" class="text-brand-700 dark:text-brand-500">✓</span>
           </button>
         </div>
       </div>
@@ -55,13 +55,13 @@
             :class="[
               'w-full text-left px-2.5 py-1.5 rounded-lg flex items-center justify-between font-medium transition-colors',
               systemStore.currentTheme === t.value
-                ? 'bg-brand-500/15 text-brand-600 dark:text-brand-300 font-bold'
+                ? 'bg-brand-500/15 text-brand-700 dark:text-brand-300 font-bold'
                 : 'text-slate-700 dark:text-studio-300 hover:bg-slate-100 dark:hover:bg-studio-800'
             ]"
             @click="selectTheme(t.value)"
           >
             <span>{{ t.icon }} {{ $t(t.labelKey) }}</span>
-            <span v-if="systemStore.currentTheme === t.value" class="text-brand-500">✓</span>
+            <span v-if="systemStore.currentTheme === t.value" class="text-brand-700 dark:text-brand-500">✓</span>
           </button>
         </div>
       </div>
@@ -79,9 +79,7 @@
             <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
           </svg>
         </div>
-        <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-          Webtoon<span class="text-brand-500 dark:text-brand-400">Hub</span> Studio
-        </h1>
+        <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight"> {{ $t('staff.s033') }} <span class="text-brand-700 dark:text-brand-500 dark:text-brand-400"> {{ $t('staff.s034') }} </span> {{ $t('staff.s383') }} </h1>
         <p class="text-xs sm:text-sm text-slate-500 dark:text-studio-400 mt-1 font-mono">
           {{ $t('login.subtitle') }}
         </p>
@@ -92,15 +90,16 @@
         <form @submit.prevent="handleLogin" class="space-y-4">
           <!-- Staff identifier -->
           <div>
-            <label class="block text-xs font-semibold text-slate-700 dark:text-studio-300 uppercase tracking-wider mb-1.5">
+            <label for="LoginView-field-1" class="block text-xs font-semibold text-slate-700 dark:text-studio-300 uppercase tracking-wider mb-1.5">
               {{ $t('login.email_label') }}
             </label>
             <input
+              id="LoginView-field-1"
               v-model="email"
               type="text"
               required
               autocomplete="username"
-              placeholder="admin yoki name@example.com"
+              :placeholder="$t('staff.s384')"
               class="w-full px-4 py-2.5 text-sm bg-white dark:bg-studio-900 border border-slate-200 dark:border-white/10 rounded-xl text-slate-900 dark:text-studio-100 placeholder-slate-400 dark:placeholder-studio-500 focus:outline-none focus:border-brand-500/70 focus:ring-1 focus:ring-brand-500/50 transition-all font-mono"
             />
           </div>
@@ -108,11 +107,11 @@
           <!-- Password Field -->
           <div>
             <div class="flex items-center justify-between mb-1.5">
-              <label class="text-xs font-semibold text-slate-700 dark:text-studio-300 uppercase tracking-wider">
+              <label for="LoginView-label-5794" class="text-xs font-semibold text-slate-700 dark:text-studio-300 uppercase tracking-wider">
                 {{ $t('login.password_label') }}
               </label>
             </div>
-            <input
+            <input id="LoginView-label-5794"
               v-model="password"
               type="password"
               required
@@ -124,9 +123,10 @@
           <!-- Error Alert -->
           <div
             v-if="errorMessage"
+            role="alert"
             class="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-600 dark:text-rose-300 text-xs flex items-start gap-2"
           >
-            <svg class="w-4 h-4 text-rose-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg class="w-4 h-4 text-rose-700 dark:text-rose-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
             <span>{{ errorMessage }}</span>
@@ -148,22 +148,26 @@
 
       <!-- Footer Info -->
       <div class="text-center mt-6 text-xs text-slate-500 dark:text-studio-500">
-        <p>KIMYO INTERNATIONAL UNIVERSITY IN TASHKENT (KIUT)</p>
-        <p class="text-[11px] text-slate-400 dark:text-studio-600 mt-0.5">Amaliy Informatika · Project Based Learning III (PBL3)</p>
+        <p> {{ $t('staff.s385') }} </p>
+        <p class="text-[11px] text-slate-600 dark:text-studio-400 dark:text-studio-600 mt-0.5"> {{ $t('staff.s386') }} </p>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
+import i18n from '../i18n/index.js'
+const tr = (...args) => i18n.global.t(...args)
+
 import { ref, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '../stores/auth'
 import { useSystemStore } from '../stores/system'
 import Button from '../components/common/Button.vue'
 
 const router = useRouter()
+const route = useRoute()
 const { t } = useI18n()
 const authStore = useAuthStore()
 const systemStore = useSystemStore()
@@ -177,9 +181,9 @@ const showLangDropdown = ref(false)
 const showThemeDropdown = ref(false)
 
 const languages = [
-  { code: 'uz', flag: '🇺🇿', label: 'O\'zbekcha' },
-  { code: 'ru', flag: '🇷🇺', label: 'Русский' },
-  { code: 'en', flag: '🇬🇧', label: 'English' }
+  { code: 'uz', flag: '🇺🇿', get label() { return tr('staff.s026') } },
+  { code: 'ru', flag: '🇷🇺', get label() { return tr('staff.s027') } },
+  { code: 'en', flag: '🇬🇧', get label() { return tr('staff.s028') } }
 ]
 
 const themeOptions = [
@@ -212,11 +216,11 @@ async function handleLogin() {
     systemStore.addToast({
       type: 'success',
       title: t('login.welcome_toast'),
-      message: res.message || `${t('dashboard.welcome')}, ${authStore.staff.username}!`
+      message: tr('staff.s387', { value0: t('dashboard.welcome'), value1: authStore.staff.username })
     })
-    router.push('/dashboard')
+    router.push(typeof route.query.redirect === 'string' && route.query.redirect.startsWith('/') && !route.query.redirect.startsWith('//') ? route.query.redirect : '/dashboard')
   } catch (err) {
-    errorMessage.value = err.response?.data?.error?.message || err.message || 'Xatolik yuz berdi'
+    errorMessage.value = err.response?.data?.error?.message || err.message || tr('staff.s388')
   } finally {
     isLoading.value = false
   }

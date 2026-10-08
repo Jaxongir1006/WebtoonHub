@@ -1,5 +1,5 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import model_validator
+from pydantic import model_validator, Field
 from typing import List
 
 
@@ -32,6 +32,11 @@ class Settings(BaseSettings):
         "http://127.0.0.1:8080",
         "http://127.0.0.1:8000"
     ]
+
+    FRONTEND_URL: str = "http://localhost:5173"
+    DAILY_MAX_COINS: int = Field(100, ge=0)
+    CHAPTER_COOLDOWN_MINUTES: int = Field(0, ge=0, le=1440)
+    AUTH_RATE_LIMIT: int = Field(20, ge=1, le=1000)
 
     # Database (PostgreSQL)
     POSTGRES_USER: str = "postgres"

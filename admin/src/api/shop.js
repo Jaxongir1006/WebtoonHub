@@ -6,6 +6,10 @@ export const shopApi = {
     return res.data
   },
 
+  async getSeries(params = {}) {
+    return (await apiClient.get('/shop/series', { params })).data
+  },
+
   async createItem(formData) {
     let body = formData
     if (!(formData instanceof FormData)) {
@@ -24,7 +28,9 @@ export const shopApi = {
   },
 
   async updateItem(id, data) {
-    const res = await apiClient.patch(`/shop/items/${id}`, data)
+    const fields = ['name', 'price_coins', 'asset_url', 'is_available', 'rarity', 'character_name', 'series_title', 'webtoon_id']
+    const body = Object.fromEntries(fields.filter(key => data[key] !== undefined).map(key => [key, data[key]]))
+    const res = await apiClient.patch(`/shop/items/${id}`, body)
     return res.data
   },
 

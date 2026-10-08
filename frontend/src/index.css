@@ -2,6 +2,34 @@
 @tailwind components;
 @tailwind utilities;
 
+.reader-surface { background-color: rgba(127, 127, 127, .12); }
+.reader-surface:hover { background-color: rgba(127, 127, 127, .2); }
+:focus-visible { outline: 2px solid #fbbf24; outline-offset: 3px; }
+button, select, input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="hidden"]) { min-height: 44px; }
+button { min-width: 44px; }
+.novel-reader :focus-visible { outline-color: currentColor; }
+
+.novel-page-frame { position: relative; overflow: hidden; perspective: 1400px; isolation: isolate; }
+.novel-page-paper { position: relative; backface-visibility: hidden; }
+.novel-page-preview { position: absolute; left: 0; width: 100%; pointer-events: none; user-select: none; }
+.novel-page-moving { will-change: transform; }
+.novel-page-turning { transition: transform 320ms cubic-bezier(.22, .61, .36, 1); }
+.novel-page-returning { transition: transform 180ms ease-out; }
+.novel-page-paper::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: var(--novel-page-shade, 0);
+  background: linear-gradient(90deg, rgba(0, 0, 0, .16), transparent 24%, transparent 76%, rgba(0, 0, 0, .13));
+}
+@media (prefers-reduced-motion: reduce) {
+  .novel-page-turning, .novel-page-returning { transition: none; }
+  .wheel-page .animate-spin, .wheel-page .animate-pulse, .wheel-page .animate-bounce, .wheel-page .animate-ping { animation: none; }
+  .wheel-page * { scroll-behavior: auto; }
+}
+
 @layer base {
   :root {
     color-scheme: dark;

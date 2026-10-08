@@ -18,15 +18,29 @@ async def create_admin(username: str, email: str, password: str) -> None:
     async with AsyncSessionLocal() as db:
         if await db.scalar(select(StaffUser.id).limit(1)) is not None:
             raise RuntimeError("Staff accounts already exist; bootstrap requires a fresh database")
-        if await db.scalar(select(Role.id).limit(1)) is not None:
-            raise RuntimeError("Roles already exist; bootstrap requires a fresh database")
-
-        permissions = [Permission(**entry) for entry in DEFAULT_PERMISSIONS]
-        role = Role(
-            name="superadmin",
-            description="Full platform administration",
-            permissions=permissions,
-        )
+        from sqlalchemy.orm import selectinload
+        existing = (await db.execute(select(Permission))).scalars().all()
+        by_code = {permission.code: permission for permission in existing}
+        for entry in DEFAULT_PERMISSIONS:
+            by_code.setdefault(entry['code'], Permission(**entry))
+        permissions = list(by_code.values())
+        role = await db.scalar(select(Role).options(selectinload(Role.permissions)).where(Role.system_key == 'superadmin'))
+        if role is None:
+            role = Role(name='superadmin', system_key='superadmin', scope='global', description='Full platform administration', permissions=permissions)
+        else:
+            role.permissions = permissions
+        creator = await db.scalar(select(Role).options(selectinload(Role.permissions)).where(Role.system_key == 'creator'))
+        if creator is None:
+            creator = Role(name='creator', system_key='creator', scope='own_content', description='Manage own works')
+        creator.permissions = [permission for permission in permissions if permission.code in {'webtoons:create','webtoons:edit','chapters:create','chapters:edit'}]
+        db.add(creator)
+        from app.modules.clans.models import ClanLevelConfig
+        from app.modules.staff.models import SystemSetting
+        if not await db.get(SystemSetting, 'clan_creation_cost'):
+            db.add(SystemSetting(key='clan_creation_cost', value='300', description='Clan creation fee'))
+        for level in range(1, 6):
+            if not await db.get(ClanLevelConfig, level):
+                db.add(ClanLevelConfig(level=level, required_xp=1000*level, upgrade_cost_coins=500*level, max_members=15+5*(level-1)))
         db.add(StaffUser(
             username=username,
             email=email,

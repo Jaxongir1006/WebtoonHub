@@ -3,7 +3,7 @@
     :type="type"
     :disabled="disabled || loading"
     :class="[
-      'inline-flex items-center justify-center font-medium rounded-xl transition-all duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed select-none active:scale-[0.98]',
+      'inline-flex items-center justify-center font-medium rounded-xl transition-all duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-studio-950 active:scale-[0.98]',
       sizeClasses,
       variantClasses
     ]"
@@ -84,15 +84,15 @@ const variantClasses = computed(() => {
     case 'primary':
       return 'bg-gradient-to-r from-brand-500 to-brand-600 hover:from-brand-400 hover:to-brand-500 text-slate-950 font-semibold shadow-glow-brand border border-brand-400/40'
     case 'secondary':
-      return 'bg-studio-850 hover:bg-studio-800 text-studio-100 border border-studio-700 hover:border-studio-600'
+      return 'bg-slate-100 dark:bg-studio-850 hover:bg-slate-200 dark:hover:bg-studio-800 text-slate-900 dark:text-studio-100 border border-slate-300 dark:border-studio-700 dark:hover:border-studio-600'
     case 'danger':
-      return 'bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/40'
+      return 'bg-rose-600/20 hover:bg-rose-600/30 text-rose-700 dark:text-rose-300 border border-rose-500/40'
     case 'success':
-      return 'bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/40'
+      return 'bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-700 dark:text-emerald-300 border border-emerald-500/40'
     case 'ghost':
-      return 'bg-transparent hover:bg-studio-800/60 text-studio-300 hover:text-studio-100 shadow-none'
+      return 'bg-transparent hover:bg-slate-100 dark:hover:bg-studio-800/60 text-slate-700 dark:text-studio-300 hover:text-slate-900 dark:hover:text-studio-100 shadow-none'
     case 'outline':
-      return 'bg-transparent hover:bg-studio-850 text-studio-200 border border-studio-700 hover:border-studio-500'
+      return 'bg-transparent hover:bg-slate-100 dark:hover:bg-studio-850 text-slate-800 dark:text-studio-200 border border-slate-300 dark:border-studio-700 dark:hover:border-studio-500'
     default:
       return 'bg-studio-800 text-studio-100'
   }

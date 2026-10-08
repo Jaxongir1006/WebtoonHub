@@ -6,6 +6,7 @@ import { clansApi } from '../api/clans';
 import { ClanDetail, ClanMemberItem, ClanMessageItem } from '../types';
 import { AvatarFrame } from '../components/common/AvatarFrame';
 import { getApiErrorMessage } from '../api/client';
+import { Modal } from '../components/common/Modal';
 import {
   Shield,
   Users,
@@ -32,13 +33,14 @@ import {
 export const ClanDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const clanId = parseInt(id || '0', 10);
-  const { user: currentUser, isAuthenticated, openAuthModal, updateCoinsLocally } = useAuth();
-  const { t } = useLanguage();
+  const { user: currentUser, isAuthenticated, isLoading: authLoading, openAuthModal, updateCoinsLocally, refreshProfile } = useAuth();
+  const { t, language } = useLanguage();
   const navigate = useNavigate();
 
   const [clan, setClan] = useState<ClanDetail | null>(null);
   const [members, setMembers] = useState<ClanMemberItem[]>([]);
   const [messages, setMessages] = useState<ClanMessageItem[]>([]);
+  const messagesRef = useRef(messages); messagesRef.current = messages;
   const [activeTab, setActiveTab] = useState<'chat' | 'members'>('chat');
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [actionLoading, setActionLoading] = useState<boolean>(false);
@@ -65,241 +67,346 @@ export const ClanDetailPage: React.FC = () => {
   const [isSending, setIsSending] = useState<boolean>(false);
   const chatMessagesEndRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
+  const messagesPaneRef = useRef<HTMLDivElement>(null);
+  const atBottom = useRef(true);
+  const sendLock = useRef(false);
+  const draftMessage = useRef<{ content: string; id: string } | null>(null);
+  const chatScope = useRef(0);
+  const actionLock = useRef(false);
+  const loadRequest = useRef(0);
+  const entityIdentity = useRef('');
+  entityIdentity.current = `${clanId}:${currentUser?.id ?? "guest"}`;
+  const [connectionState, setConnectionState] = useState<'connecting' | 'online' | 'reconnecting'>('connecting');
+  const [chatError, setChatError] = useState<string | null>(null);
+  const [chatLoading, setChatLoading] = useState(false);
+  const [hasOlder, setHasOlder] = useState(false);
+  const [olderLoading, setOlderLoading] = useState(false);
+  const [newMessages, setNewMessages] = useState(false);
 
   const loadClanData = async () => {
-    if (!clanId) return;
-    setIsLoading(true);
+    if (!clanId) { setIsLoading(false); return; }
+    const request = ++loadRequest.current;
+    if (!clan) setIsLoading(true);
     setActionError(null);
     try {
       const [clanRes, membersRes] = await Promise.all([
         clansApi.getClanDetail(clanId),
         clansApi.getClanMembers(clanId),
       ]);
+      if (request !== loadRequest.current) return;
       setClan(clanRes.data);
       setMembers(membersRes.data || []);
     } catch (err) {
-      setActionError(getApiErrorMessage(err, "Klan ma'lumotlarini yuklashda xatolik"));
+      if (request === loadRequest.current) setActionError(getApiErrorMessage(err, t('socialFix.loadFailed')));
     } finally {
-      setIsLoading(false);
+      if (request === loadRequest.current) setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    loadClanData();
-  }, [clanId, currentUser]);
+    setClan(null); setMembers([]); setActionSuccess(null); setIsSettingsModalOpen(false); setIsLoading(true);
+    if (!authLoading) loadClanData();
+    return () => { loadRequest.current++; };
+  }, [clanId, currentUser?.id, authLoading]);
 
-  // Load chat messages and initialize WebSocket
-  useEffect(() => {
-    if (!clanId || !clan?.my_role) return;
+  const mergeMessages = (previous: ClanMessageItem[], incoming: ClanMessageItem[]) => {
+    const unique = new Map(previous.map(message => [message.id > 0 ? String(message.id) : `${message.created_at}:${message.content}`, message]));
+    for (const message of incoming) unique.set(message.id > 0 ? String(message.id) : `${message.created_at}:${message.content}`, message);
+    return [...unique.values()].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime() || a.id - b.id);
+  };
 
-    // 1. Fetch initial REST history
-    clansApi.getClanMessages(clanId, 50).then((res) => {
-      setMessages(res.data || []);
-      scrollToBottom();
+  const scrollToBottom = (force = false) => {
+    if (!force && !atBottom.current) { setNewMessages(true); return; }
+    requestAnimationFrame(() => {
+      const pane = messagesPaneRef.current;
+      if (pane) pane.scrollTop = pane.scrollHeight;
+      setNewMessages(false);
     });
-
-    // 2. Connect to WebSocket
-    const token = localStorage.getItem('webtoonhub_access_token');
-    if (!token) return;
-
-    const apiBase = new URL(import.meta.env.VITE_API_URL || '/api/v1', window.location.origin);
-    const wsProtocol = apiBase.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsPath = `${apiBase.pathname.replace(/\/$/, '')}/clans/${clanId}/chat/ws`;
-    const wsUrl = `${wsProtocol}//${apiBase.host}${wsPath}?token=${encodeURIComponent(token)}`;
-
-    const ws = new WebSocket(wsUrl);
-    wsRef.current = ws;
-
-    ws.onmessage = (event) => {
-      try {
-        const newMsg: ClanMessageItem = JSON.parse(event.data);
-        setMessages((prev) => [...prev, newMsg]);
-        scrollToBottom();
-      } catch (e) {
-        console.error("WS Parse error", e);
-      }
-    };
-
-    ws.onclose = () => {
-      // ws closed
-    };
-
-    return () => {
-      ws.close();
-      wsRef.current = null;
-    };
-  }, [clanId, clan?.my_role]);
-
-  const scrollToBottom = () => {
-    setTimeout(() => {
-      chatMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, 100);
   };
 
-  // Send message
-  const handleSendMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!chatInput.trim() || isSending) return;
+  useEffect(() => {
+    chatScope.current++;
+    draftMessage.current = null; sendLock.current = false; setIsSending(false); setChatInput('');
+    setMessages([]); setNewMessages(false); setChatError(null); setOlderLoading(false); setHasOlder(false); setChatLoading(false); atBottom.current = true;
+    if (!clanId || !clan?.my_role) return;
+    let disposed = false;
+    let retry: ReturnType<typeof setTimeout> | undefined;
+    let attempts = 0;
+    // Advance only the REST cursor. A newer socket message must not skip a missing range.
+    let restCursor: number | undefined;
+    let initialized = false;
+    let catchUpFlight: Promise<void> | null = null;
+    const catchUp = () => {
+      if (catchUpFlight) return catchUpFlight;
+      catchUpFlight = (async () => {
+        if (!initialized) setChatLoading(true);
+        try {
+          let more = false; let receivedNew = false;
+          do {
+            const result = await clansApi.getClanMessages(clanId, 50, undefined, initialized ? restCursor ?? 0 : undefined);
+            if (disposed) return;
+            const batch = result.data || [];
+            if (batch.some(message => !messagesRef.current.some(known => known.id === message.id))) receivedNew = true;
+            setMessages(previous => mergeMessages(previous, batch));
+            if (!initialized) setHasOlder(result.has_more ?? result.pagination?.has_more ?? batch.length === 50);
+            const next = batch.reduce((highest, message) => Math.max(highest, message.id), restCursor ?? 0);
+            more = initialized && (result.has_more ?? result.pagination?.has_more ?? false) && next > (restCursor ?? 0);
+            restCursor = next; initialized = true;
+          } while (more && !disposed);
+          setChatError(null); if (receivedNew) scrollToBottom();
+        } catch (error) { if (!disposed) setChatError(getApiErrorMessage(error, t('socialFix.loadFailed'))); }
+        finally { catchUpFlight = null; if (!disposed) setChatLoading(false); }
+      })();
+      return catchUpFlight;
+    };
+    const connect = () => {
+      if (disposed) return;
+      const token = localStorage.getItem('webtoonhub_access_token');
+      if (!token) { setConnectionState('reconnecting'); return; }
+      const apiBase = new URL(import.meta.env.VITE_API_URL || '/api/v1', window.location.origin);
+      const protocol = apiBase.protocol === 'https:' ? 'wss:' : 'ws:';
+      const path = `${apiBase.pathname.replace(/\/$/, '')}/clans/${clanId}/chat/ws`;
+      const socket = new WebSocket(`${protocol}//${apiBase.host}${path}?token=${encodeURIComponent(token)}`);
+      wsRef.current = socket;
+      socket.onopen = () => { if (disposed) return; attempts = 0; setConnectionState('online'); catchUp(); };
+      socket.onmessage = event => {
+        if (disposed) return;
+        try {
+          const message: ClanMessageItem = JSON.parse(event.data);
+          if (typeof message.content !== 'string' || !message.created_at) return;
+          setMessages(previous => mergeMessages(previous, [message])); scrollToBottom();
+        } catch { setChatError(t('socialFix.loadFailed')); }
+      };
+      socket.onclose = event => {
+        if (disposed) return;
+        setConnectionState('reconnecting');
+        if (event.code === 1008 || event.code === 4003) { loadClanData(); }
+        retry = setTimeout(async () => { await refreshProfile().catch(() => undefined); if (!disposed) connect(); }, Math.min(30000, 1000 * 2 ** attempts++));
+      };
+      socket.onerror = () => { if (!disposed) setConnectionState('reconnecting'); };
+    };
+    setConnectionState('connecting'); catchUp(); connect();
+    const onOnline = () => {
+      if (wsRef.current?.readyState === WebSocket.OPEN) { catchUp(); return; }
+      if (wsRef.current?.readyState === WebSocket.CONNECTING) return;
+      if (retry) clearTimeout(retry);
+      connect();
+    };
+    const onVisible = () => { if (document.visibilityState === 'visible') catchUp(); };
+    const poll = setInterval(() => { if (document.visibilityState === 'visible' && navigator.onLine) catchUp(); }, 15000);
+    window.addEventListener('online', onOnline);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => { disposed = true; chatScope.current++; if (retry) clearTimeout(retry); clearInterval(poll); wsRef.current?.close(); wsRef.current = null; window.removeEventListener('online', onOnline); document.removeEventListener('visibilitychange', onVisible); };
+  }, [clanId, clan?.my_role, currentUser?.id]);
 
-    const text = chatInput.trim();
-    setChatInput('');
-    setIsSending(true);
-
+  const loadOlderMessages = async () => {
+    if (olderLoading) return;
+    const before = messages.filter(message => message.id > 0).reduce((min, message) => Math.min(min, message.id), Infinity);
+    if (!Number.isFinite(before)) return;
+    setOlderLoading(true);
+    const scope = chatScope.current;
+    const pane = messagesPaneRef.current;
+    const oldHeight = pane?.scrollHeight || 0;
+    const oldTop = pane?.scrollTop || 0;
     try {
-      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-        wsRef.current.send(JSON.stringify({ content: text }));
-      } else {
-        // Fallback REST endpoint
-        const res = await clansApi.sendClanMessage(clanId, text);
-        if (res.data) {
-          setMessages((prev) => [...prev, res.data]);
-          scrollToBottom();
-        }
-      }
-    } catch (err) {
-      console.error("Failed to send message", err);
-    } finally {
-      setIsSending(false);
-    }
+      const result = await clansApi.getClanMessages(clanId, 50, before);
+      if (scope !== chatScope.current) return;
+      setMessages(previous => mergeMessages(previous, result.data || []));
+      setHasOlder((result.data?.length || 0) === 50);
+      requestAnimationFrame(() => { if (pane) pane.scrollTop = oldTop + pane.scrollHeight - oldHeight; });
+    } catch (error) { if (scope === chatScope.current) setChatError(getApiErrorMessage(error, t('socialFix.loadFailed'))); }
+    finally { if (scope === chatScope.current) setOlderLoading(false); }
+  };
+
+  const handleSendMessage = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const text = chatInput.trim();
+    if (!text || sendLock.current) return;
+    sendLock.current = true; setIsSending(true); setChatError(null);
+    const scope = chatScope.current;
+    if (draftMessage.current?.content !== text) draftMessage.current = { content: text, id: crypto.randomUUID() };
+    try {
+      const result = await clansApi.sendClanMessage(clanId, text, draftMessage.current.id);
+      if (scope !== chatScope.current) return;
+      if (result.data) setMessages(previous => mergeMessages(previous, [result.data]));
+      setChatInput(previous => previous.trim() === text ? '' : previous);
+      draftMessage.current = null;
+      atBottom.current = true; scrollToBottom(true);
+    } catch (error) { if (scope === chatScope.current) setChatError(getApiErrorMessage(error, t('socialFix.sendFailed'))); }
+    finally { if (scope === chatScope.current) { sendLock.current = false; setIsSending(false); } }
   };
 
   // Join Clan
   const handleJoinClan = async () => {
+    const identity = entityIdentity.current;
     if (!isAuthenticated) {
       openAuthModal('login');
       return;
     }
-    setActionLoading(true);
+    if (actionLock.current) return;
+    actionLock.current = true; setActionLoading(true);
     setActionError(null);
     try {
       const res = await clansApi.joinClan(clanId);
-      setActionSuccess(res.message || "Klanga muvaffaqiyatli qo'shildingiz!");
-      loadClanData();
+      if (identity !== entityIdentity.current) return;
+      setActionSuccess(t('socialFix.clanJoined'));
+      if (identity !== entityIdentity.current) return;
+      await loadClanData();
+      if (identity !== entityIdentity.current) return;
+      await refreshProfile().catch(() => undefined);
     } catch (err) {
-      setActionError(getApiErrorMessage(err, "Klanga qo'shilishda xatolik"));
+      if (identity === entityIdentity.current) setActionError(getApiErrorMessage(err, t('common.error')));
     } finally {
-      setActionLoading(false);
+      actionLock.current = false; setActionLoading(false);
     }
   };
 
   // Leave Clan
   const handleLeaveClan = async () => {
-    if (!window.confirm("Rostdan ham klandan chiqmoqchimisiz?")) return;
-    setActionLoading(true);
+    const identity = entityIdentity.current;
+    if (clan?.my_role === 'leader' && members.length > 1) { setActionError(t('socialFix.transferHint')); setActiveTab('members'); return; }
+    if (!window.confirm(t(clan?.my_role === 'leader' ? 'socialFix.confirmDisband' : 'socialFix.confirmLeave'))) return;
+    if (actionLock.current) return;
+    actionLock.current = true; setActionLoading(true);
     setActionError(null);
     try {
       const res = await clansApi.leaveClan(clanId);
-      setActionSuccess(res.message || "Klandan chiqdingiz");
-      navigate('/clans');
+      if (identity !== entityIdentity.current) return;
+      setActionSuccess(t('socialFix.saved'));
+      if (identity !== entityIdentity.current) return;
+      await refreshProfile().catch(() => undefined);
+      if (identity === entityIdentity.current) navigate('/clans');
     } catch (err) {
-      setActionError(getApiErrorMessage(err, "Klandan chiqishda xatolik"));
+      if (identity === entityIdentity.current) setActionError(getApiErrorMessage(err, t('common.error')));
     } finally {
-      setActionLoading(false);
+      actionLock.current = false; setActionLoading(false);
     }
   };
 
   // Kick member
   const handleKickMember = async (userId: number, username: string) => {
-    if (!window.confirm(`${username} ni klandan haydamoqchimisiz?`)) return;
-    setActionLoading(true);
+    const identity = entityIdentity.current;
+    if (!window.confirm(t('socialFix.kickConfirm', { name: username }))) return;
+    if (actionLock.current) return;
+    actionLock.current = true; setActionLoading(true);
     try {
       await clansApi.kickMember(clanId, userId);
-      setMembers((prev) => prev.filter((m) => m.user_id !== userId));
-      setActionSuccess(`${username} klandan chetlatildi`);
+      if (identity !== entityIdentity.current) return;
+      await loadClanData();
+      if (identity !== entityIdentity.current) return;
+      setActionSuccess(t('socialFix.kicked', { name: username }));
     } catch (err) {
-      setActionError(getApiErrorMessage(err, "A'zoni chetlatishda xatolik"));
+      if (identity === entityIdentity.current) setActionError(getApiErrorMessage(err, t('common.error')));
     } finally {
-      setActionLoading(false);
+      actionLock.current = false; setActionLoading(false);
     }
+  };
+
+  const handleTransferLeadership = async (member: ClanMemberItem) => {
+    const identity = entityIdentity.current;
+    if (actionLock.current || !window.confirm(t('socialFix.confirmTransfer', { name: member.username }))) return;
+    actionLock.current = true; setActionLoading(true); setActionError(null);
+    try { await clansApi.transferLeadership(clanId, member.user_id); if (identity !== entityIdentity.current) return; await loadClanData(); if (identity !== entityIdentity.current) return; await refreshProfile().catch(() => undefined); }
+    catch (error) { if (identity === entityIdentity.current) setActionError(getApiErrorMessage(error, t('common.error'))); }
+    finally { actionLock.current = false; setActionLoading(false); }
   };
 
   // Upgrade clan level
   const handleUpgradeLevel = async () => {
-    if (!clan) return;
+    const identity = entityIdentity.current;
+    if (!clan || actionLock.current) return;
     if (!clan.can_upgrade) {
-      setActionError(t('clans.fullXpRequired'));
+      if (identity === entityIdentity.current) setActionError(t('clans.fullXpRequired'));
       return;
     }
 
-    if (!window.confirm(`Klan darajasini oshirish uchun ${clan.upgrade_cost_coins} ⚡ to'laysizmi?`)) {
+    if (!window.confirm(t('socialFix.upgradeConfirm', { cost: clan.upgrade_cost_coins }))) {
       return;
     }
 
-    setActionLoading(true);
+    actionLock.current = true; setActionLoading(true);
     setActionError(null);
     try {
-      const res = await clansApi.upgradeClanLevel(clanId);
-      setActionSuccess(res.message || t('clans.upgradeSuccess'));
-      if (currentUser && currentUser.lightning_coins >= clan.upgrade_cost_coins) {
-        updateCoinsLocally(currentUser.lightning_coins - clan.upgrade_cost_coins);
-      }
-      loadClanData();
+      const res = await clansApi.upgradeClanLevel(clanId, clan.upgrade_cost_coins);
+      if (identity !== entityIdentity.current) return;
+      updateCoinsLocally(res.data.remaining_coins);
+      setActionSuccess(t('clans.upgradeSuccess'));
+      if (identity !== entityIdentity.current) return;
+      await refreshProfile().catch(() => undefined);
+      if (identity !== entityIdentity.current) return;
+      await loadClanData();
     } catch (err) {
-      setActionError(getApiErrorMessage(err, "Daraja oshirishda xatolik"));
+      if (identity === entityIdentity.current) setActionError(getApiErrorMessage(err, t('common.error')));
     } finally {
-      setActionLoading(false);
+      actionLock.current = false; setActionLoading(false);
     }
   };
 
   const handleUploadClanAvatar = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const identity = entityIdentity.current;
     const file = e.target.files?.[0];
     if (!file || !clan) return;
     setUploadingFile(true);
     setSettingsError(null);
     try {
       const res = await clansApi.uploadClanAvatar(clan.id, file);
+      if (identity !== entityIdentity.current) return;
       if (res.data?.avatar_url) {
         setEditAvatar(res.data.avatar_url);
-        setSettingsSuccess("Klan logosi yuklandi!");
+        if (identity === entityIdentity.current) setSettingsSuccess(t('socialFix.appearanceDraft'));
       }
     } catch (err) {
-      setSettingsError(getApiErrorMessage(err, "Logo yuklashda xatolik"));
+      if (identity === entityIdentity.current) setSettingsError(getApiErrorMessage(err, t('common.error')));
     } finally {
-      setUploadingFile(false);
+      if (identity === entityIdentity.current) setUploadingFile(false);
       if (e.target) e.target.value = '';
     }
   };
 
   const handleUploadClanBanner = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const identity = entityIdentity.current;
     const file = e.target.files?.[0];
     if (!file || !clan) return;
     setUploadingFile(true);
     setSettingsError(null);
     try {
       const res = await clansApi.uploadClanBanner(clan.id, file);
+      if (identity !== entityIdentity.current) return;
       if (res.data?.banner_url) {
         setEditBanner(res.data.banner_url);
-        setSettingsSuccess("Klan foni yuklandi!");
+        if (identity === entityIdentity.current) setSettingsSuccess(t('socialFix.appearanceDraft'));
       }
     } catch (err) {
-      setSettingsError(getApiErrorMessage(err, "Fon yuklashda xatolik"));
+      if (identity === entityIdentity.current) setSettingsError(getApiErrorMessage(err, t('common.error')));
     } finally {
-      setUploadingFile(false);
+      if (identity === entityIdentity.current) setUploadingFile(false);
       if (e.target) e.target.value = '';
     }
   };
 
   const handleUploadClanFrame = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const identity = entityIdentity.current;
     const file = e.target.files?.[0];
     if (!file || !clan) return;
     setUploadingFile(true);
     setSettingsError(null);
     try {
       const res = await clansApi.uploadClanFrame(clan.id, file);
+      if (identity !== entityIdentity.current) return;
       if (res.data?.frame_url) {
         setEditFrame(res.data.frame_url);
-        setSettingsSuccess("Klan ramkasi yuklandi!");
+        if (identity === entityIdentity.current) setSettingsSuccess(t('socialFix.appearanceDraft'));
       }
     } catch (err) {
-      setSettingsError(getApiErrorMessage(err, "Ramka yuklashda xatolik"));
+      if (identity === entityIdentity.current) setSettingsError(getApiErrorMessage(err, t('common.error')));
     } finally {
-      setUploadingFile(false);
+      if (identity === entityIdentity.current) setUploadingFile(false);
       if (e.target) e.target.value = '';
     }
   };
 
   const handleOpenSettingsModal = () => {
-    if (!clan) return;
+    if (!clan || savingSettings || uploadingFile) return;
     setEditDesc(clan.description || '');
     setEditAvatar(clan.avatar_url || '');
     setEditFrame(clan.frame_url || null);
@@ -311,8 +418,9 @@ export const ClanDetailPage: React.FC = () => {
   };
 
   const handleSaveSettings = async (e: React.FormEvent) => {
+    const identity = entityIdentity.current;
     e.preventDefault();
-    if (!clan) return;
+    if (!clan || savingSettings || uploadingFile) return;
     setSavingSettings(true);
     setSettingsError(null);
     setSettingsSuccess(null);
@@ -324,20 +432,22 @@ export const ClanDetailPage: React.FC = () => {
         banner_url: editBanner || '',
         is_recruiting: editRecruiting,
       });
+      if (identity !== entityIdentity.current) return;
 
-      setSettingsSuccess(res.message || "Klan sozlamalari va bezaklari muvaffaqiyatli saqlandi!");
+      if (identity === entityIdentity.current) setSettingsSuccess(t('socialFix.saved'));
+      if (identity !== entityIdentity.current) return;
       await loadClanData();
       setTimeout(() => {
-        setIsSettingsModalOpen(false);
+        if (identity === entityIdentity.current) setIsSettingsModalOpen(false);
       }, 900);
     } catch (err) {
-      setSettingsError(getApiErrorMessage(err, "Sozlamalarni saqlashda xatolik yuz berdi"));
+      if (identity === entityIdentity.current) setSettingsError(getApiErrorMessage(err, t('common.error')));
     } finally {
-      setSavingSettings(false);
+      if (identity === entityIdentity.current) setSavingSettings(false);
     }
   };
 
-  if (isLoading) {
+  if (isLoading || authLoading) {
     return (
       <div className="min-h-[70vh] flex flex-col items-center justify-center gap-3">
         <Loader2 className="w-10 h-10 text-brand-500 animate-spin" />
@@ -350,14 +460,16 @@ export const ClanDetailPage: React.FC = () => {
     return (
       <div className="min-h-[70vh] max-w-lg mx-auto px-4 flex flex-col items-center justify-center text-center">
         <AlertCircle className="w-12 h-12 text-rose-400 mb-3" />
-        <h2 className="text-2xl font-bold text-white mb-2">{t('common.notFound')}</h2>
+        <h2 className="text-2xl font-bold text-white mb-2">{actionError || t('common.notFound')}</h2>
+        <button onClick={loadClanData} className="my-4 px-4 py-3 rounded-xl bg-brand-500 text-studio-950">{t('socialFix.retry')}</button>
         <Link to="/clans" className="text-brand-400 font-bold text-sm">
-          Klanlar ro'yxatiga qaytish
+          {t('socialFix.backToClans')}
         </Link>
       </div>
     );
   }
 
+  const roleLabel = (role: string) => t(`socialFix.${role === 'co_leader' ? 'coLeader' : role}`);
   const isLeaderOrCoLeader = clan.my_role === 'leader' || clan.my_role === 'co_leader';
   const xpPercentage = Math.min(100, Math.floor((clan.xp / (clan.required_xp || 1)) * 100));
 
@@ -395,25 +507,25 @@ export const ClanDetailPage: React.FC = () => {
                   <span className="text-xs px-2.5 py-1 rounded-lg bg-purple-500/20 text-purple-300 font-extrabold border border-purple-500/40 font-mono">
                     [{clan.tag}]
                   </span>
-                  <h1 className="text-2xl sm:text-3xl font-black text-white">{clan.name}</h1>
+                  <h1 className="text-2xl sm:text-3xl font-black text-white [overflow-wrap:anywhere]">{clan.name}</h1>
                   <span className="px-3 py-1 rounded-full bg-brand-500/15 text-brand-400 font-bold text-xs border border-brand-500/30">
-                    Daraja {clan.level}
+                    {t('socialFix.level', { level: clan.level })}
                   </span>
                 </div>
 
-                <p className="text-studio-300 text-sm max-w-xl mb-3">
-                  {clan.description || "Ushbu klan haqida ma'lumot kiritilmagan"}
+                <p className="text-studio-300 text-sm max-w-xl mb-3 [overflow-wrap:anywhere]">
+                  {clan.description || t('socialFix.noClanDesc')}
                 </p>
 
                 <div className="flex flex-wrap items-center justify-center sm:justify-start gap-4 text-xs text-studio-400">
                   <span className="flex items-center gap-1.5">
                     <Crown className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Yetakchi: <Link to={`/users/${clan.leader_username}`} className="text-white hover:text-brand-400 font-bold">{clan.leader_username}</Link></span>
+                    <span>{t('socialFix.leader')}: <Link to={`/users/${clan.leader_username}`} className="text-white hover:text-brand-400 font-bold">{clan.leader_username}</Link></span>
                   </span>
                   <span>•</span>
                   <span className="flex items-center gap-1.5">
                     <Users className="w-3.5 h-3.5 text-indigo-400" />
-                    <span>A'zolar: <strong className="text-white">{clan.member_count}</strong> / {clan.max_members}</span>
+                    <span>{t('socialFix.members')}: <strong className="text-white">{clan.member_count}</strong> / {clan.max_members}</span>
                   </span>
                 </div>
               </div>
@@ -433,7 +545,7 @@ export const ClanDetailPage: React.FC = () => {
               ) : (
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="px-3 py-1.5 rounded-xl bg-purple-500/15 border border-purple-500/30 text-purple-300 font-bold text-xs">
-                    Rolingiz: {clan.my_role.toUpperCase()}
+                    {t('socialFix.role', { role: roleLabel(clan.my_role) })}
                   </span>
 
                   {isLeaderOrCoLeader && (
@@ -442,32 +554,33 @@ export const ClanDetailPage: React.FC = () => {
                       className="px-3.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
                     >
                       <Settings className="w-3.5 h-3.5" />
-                      <span>Klan Sozlamalari & Bezaklar</span>
+                      <span>{t('socialFix.clanSettings')}</span>
                     </button>
                   )}
 
                   <button
                     onClick={handleLeaveClan}
                     disabled={actionLoading}
-                    title="Klandan chiqish"
+                    title={t(clan.my_role === 'leader' && members.length === 1 ? 'socialFix.disband' : 'socialFix.leaveClan')} aria-label={t(clan.my_role === 'leader' && members.length === 1 ? 'socialFix.disband' : 'socialFix.leaveClan')}
                     className="p-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 rounded-xl transition-colors border border-rose-500/20"
                   >
-                    <LogOut className="w-4 h-4" />
+                    <LogOut className="w-4 h-4" /><span>{t(clan.my_role === 'leader' && members.length === 1 ? 'socialFix.disband' : 'socialFix.leaveClan')}</span>
                   </button>
                 </div>
               )}
             </div>
           </div>
+          {!clan.my_role && (!clan.is_recruiting || clan.member_count >= clan.max_members) && <p className="mt-4 text-sm text-studio-300">{t(clan.member_count >= clan.max_members ? 'socialFix.full' : 'socialFix.closed')}</p>}
 
           {/* Feedback messages */}
           {actionError && (
-            <div className="mt-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs flex items-center gap-2">
+            <div role="alert" className="mt-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs flex items-center gap-2">
               <AlertCircle className="w-4 h-4 shrink-0" />
               <span>{actionError}</span>
             </div>
           )}
           {actionSuccess && (
-            <div className="mt-4 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs flex items-center gap-2">
+            <div role="status" className="mt-4 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs flex items-center gap-2">
               <CheckCircle className="w-4 h-4 shrink-0" />
               <span>{actionSuccess}</span>
             </div>
@@ -502,7 +615,7 @@ export const ClanDetailPage: React.FC = () => {
                     <div className="flex items-center gap-2 text-xs text-studio-400 bg-studio-950 px-3.5 py-2 rounded-xl border border-studio-800">
                       <Info className="w-4 h-4 text-amber-400 shrink-0" />
                       <span>
-                        Keyingi darajaga: {clan.upgrade_cost_coins} ⚡ (XP to'lishi kutilmoqda)
+                        {clan.has_next_level === false ? t('socialFix.maxLevel') : (currentUser?.lightning_coins ?? 0) < clan.upgrade_cost_coins ? t('socialFix.needCoins', { amount: clan.upgrade_cost_coins - (currentUser?.lightning_coins ?? 0) }) : t('socialFix.waitingXp')}
                       </span>
                     </div>
                   )}
@@ -523,8 +636,8 @@ export const ClanDetailPage: React.FC = () => {
             </div>
 
             <div className="flex items-center justify-between text-[11px] text-studio-500 mt-2 font-mono">
-              <span>{clan.next_level_perks || "Boblar mutolaasi orqali har bir bob uchun +25 XP qo'shiladi"}</span>
-              <span>Keyingi sig'im: {clan.next_level_max_members || clan.max_members} kishi</span>
+              <span>{clan.next_level_perks || t('socialFix.xpHint')}</span>
+              <span>{t('socialFix.nextCapacity', { count: clan.next_level_max_members ?? clan.max_members })}</span>
             </div>
           </div>
         </div>
@@ -532,7 +645,7 @@ export const ClanDetailPage: React.FC = () => {
         {/* 2 Main Tabs: Clan Chat & Clan Members */}
         <div className="flex border-b border-studio-800 mb-6 gap-6">
           <button
-            onClick={() => setActiveTab('chat')}
+            aria-pressed={activeTab === 'chat'} onClick={() => setActiveTab('chat')}
             className={`pb-3 font-bold text-sm tracking-wide transition-all border-b-2 flex items-center gap-2 ${
               activeTab === 'chat'
                 ? 'text-white border-brand-500'
@@ -544,7 +657,7 @@ export const ClanDetailPage: React.FC = () => {
           </button>
 
           <button
-            onClick={() => setActiveTab('members')}
+            aria-pressed={activeTab === 'members'} onClick={() => setActiveTab('members')}
             className={`pb-3 font-bold text-sm tracking-wide transition-all border-b-2 flex items-center gap-2 ${
               activeTab === 'members'
                 ? 'text-white border-brand-500'
@@ -558,26 +671,30 @@ export const ClanDetailPage: React.FC = () => {
 
         {/* Tab 1: Real-time Clan Chat */}
         {activeTab === 'chat' && (
-          <div className="bg-studio-900 border border-studio-800 rounded-3xl overflow-hidden shadow-2xl flex flex-col h-[600px]">
+          <div className="bg-studio-900 border border-studio-800 rounded-3xl overflow-hidden shadow-2xl flex flex-col h-[min(600px,80dvh)] min-h-[300px]">
             {/* Chat Messages Log */}
-            <div className="flex-1 p-4 sm:p-6 overflow-y-auto space-y-4">
+            <div role="status" className="px-4 pt-3 text-xs text-studio-300">{clan.my_role && t(`socialFix.${connectionState}`)}</div>
+            {chatError && <p role="alert" className="p-4 text-rose-400 text-sm">{chatError}</p>}
+            <div ref={messagesPaneRef} onScroll={() => { const pane = messagesPaneRef.current; if (pane) { atBottom.current = pane.scrollHeight - pane.scrollTop - pane.clientHeight < 80; if (atBottom.current) setNewMessages(false); } }} className="flex-1 min-h-0 p-4 sm:p-6 overflow-y-auto space-y-4">
+              {clan.my_role && hasOlder && <button disabled={olderLoading} onClick={loadOlderMessages} className="w-full py-3 text-sm text-brand-400">{olderLoading ? t('common.loading') : t('socialFix.olderMessages')}</button>}
               {!clan.my_role ? (
                 <div className="h-full flex flex-col items-center justify-center text-center p-6">
                   <Shield className="w-12 h-12 text-studio-600 mb-3" />
-                  <h4 className="text-white font-bold text-base mb-1">Klan ichki chati</h4>
+                  <h4 className="text-white font-bold text-base mb-1">{t('socialFix.clanChat')}</h4>
                   <p className="text-studio-400 text-xs max-w-sm mb-4">
-                    Klan a'zolari bilan real vaqtda suhbatlashish uchun avval klanga a'zo bo'ling.
+                    {t('socialFix.joinChat')}
                   </p>
                   <button
                     onClick={handleJoinClan}
+                    disabled={actionLoading || !clan.is_recruiting || clan.member_count >= clan.max_members}
                     className="px-5 py-2 bg-brand-500 text-studio-950 font-bold text-xs rounded-xl"
                   >
-                    Klanga qo'shilish
+                    {t('clans.joinClan')}
                   </button>
                 </div>
-              ) : messages.length === 0 ? (
+              ) : chatLoading && messages.length === 0 ? <p role="status">{t('common.loading')}</p> : messages.length === 0 ? (
                 <div className="h-full flex items-center justify-center text-studio-500 text-sm">
-                  Klan chatida hali xabarlar yo'q. Birinchi bo'lib salom yo'llang!
+                  {t('socialFix.emptyChat')}
                 </div>
               ) : (
                 messages.map((msg, index) => {
@@ -601,13 +718,13 @@ export const ClanDetailPage: React.FC = () => {
                       className={`flex items-start gap-3 ${isMe ? 'flex-row-reverse' : ''}`}
                     >
                       <AvatarFrame
-                        username={msg.username || 'User'}
+                        username={msg.username || t('socialFix.reader')}
                         avatarUrl={msg.avatar_url}
                         frameUrl={msg.active_frame_svg}
                         size="sm"
                       />
 
-                      <div className={`max-w-[75%] ${isMe ? 'items-end' : 'items-start'} flex flex-col`}>
+                      <div className={`min-w-0 max-w-[75%] ${isMe ? 'items-end' : 'items-start'} flex flex-col`}>
                         <div className="flex items-center gap-2 mb-1">
                           <Link
                             to={`/users/${msg.username}`}
@@ -618,22 +735,22 @@ export const ClanDetailPage: React.FC = () => {
 
                           {msg.role === 'leader' && (
                             <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 font-bold">
-                              Yetakchi
+                              {t('socialFix.leader')}
                             </span>
                           )}
                           {msg.role === 'co_leader' && (
                             <span className="text-[9px] px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-300 font-bold">
-                              O'rinbosar
+                              {t('socialFix.coLeader')}
                             </span>
                           )}
 
                           <span className="text-[10px] text-studio-500">
-                            {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            {new Date(msg.created_at).toLocaleTimeString(language, { hour: '2-digit', minute: '2-digit' })}
                           </span>
                         </div>
 
                         <div
-                          className={`px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${
+                          className={`px-4 py-2.5 rounded-2xl text-sm leading-relaxed [overflow-wrap:anywhere] whitespace-pre-wrap ${
                             isMe
                               ? 'bg-brand-500 text-studio-950 font-medium rounded-tr-none'
                               : 'bg-studio-800 text-white rounded-tl-none border border-studio-700'
@@ -649,6 +766,7 @@ export const ClanDetailPage: React.FC = () => {
               <div ref={chatMessagesEndRef} />
             </div>
 
+            {newMessages && <button onClick={() => { atBottom.current = true; scrollToBottom(true); }} className="py-3 text-brand-400">{t('socialFix.newMessages')}</button>}
             {/* Chat Input Field */}
             {clan.my_role && (
               <form onSubmit={handleSendMessage} className="p-4 bg-studio-950 border-t border-studio-800 flex items-center gap-3">
@@ -658,11 +776,11 @@ export const ClanDetailPage: React.FC = () => {
                   onChange={(e) => setChatInput(e.target.value)}
                   placeholder={t('clans.sendMessage')}
                   maxLength={500}
-                  className="flex-1 px-4 py-3 bg-studio-900 border border-studio-800 rounded-2xl text-white placeholder-studio-500 focus:outline-none focus:border-brand-500 text-sm shadow-inner"
+                  aria-label={t('clans.sendMessage')} className="min-w-0 flex-1 px-4 py-3 bg-studio-900 border border-studio-800 rounded-2xl text-white placeholder-studio-500 focus:outline-none focus:border-brand-500 text-sm shadow-inner"
                 />
                 <button
                   type="submit"
-                  disabled={!chatInput.trim() || isSending}
+                  aria-label={t('socialFix.send')} disabled={!chatInput.trim() || isSending}
                   className="px-5 py-3 bg-brand-500 hover:bg-brand-400 disabled:opacity-50 text-studio-950 font-bold rounded-2xl shadow-glow-brand transition-all flex items-center justify-center shrink-0"
                 >
                   <Send className="w-4 h-4" />
@@ -679,7 +797,7 @@ export const ClanDetailPage: React.FC = () => {
               {members.map((member) => (
                 <div
                   key={member.id}
-                  className="bg-studio-950/80 border border-studio-800 rounded-2xl p-4 flex items-center justify-between gap-3 hover:border-studio-700 transition-all"
+                  className="bg-studio-950/80 border border-studio-800 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3 hover:border-studio-700 transition-all"
                 >
                   <Link
                     to={`/users/${member.username}`}
@@ -702,7 +820,7 @@ export const ClanDetailPage: React.FC = () => {
                       </div>
                       <div className="text-xs text-studio-400 flex items-center gap-2 mt-0.5">
                         <span className="capitalize font-medium text-[11px] text-purple-300">
-                          {member.role}
+                          {roleLabel(member.role)}
                         </span>
                         <span>•</span>
                         <span className="text-brand-400 font-mono text-[11px]">
@@ -712,10 +830,11 @@ export const ClanDetailPage: React.FC = () => {
                     </div>
                   </Link>
 
+                  {clan.my_role === 'leader' && member.user_id !== currentUser?.id && <button disabled={actionLoading} onClick={() => handleTransferLeadership(member)} className="text-xs px-3 py-2 text-brand-400">{t('socialFix.transfer')}</button>}
                   {/* Kick Action for Leader/Co-Leader */}
                   {isLeaderOrCoLeader && member.user_id !== currentUser?.id && member.role !== 'leader' && (
                     <button
-                      onClick={() => handleKickMember(member.user_id, member.username)}
+                      disabled={actionLoading} aria-label={t('clans.kickMember')} onClick={() => handleKickMember(member.user_id, member.username)}
                       title={t('clans.kickMember')}
                       className="p-2 text-studio-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-xl transition-colors"
                     >
@@ -731,45 +850,27 @@ export const ClanDetailPage: React.FC = () => {
 
       {/* Clan Customization & Settings Modal (Leader & Co-Leader) */}
       {isSettingsModalOpen && clan && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in overflow-y-auto">
-          <div className="relative w-full max-w-2xl bg-studio-900 border border-studio-800 rounded-3xl p-6 sm:p-8 shadow-2xl my-8">
-            <div className="flex items-center justify-between pb-4 border-b border-studio-800 mb-6">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-purple-600/20 text-purple-400 flex items-center justify-center border border-purple-500/30">
-                  <Settings className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-black text-white">Klan Bezaklari & Sozlamalari</h3>
-                  <p className="text-xs text-studio-400">Klan ramkasi, fon rasmi va ma'lumotlarini sozlash</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsSettingsModalOpen(false)}
-                className="p-1.5 rounded-xl text-studio-400 hover:text-white hover:bg-studio-800 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
+        <Modal isOpen={isSettingsModalOpen} onClose={() => { if (!savingSettings && !uploadingFile) setIsSettingsModalOpen(false); }} title={t('socialFix.clanSettings')} maxWidth="2xl">
+          <div className="w-full">
             {settingsError && (
-              <div className="mb-5 p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs flex items-center gap-2">
+              <div role="alert" className="mb-5 p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs flex items-center gap-2">
                 <AlertCircle className="w-4 h-4 shrink-0" />
                 <span>{settingsError}</span>
               </div>
             )}
 
             {settingsSuccess && (
-              <div className="mb-5 p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs flex items-center gap-2">
+              <div role="status" className="mb-5 p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs flex items-center gap-2">
                 <CheckCircle className="w-4 h-4 shrink-0" />
                 <span>{settingsSuccess}</span>
               </div>
             )}
 
+            <p className="mb-4 text-sm text-studio-300">{t('socialFix.appearanceDraft')}</p>
             {/* LIVE PREVIEW BOX */}
             <div className="mb-6 rounded-2xl border border-studio-800 p-4 bg-studio-950 relative overflow-hidden shadow-lg">
               <span className="text-[10px] font-bold uppercase tracking-wider text-studio-400 block mb-2">
-                Jonli Ko'rinish (Live Preview):
+                {t('socialFix.preview')}
               </span>
               <div className="relative rounded-xl overflow-hidden p-4 sm:p-6 min-h-[120px] flex items-center gap-4">
                 {/* Banner backdrop preview */}
@@ -796,7 +897,7 @@ export const ClanDetailPage: React.FC = () => {
                       <h4 className="text-lg font-black text-white">{clan.name}</h4>
                     </div>
                     <p className="text-xs text-studio-300 mt-0.5 line-clamp-1">
-                      {editDesc || clan.description || "Klan tavsifi..."}
+                      {editDesc || clan.description || t('socialFix.noClanDesc')}
                     </p>
                   </div>
                 </div>
@@ -806,10 +907,10 @@ export const ClanDetailPage: React.FC = () => {
             <form onSubmit={handleSaveSettings} className="space-y-6">
               {/* 1. CLAN RAMKASI (AVATAR FRAME) */}
               <div>
-                <label className="block text-xs font-bold text-studio-300 uppercase tracking-wider mb-2">
-                  1. Klan Ramkasi (Avatar Frame)
-                </label>
-                <div className="mt-3 flex items-center gap-3">
+                <p className="block text-xs font-bold text-studio-300 uppercase tracking-wider mb-2">
+                  {t('socialFix.equippedFrame')}
+                </p>
+                <div className="mt-3 flex flex-wrap items-center gap-3">
                   <input
                     type="file"
                     ref={frameFileInputRef}
@@ -824,24 +925,24 @@ export const ClanDetailPage: React.FC = () => {
                     className="px-3.5 py-2 rounded-xl bg-studio-800 hover:bg-studio-700 text-xs font-bold text-studio-200 border border-studio-700 hover:border-purple-500/50 transition-all flex items-center gap-2 cursor-pointer"
                   >
                     <Upload className="w-3.5 h-3.5 text-purple-400" />
-                    <span>O'z ramkangizni yuklash (SVG / PNG)</span>
+                    <span>{t('socialFix.uploadFrame')}</span>
                   </button>
-                  {editFrame && <button type="button" onClick={() => setEditFrame(null)} className="text-xs text-studio-400 hover:text-white">Ramkani olib tashlash</button>}
-                  {uploadingFile && <span className="text-xs text-purple-400 animate-pulse">Yuklanmoqda...</span>}
+                  {editFrame && <button type="button" onClick={() => setEditFrame(null)} className="text-xs text-studio-400 hover:text-white">{t('socialFix.remove')}</button>}
+                  {uploadingFile && <span className="text-xs text-purple-400 animate-pulse">{t('common.loading')}</span>}
                 </div>
               </div>
 
               {/* 2. CLAN BACKGROUND (FON / BANNER) */}
               <div>
-                <label className="block text-xs font-bold text-studio-300 uppercase tracking-wider mb-2">
-                  2. Klan Foni (Background Banner)
-                </label>
-                <div className="mt-3 flex items-center gap-3">
+                <p className="block text-xs font-bold text-studio-300 uppercase tracking-wider mb-2">
+                  {t('socialFix.equippedBackground')}
+                </p>
+                <div className="mt-3 flex flex-wrap items-center gap-3">
                   <input
                     type="file"
                     ref={bannerFileInputRef}
                     onChange={handleUploadClanBanner}
-                    accept="image/*"
+                    accept="image/png,image/jpeg,image/webp"
                     className="hidden"
                   />
                   <button
@@ -851,24 +952,24 @@ export const ClanDetailPage: React.FC = () => {
                     className="px-3.5 py-2 rounded-xl bg-studio-800 hover:bg-studio-700 text-xs font-bold text-studio-200 border border-studio-700 hover:border-purple-500/50 transition-all flex items-center gap-2 cursor-pointer"
                   >
                     <Upload className="w-3.5 h-3.5 text-purple-400" />
-                    <span>O'z fon rasmingizni yuklash (JPG / PNG)</span>
+                    <span>{t('socialFix.uploadBanner')}</span>
                   </button>
-                  {editBanner && <button type="button" onClick={() => setEditBanner(null)} className="text-xs text-studio-400 hover:text-white">Fonni olib tashlash</button>}
-                  {uploadingFile && <span className="text-xs text-purple-400 animate-pulse">Yuklanmoqda...</span>}
+                  {editBanner && <button type="button" onClick={() => setEditBanner(null)} className="text-xs text-studio-400 hover:text-white">{t('socialFix.remove')}</button>}
+                  {uploadingFile && <span className="text-xs text-purple-400 animate-pulse">{t('common.loading')}</span>}
                 </div>
               </div>
 
               {/* 3. CLAN AVATAR (LOGO) */}
               <div>
-                <label className="block text-xs font-bold text-studio-300 uppercase tracking-wider mb-2">
-                  3. Klan Logosi (Avatar)
-                </label>
-                <div className="mt-3 flex items-center gap-3">
+                <p className="block text-xs font-bold text-studio-300 uppercase tracking-wider mb-2">
+                  {t('socialFix.uploadLogo')}
+                </p>
+                <div className="mt-3 flex flex-wrap items-center gap-3">
                   <input
                     type="file"
                     ref={avatarFileInputRef}
                     onChange={handleUploadClanAvatar}
-                    accept="image/*"
+                    accept="image/png,image/jpeg,image/webp"
                     className="hidden"
                   />
                   <button
@@ -878,40 +979,40 @@ export const ClanDetailPage: React.FC = () => {
                     className="px-3.5 py-2 rounded-xl bg-studio-800 hover:bg-studio-700 text-xs font-bold text-studio-200 border border-studio-700 hover:border-purple-500/50 transition-all flex items-center gap-2 cursor-pointer"
                   >
                     <Upload className="w-3.5 h-3.5 text-purple-400" />
-                    <span>O'z logongizni yuklash (JPG / PNG / SVG)</span>
+                    <span>{t('socialFix.uploadLogo')}</span>
                   </button>
-                  {editAvatar && <button type="button" onClick={() => setEditAvatar('')} className="text-xs text-studio-400 hover:text-white">Logoni olib tashlash</button>}
-                  {uploadingFile && <span className="text-xs text-purple-400 animate-pulse">Yuklanmoqda...</span>}
+                  {editAvatar && <button type="button" onClick={() => setEditAvatar('')} className="text-xs text-studio-400 hover:text-white">{t('socialFix.remove')}</button>}
+                  {uploadingFile && <span className="text-xs text-purple-400 animate-pulse">{t('common.loading')}</span>}
                 </div>
               </div>
 
               {/* 4. CLAN TAVSIFI & A'ZO QABULI */}
               <div className="space-y-3 pt-2 border-t border-studio-800">
                 <div>
-                  <label className="block text-xs font-bold text-studio-300 uppercase tracking-wider mb-1.5 flex items-center justify-between">
-                    <span>Klan Tavsifi (Description)</span>
+                  <label htmlFor="clan-description" className="block text-xs font-bold text-studio-300 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                    <span>{t('clans.description')}</span>
                     <span className="text-[10px] text-studio-500 font-mono">{editDesc.length}/500</span>
                   </label>
-                  <textarea
+                  <textarea id="clan-description"
                     value={editDesc}
                     onChange={(e) => setEditDesc(e.target.value)}
                     rows={3}
                     maxLength={500}
-                    placeholder="Klaningiz haqida, maqsad va qoidalar..."
+                    placeholder={t('socialFix.clanDescPlaceholder')}
                     className="w-full px-3.5 py-2.5 bg-studio-950 border border-studio-800 rounded-xl text-xs text-white placeholder-studio-500 focus:outline-none focus:border-purple-500 resize-none"
                   />
                 </div>
 
                 <div className="flex items-center justify-between p-3.5 rounded-2xl bg-studio-950 border border-studio-800">
                   <div>
-                    <span className="text-xs font-bold text-white block">Yangi a'zolarni qabul qilish</span>
+                    <span className="text-xs font-bold text-white block">{t('socialFix.recruiting')}</span>
                     <span className="text-[11px] text-studio-400">
-                      {editRecruiting ? "Ochiq: Boshqa o'quvchilar qo'shilishi mumkin" : "Yopiq: Yangi a'zolar qabul qilinmaydi"}
+                      {editRecruiting ? t('socialFix.recruitingOpen') : t('socialFix.closed')}
                     </span>
                   </div>
                   <button
                     type="button"
-                    onClick={() => setEditRecruiting(!editRecruiting)}
+                    aria-label={t('socialFix.recruiting')} aria-pressed={editRecruiting} onClick={() => setEditRecruiting(!editRecruiting)}
                     className={`w-12 h-6 rounded-full transition-colors relative cursor-pointer ${
                       editRecruiting ? 'bg-purple-600' : 'bg-studio-800'
                     }`}
@@ -929,23 +1030,23 @@ export const ClanDetailPage: React.FC = () => {
               <div className="pt-3 border-t border-studio-800 flex items-center justify-end gap-3">
                 <button
                   type="button"
-                  onClick={() => setIsSettingsModalOpen(false)}
+                  disabled={savingSettings || uploadingFile} onClick={() => setIsSettingsModalOpen(false)}
                   className="px-4 py-2.5 text-xs font-bold text-studio-400 hover:text-white"
                 >
-                  Bekor qilish
+                  {t('common.cancel')}
                 </button>
                 <button
                   type="submit"
-                  disabled={savingSettings}
+                  disabled={savingSettings || uploadingFile}
                   className="px-6 py-2.5 bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs rounded-xl shadow-lg transition-all flex items-center gap-2 disabled:opacity-50"
                 >
                   {savingSettings && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                  <span>Bezaklarni saqlash</span>
+                  <span>{t('common.save')}</span>
                 </button>
               </div>
             </form>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

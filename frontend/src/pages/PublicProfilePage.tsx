@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
@@ -7,6 +7,7 @@ import { friendsApi } from '../api/friends';
 import { PublicProfileData } from '../types';
 import { AvatarFrame } from '../components/common/AvatarFrame';
 import { getApiErrorMessage } from '../api/client';
+import { CardCollectionPanel } from '../components/cards/CardCollectionPanel';
 import {
   UserPlus,
   UserCheck,
@@ -26,7 +27,11 @@ import {
 export const PublicProfilePage: React.FC = () => {
   const { identifier } = useParams<{ identifier: string }>();
   const { user: currentUser, isAuthenticated, openAuthModal } = useAuth();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const requestId = useRef(0);
+  const actionLock = useRef(false);
+  const actorIdentity = useRef(`${identifier}:${currentUser?.id ?? "guest"}`);
+  actorIdentity.current = `${identifier}:${currentUser?.id ?? "guest"}`;
 
   const [profile, setProfile] = useState<PublicProfileData | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -36,55 +41,66 @@ export const PublicProfilePage: React.FC = () => {
 
   const fetchProfile = async () => {
     if (!identifier) return;
+    const request = ++requestId.current;
     setIsLoading(true);
+    setProfile(null);
+    setActionMessage(null);
     setError(null);
     try {
       const res = await usersApi.getPublicProfile(identifier);
+      if (request !== requestId.current) return;
       if (res.data) {
         setProfile(res.data);
       }
     } catch (err) {
-      setError(getApiErrorMessage(err, "Profilni yuklashda xatolik yuz berdi"));
+      if (request === requestId.current) setError(getApiErrorMessage(err, t('socialFix.loadFailed')));
     } finally {
-      setIsLoading(false);
+      if (request === requestId.current) setIsLoading(false);
     }
   };
 
   useEffect(() => {
     fetchProfile();
-  }, [identifier, currentUser]);
+    return () => { requestId.current++; };
+  }, [identifier, currentUser?.id]);
 
   const handleSendFriendRequest = async () => {
+    const actor = actorIdentity.current;
     if (!isAuthenticated) {
       openAuthModal('login');
       return;
     }
     if (!profile) return;
-    setActionLoading(true);
+    if (actionLock.current) return;
+    actionLock.current = true; setActionLoading(true);
     setActionMessage(null);
     try {
-      await friendsApi.sendFriendRequest({ user_id: profile.id });
+      const result = await friendsApi.sendFriendRequest({ user_id: profile.id });
+      if (actor !== actorIdentity.current) return ;
       setProfile((prev) =>
         prev
           ? {
               ...prev,
-              friendship: { status: 'pending_sent' },
+              friendship: { status: result.data?.status === 'accepted' ? 'friends' : 'pending_sent', friendship_id: result.data?.friendship_id },
             }
           : null
       );
-      setActionMessage("Do'stlik so'rovi yuborildi!");
+      setActionMessage(t(result.data?.status === 'accepted' ? 'socialFix.requestAccepted' : 'socialFix.requestSent'));
     } catch (err) {
-      setActionMessage(getApiErrorMessage(err, "So'rov yuborishda xatolik"));
+      if (actor === actorIdentity.current) setActionMessage(getApiErrorMessage(err, t('common.error')));
     } finally {
-      setActionLoading(false);
+      actionLock.current = false; setActionLoading(false);
     }
   };
 
   const handleAcceptRequest = async () => {
+    const actor = actorIdentity.current;
     if (!profile?.friendship.friendship_id) return;
-    setActionLoading(true);
+    if (actionLock.current) return;
+    actionLock.current = true; setActionLoading(true);
     try {
       await friendsApi.acceptFriendRequest(profile.friendship.friendship_id);
+      if (actor !== actorIdentity.current) return;
       setProfile((prev) =>
         prev
           ? {
@@ -93,20 +109,23 @@ export const PublicProfilePage: React.FC = () => {
             }
           : null
       );
-      setActionMessage("Do'stlik qabul qilindi!");
+      setActionMessage(t('socialFix.requestAccepted'));
     } catch (err) {
-      setActionMessage(getApiErrorMessage(err, "Qabul qilishda xatolik"));
+      if (actor === actorIdentity.current) setActionMessage(getApiErrorMessage(err, t('common.error')));
     } finally {
-      setActionLoading(false);
+      actionLock.current = false; setActionLoading(false);
     }
   };
 
   const handleRemoveFriend = async () => {
+    const actor = actorIdentity.current;
     if (!profile) return;
-    if (!window.confirm("Haqiqatan ham bu foydalanuvchini do'stlikdan o'chirmoqchimisiz?")) return;
-    setActionLoading(true);
+    if (!window.confirm(t('socialFix.confirmRemove'))) return;
+    if (actionLock.current) return;
+    actionLock.current = true; setActionLoading(true);
     try {
       await friendsApi.removeFriend(profile.id);
+      if (actor !== actorIdentity.current) return;
       setProfile((prev) =>
         prev
           ? {
@@ -115,12 +134,22 @@ export const PublicProfilePage: React.FC = () => {
             }
           : null
       );
-      setActionMessage("Do'stlikdan o'chirildi");
+      setActionMessage(t('socialFix.friendRemoved'));
     } catch (err) {
-      setActionMessage(getApiErrorMessage(err, "O'chirishda xatolik"));
+      if (actor === actorIdentity.current) setActionMessage(getApiErrorMessage(err, t('common.error')));
     } finally {
-      setActionLoading(false);
+      actionLock.current = false; setActionLoading(false);
     }
+  };
+
+  const handleCancelRequest = async () => {
+    const actor = actorIdentity.current;
+    if (!profile || actionLoading) return;
+    if (actionLock.current) return;
+    actionLock.current = true; setActionLoading(true);
+    try { await friendsApi.removeFriend(profile.id); if (actor !== actorIdentity.current) return; await fetchProfile(); }
+    catch (err) { if (actor === actorIdentity.current) setActionMessage(getApiErrorMessage(err, t('common.error'))); }
+    finally { actionLock.current = false; setActionLoading(false); }
   };
 
   if (isLoading) {
@@ -138,8 +167,9 @@ export const PublicProfilePage: React.FC = () => {
         <div className="w-16 h-16 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center mb-4 text-rose-400">
           <AlertCircle className="w-8 h-8" />
         </div>
-        <h2 className="text-2xl font-bold text-white mb-2">{t('common.notFound')}</h2>
-        <p className="text-studio-400 text-sm mb-6">{error || "Bunday foydalanuvchi topilmadi."}</p>
+        <h2 className="text-2xl font-bold text-white mb-2">{t('common.error')}</h2>
+        <p className="text-studio-400 text-sm mb-6">{error || t('common.notFound')}</p>
+        <button onClick={fetchProfile} className="mb-4 px-5 py-3 rounded-xl bg-brand-500 text-studio-950">{t('socialFix.retry')}</button>
         <Link
           to="/"
           className="px-6 py-2.5 bg-brand-500 hover:bg-brand-400 text-studio-950 font-bold rounded-xl transition-all shadow-glow-brand"
@@ -188,7 +218,7 @@ export const PublicProfilePage: React.FC = () => {
 
               <div>
                 <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3 mb-1.5">
-                  <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+                  <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight [overflow-wrap:anywhere]">
                     {profile.username}
                   </h1>
 
@@ -206,19 +236,19 @@ export const PublicProfilePage: React.FC = () => {
                 </div>
 
                 {profile.bio ? (
-                  <p className="text-studio-300 text-sm max-w-lg mb-3 italic">
+                  <p className="text-studio-300 text-sm max-w-lg mb-3 italic [overflow-wrap:anywhere]">
                     "{profile.bio}"
                   </p>
                 ) : (
                   <p className="text-studio-500 text-xs italic mb-3">
-                    Biografiya kiritilmagan
+                    {t('socialFix.noBio')}
                   </p>
                 )}
 
                 <div className="flex items-center justify-center sm:justify-start gap-4 text-xs text-studio-400 font-mono">
                   <span className="flex items-center gap-1.5">
                     <Calendar className="w-3.5 h-3.5 text-brand-400" />
-                    <span>{t('publicProfile.memberSince')}: {new Date(profile.created_at).toLocaleDateString()}</span>
+                    <span>{t('publicProfile.memberSince')}: {new Date(profile.created_at).toLocaleDateString(language === 'uz' ? 'uz-UZ' : language === 'ru' ? 'ru-RU' : 'en-US')}</span>
                   </span>
                 </div>
               </div>
@@ -238,12 +268,13 @@ export const PublicProfilePage: React.FC = () => {
                 <div className="flex items-center gap-2">
                   <span className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-sm font-semibold">
                     <UserCheck className="w-4 h-4" />
-                    <span>Do'stlar ro'yxatida</span>
+                    <span>{t('socialFix.friends')}</span>
                   </span>
                   <button
                     onClick={handleRemoveFriend}
                     disabled={actionLoading}
-                    title="Do'stlikdan o'chirish"
+                    title={t('socialFix.removeFriend')}
+                    aria-label={t('socialFix.removeFriend')}
                     className="p-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 rounded-xl transition-colors border border-rose-500/20"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -251,11 +282,12 @@ export const PublicProfilePage: React.FC = () => {
                 </div>
               ) : isPendingSent ? (
                 <button
-                  disabled
-                  className="w-full sm:w-auto px-5 py-2.5 bg-studio-800 text-studio-400 font-semibold text-sm rounded-xl cursor-not-allowed flex items-center justify-center gap-2 border border-studio-700"
+                  onClick={handleCancelRequest}
+                  disabled={actionLoading}
+                  className="w-full sm:w-auto px-5 py-2.5 bg-studio-800 text-studio-400 font-semibold text-sm rounded-xl  flex items-center justify-center gap-2 border border-studio-700"
                 >
                   <Clock className="w-4 h-4 text-amber-400 animate-pulse" />
-                  <span>{t('publicProfile.requestPending')}</span>
+                  <span>{t('socialFix.cancelRequest')}</span>
                 </button>
               ) : isPendingReceived ? (
                 <button
@@ -278,7 +310,7 @@ export const PublicProfilePage: React.FC = () => {
               )}
 
               {actionMessage && (
-                <span className="text-xs text-brand-400 font-medium">{actionMessage}</span>
+                <span role="status" className="text-xs text-brand-400 font-medium">{actionMessage}</span>
               )}
             </div>
           </div>
@@ -321,13 +353,15 @@ export const PublicProfilePage: React.FC = () => {
           </div>
         </div>
 
+        {profile.card_collection && <div className="mt-8"><CardCollectionPanel key={profile.id} summary={profile.card_collection} /></div>}
+
         {/* Equipped Assets Showcase */}
         <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Active Frame */}
           <div className="bg-studio-900 border border-studio-800 rounded-3xl p-6">
             <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2">
               <Award className="w-5 h-5 text-brand-400" />
-              <span>O'rnatilgan Avatar Ramkasi</span>
+              <span>{t('socialFix.equippedFrame')}</span>
             </h3>
             {profile.active_frame ? (
               <div className="flex items-center gap-4 p-4 rounded-2xl bg-studio-950 border border-studio-800">
@@ -341,12 +375,12 @@ export const PublicProfilePage: React.FC = () => {
                 </div>
                 <div>
                   <h4 className="text-white font-bold text-sm">{profile.active_frame.name}</h4>
-                  <span className="text-xs text-brand-400 font-medium">Faol bezak</span>
+                  <span className="text-xs text-brand-400 font-medium">{t('shop.equipped')}</span>
                 </div>
               </div>
             ) : (
               <div className="p-6 text-center text-studio-500 text-sm bg-studio-950/50 rounded-2xl border border-dashed border-studio-800">
-                Ramka tanlanmagan
+                {t('socialFix.noFrame')}
               </div>
             )}
           </div>
@@ -355,7 +389,7 @@ export const PublicProfilePage: React.FC = () => {
           <div className="bg-studio-900 border border-studio-800 rounded-3xl p-6">
             <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2">
               <Shield className="w-5 h-5 text-indigo-400" />
-              <span>O'rnatilgan Profil Foni</span>
+              <span>{t('socialFix.equippedBackground')}</span>
             </h3>
             {profile.active_background ? (
               <div className="relative rounded-2xl overflow-hidden h-28 border border-studio-800">
@@ -370,7 +404,7 @@ export const PublicProfilePage: React.FC = () => {
               </div>
             ) : (
               <div className="p-6 text-center text-studio-500 text-sm bg-studio-950/50 rounded-2xl border border-dashed border-studio-800">
-                Maxsus fon o'rnatilmagan
+                {t('socialFix.noBackground')}
               </div>
             )}
           </div>

@@ -35,6 +35,7 @@ export interface UserProfile {
   daily_bonus_claimed?: boolean;
   last_daily_login?: string | null;
   created_at: string;
+  card_collection?: CardCollectionSummary;
 }
 
 export interface ClanSummary {
@@ -70,6 +71,7 @@ export interface ClanDetail {
   required_xp: number;
   upgrade_cost_coins: number;
   can_upgrade: boolean;
+  has_next_level?: boolean;
   next_level_max_members?: number;
   next_level_perks?: string;
   max_members: number;
@@ -141,6 +143,7 @@ export interface PublicProfileData {
   created_at: string;
   active_frame?: ActiveAsset | null;
   active_background?: ActiveAsset | null;
+  card_collection?: CardCollectionSummary;
   clan?: {
     id: number;
     name: string;
@@ -182,6 +185,7 @@ export interface LatestChapterInfo {
   id: number;
   chapter_number: number;
   created_at: string;
+  published_at?: string | null;
 }
 
 export type ContentType = 'manhwa' | 'manga' | 'novel';
@@ -218,6 +222,7 @@ export interface ChapterSummary {
   is_claimed?: boolean;
   content_text?: string | null;
   created_at: string;
+  published_at?: string | null;
 }
 
 export interface WebtoonDetail {
@@ -238,6 +243,25 @@ export interface ChapterImage {
   id: number;
   image_url: string;
   order_index: number;
+  width?: number | null;
+  height?: number | null;
+}
+
+export interface ReadingProgress {
+  webtoon_id: number;
+  chapter_id: number;
+  page_index: number;
+  anchor?: string | null;
+  progress_percent: number;
+  completed: boolean;
+  updated_at?: string;
+  reward_eligible_at?: string | null;
+  webtoon_title?: string;
+  webtoon_slug?: string;
+  webtoon_type?: ContentType;
+  chapter_number?: number;
+  cover_image_url?: string;
+  webtoon?: WebtoonSummary;
 }
 
 export interface ChapterReaderData {
@@ -253,6 +277,9 @@ export interface ChapterReaderData {
   images: ChapterImage[];
   prev_chapter_id?: number | null;
   next_chapter_id?: number | null;
+  reading_progress?: ReadingProgress | null;
+  reward_eligible_at?: string | null;
+  minimum_read_seconds?: number;
 }
 
 export type BookmarkStatus = 'reading' | 'plan_to_read' | 'completed' | 'dropped';
@@ -263,31 +290,55 @@ export interface WebtoonBookmarkInfo {
   slug: string;
   cover_image_url: string;
   status: 'ongoing' | 'completed';
+  first_chapter?: LatestChapterInfo | null;
 }
 
 export interface BookmarkItem {
   webtoon: WebtoonBookmarkInfo;
   reading_status: BookmarkStatus;
   updated_at: string;
+  reading_progress?: ReadingProgress | null;
 }
 
-export interface ShopItem {
+export type CardRarity = 'common' | 'rare' | 'epic' | 'legendary';
+export type ShopItemType = 'frame' | 'background' | 'card';
+
+export interface CardMetadata {
+  rarity?: CardRarity | null;
+  character_name?: string | null;
+  series_title?: string | null;
+  webtoon_id?: number | null;
+  asset_preview_url?: string | null;
+  asset_animated?: boolean;
+}
+
+export interface ShopItem extends CardMetadata {
   id: number;
   name: string;
-  item_type: 'frame' | 'background';
+  item_type: ShopItemType;
   price_coins: number;
   asset_url: string;
   is_owned: boolean;
 }
 
-export interface InventoryItem {
+export interface InventoryItem extends CardMetadata {
   id: number;
   name: string;
-  item_type: 'frame' | 'background';
+  item_type: ShopItemType;
   price_coins: number;
   asset_url: string;
   is_active: boolean;
   purchased_at: string;
+}
+
+export interface CardCollectionSummary {
+  total_cards: number;
+  rarity_counts: Record<CardRarity, number>;
+  featured_cards: ShopItem[];
+}
+
+export interface CardCollection extends CardCollectionSummary {
+  cards: InventoryItem[];
 }
 
 export interface CommentAuthor {
@@ -310,6 +361,9 @@ export interface CommentItemData {
   content: string;
   created_at: string;
   replies: CommentReply[];
+  reply_count?: number;
+  has_more_replies?: boolean;
+  next_reply_offset?: number;
 }
 
 export interface CreatorRequest {

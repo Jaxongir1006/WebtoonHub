@@ -25,7 +25,7 @@ export const Footer: React.FC = () => {
             </p>
             <div className="flex items-center gap-2 text-xs text-brand-400 font-medium">
               <Shield className="w-4 h-4 text-brand-500" />
-              <span>100% {t('shop.active')} & PBL Project</span>
+              <span>{t('ux.free')}</span>
             </div>
           </div>
 
@@ -62,12 +62,12 @@ export const Footer: React.FC = () => {
 
           {/* Academic Info */}
           <div>
-            <h4 className="text-xs font-bold text-white uppercase tracking-wider mb-3">Loyiha Haqida</h4>
+            <h4 className="text-xs font-bold text-white uppercase tracking-wider mb-3">{t('ux.about')}</h4>
             <div className="text-xs space-y-1.5 text-studio-400">
               <p className="font-semibold text-studio-200">Kimyo International University in Tashkent (KIUT)</p>
-              <p>Amaliy Informatika (ISE) · PBL3</p>
+              <p>{t('ux.degree')}</p>
               <p className="pt-2 text-studio-500 text-[11px]">
-                Mualliflar: Qosimjonov Jaxongir, Muxtorov Akmaljon, Tursunaliyev Asilbek
+                {t('ux.authors')}: Qosimjonov Jaxongir, Muxtorov Akmaljon, Tursunaliyev Asilbek
               </p>
             </div>
           </div>
@@ -78,9 +78,8 @@ export const Footer: React.FC = () => {
             © 2026 WebtoonHub. {t('footer.allRightsReserved')}
           </div>
           <div className="flex items-center gap-1 text-studio-500">
-            <span>Made with</span>
-            <Heart className="w-3.5 h-3.5 text-rose-500 fill-rose-500 inline" />
-            <span>for webtoon fans</span>
+            <Heart aria-hidden="true" className="w-3.5 h-3.5 text-rose-500 fill-rose-500 inline" />
+            <span>{t('ux.madeFor')}</span>
           </div>
         </div>
       </div>

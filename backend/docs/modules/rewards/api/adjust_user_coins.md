@@ -1,39 +1,24 @@
-# 📄 API: O'quvchiga Tangalar Berish / Ayirish (Adjust User Coins)
+# Adjust a reader's coins
 
-## Umumiy Ma'lumot
-* **Metod:** `POST`
-* **Yo'l:** `/api/v1/staff/readers/{id}/coins`
-* **Avtorizatsiya:** Majburiy (`Bearer <staff_token>`)
-* **Talab etiladigan ruxsat:** `users:manage`
-* **Tavsif:** Muayyan o'quvchi balansiga sabab ko'rsatilgan holda tanga qo'shish yoki yechish (tranzaksiyalar tarixiga yoziladi).
+`POST /api/v1/staff/readers/{id}/coins` requires a staff bearer token and `coins:adjust` permission. The reader ID belongs in the route. A negative delta deducts coins; the resulting balance is clamped at zero, and the returned delta records the amount actually applied. Every accepted adjustment records a ledger transaction.
 
----
-
-## So'rov Parametrlari (Request)
-
-### URL Parametri:
-* `id`: integer (O'quvchi ID si)
-
-### Sarlavhalar (Headers):
 ```http
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+Authorization: Bearer <staff_access_token>
 Content-Type: application/json
+Idempotency-Key: 12fe9b0e-f25e-4d18-b395-fc9313f0edc2
 ```
 
-### So'rov Tanasi (Request Body):
 ```json
 {
   "amount_delta": 50,
-  "reason": "Tarjimonlik tanlovi 1-o'rin sohibi"
+  "reason": "Translation contest award"
 }
 ```
-*(Manfiy qiymat kiritilsa jarima sifatida balansdan ayriladi, masalan: `-20`).*
 
----
+`reason` must contain 2–255 characters. `amount` is an accepted alias; `amount_delta` takes precedence when both are supplied. Clients should send one amount field and a nonzero integer for a deliberate correction.
 
-## Javoblar (Responses)
+`Idempotency-Key` is required: 8–128 ASCII letters, digits, `_` or `-`. Generate a new key for each deliberate adjustment and keep the same key and payload when retrying an unknown transport outcome. Keys belong to the authenticated staff account, including the target reader in the recorded intent. Replaying an accepted intent returns its original result without changing the balance or adding another ledger entry. Reusing that key with another reader, payload or financial endpoint returns 409. Validation failure returns 422; an unknown reader returns 404.
 
-### 200 OK (Muvaffaqiyatli)
 ```json
 {
   "success": true,
@@ -42,8 +27,10 @@ Content-Type: application/json
     "previous_coins": 120,
     "new_coins": 170,
     "amount_delta": 50,
-    "reason": "Tarjimonlik tanlovi 1-o'rin sohibi"
+    "reason": "Translation contest award"
   },
-  "message": "Foydalanuvchi balansi muvaffaqiyatli o'zgartirildi"
+  "message": "Foydalanuvchi chaqmoq balansi muvaffaqiyatli o'zgartirildi"
 }
 ```
+
+The replayed `new_coins` describes that original operation. Refresh the reader before presenting a current balance after later operations. See [operation reliability](../../../04_OPERATION_RELIABILITY.md).

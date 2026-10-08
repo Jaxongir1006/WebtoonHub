@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field
 
 
 class ClanCreatePayload(BaseModel):
+    expected_cost: int = Field(ge=0)
     name: str = Field(..., min_length=3, max_length=50)
     tag: str = Field(..., min_length=2, max_length=8)
     description: Optional[str] = Field(None, max_length=500)
@@ -45,6 +46,7 @@ class ClanDetailResponse(BaseModel):
     xp: int
     required_xp: int
     upgrade_cost_coins: int
+    has_next_level: bool = False
     can_upgrade: bool
     next_level_max_members: Optional[int] = None
     next_level_perks: Optional[str] = None

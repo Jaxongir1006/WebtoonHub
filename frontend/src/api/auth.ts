@@ -1,4 +1,5 @@
-import { apiClient } from './client';
+import axios from 'axios';
+import { apiClient, API_BASE_URL } from './client';
 import { ApiResponse, UserProfile, UserSession, UserSummary } from '../types';
 
 export interface LoginResponseData {
@@ -10,6 +11,15 @@ export interface LoginResponseData {
 }
 
 export const authApi = {
+  async logout(token: string | null, refreshToken: string | null) {
+    await axios.post(`${API_BASE_URL}/auth/logout`, { refresh_token: refreshToken }, { timeout: 15000, headers: token ? { Authorization: `Bearer ${token}` } : {} });
+  },
+  async forgotPassword(email: string) {
+    await apiClient.post('/auth/password/forgot', { email });
+  },
+  async resetPassword(token: string, new_password: string) {
+    await apiClient.post('/auth/password/reset', { token, new_password });
+  },
   async register(data: { email: string; username: string; password: string }) {
     const res = await apiClient.post<ApiResponse<{ user: UserSummary }>>('/auth/register', data);
     return res.data;

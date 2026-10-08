@@ -9,7 +9,7 @@ export const requestsApi = {
   async reviewRequest(id, status, feedback = '') {
     const res = await apiClient.patch(`/creator-requests/${id}`, {
       status,
-      admin_feedback: feedback || (status === 'approved' ? 'Arizangiz ma\'qullandi' : 'Arizangiz rad etildi')
+      admin_feedback: feedback
     })
     return res.data
   }

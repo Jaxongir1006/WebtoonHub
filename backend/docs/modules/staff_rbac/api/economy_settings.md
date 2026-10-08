@@ -1,15 +1,11 @@
-# API: Chaqmoq Iqtisodiyoti va Mukofot Sozlamalari (Economy Settings)
+# API: Economy settings
 
-Ushbu endpointlar orqali adminlar o'quvchilar va creatorlarga beriladigan barcha turdagi ⚡ Chaqmoq mukofotlari miqdorini, sutkalik limitlarni va yangilanish vaqtini boshqaradilar.
+`GET` and `PATCH /api/v1/staff/economy/settings` require a staff bearer token
+and `users:manage`. Supported settings persist in `system_settings` and are
+read by registration and reward services; restarting the API retains changes.
 
----
+The GET response uses the standard success envelope:
 
-### 1. Sozlamalarni Olish
-* **Method:** `GET`
-* **URL:** `/api/v1/staff/economy/settings`
-* **Talab qilinadigan ruxsat:** `users:manage`
-
-#### Muvaffaqiyatli Javob (`200 OK`):
 ```json
 {
   "success": true,
@@ -17,50 +13,42 @@ Ushbu endpointlar orqali adminlar o'quvchilar va creatorlarga beriladigan barcha
     "chapter_read_reward": 5,
     "daily_checkin_reward": 15,
     "welcome_bonus": 50,
-    "creator_chapter_reward": 25,
-    "comment_reward": 2,
     "daily_max_limit": 100,
+    "anti_farming_cooldown_min": 0,
     "reset_timezone": "Asia/Tashkent",
     "reset_time": "00:00",
-    "anti_farming_cooldown_min": 3
+    "creator_chapter_reward": null,
+    "comment_reward": null,
+    "unsupported_rewards": ["creator_chapter_reward", "comment_reward"]
   }
 }
 ```
 
----
+These numbers illustrate defaults; GET returns the current configured values.
+The two null reward fields are unsupported features, not active rewards.
+Timezone comes from server configuration, and the reset time is fixed at midnight.
 
-### 2. Sozlamalarni Yangilash / Tahrirlash
-* **Method:** `PATCH`
-* **URL:** `/api/v1/staff/economy/settings`
-* **Talab qilinadigan ruxsat:** `users:manage`
+PATCH accepts only these optional integer fields:
 
-#### So'rov Tanasi (JSON):
+| Field | Allowed range | Meaning |
+|---|---|---|
+| `chapter_read_reward` | 0–100000 | Configured chapter reward setting; individual chapters retain their explicit reward amount. |
+| `daily_checkin_reward` | 0–100000 | Daily check-in bonus. |
+| `welcome_bonus` | 0–100000 | Bonus for newly registered accounts. |
+| `daily_max_limit` | 0–1000000 | Daily chapter-reward cap; zero disables the cap. |
+| `anti_farming_cooldown_min` | 0–1440 | Minimum minutes between successful chapter claims; zero disables the cooldown. |
+
 ```json
 {
-  "chapter_read_reward": 10,
   "daily_checkin_reward": 20,
   "welcome_bonus": 50,
-  "creator_chapter_reward": 30,
-  "comment_reward": 2,
   "daily_max_limit": 150
 }
 ```
 
-#### Muvaffaqiyatli Javob (`200 OK`):
-```json
-{
-  "success": true,
-  "data": {
-    "chapter_read_reward": 10,
-    "daily_checkin_reward": 20,
-    "welcome_bonus": 50,
-    "creator_chapter_reward": 30,
-    "comment_reward": 2,
-    "daily_max_limit": 150,
-    "reset_timezone": "Asia/Tashkent",
-    "reset_time": "00:00",
-    "anti_farming_cooldown_min": 3
-  },
-  "message": "Chaqmoq berilishi va iqtisodiyot sozlamalari muvaffaqiyatli saqlandi"
-}
-```
+Omitted or null fields remain unchanged. PATCH returns the complete current
+settings in the same envelope as GET. Unknown fields return 422, including
+`creator_chapter_reward`, `comment_reward`, `reset_timezone`, and `reset_time`.
+Missing permission returns 403. Chapter rewards also require completed reading
+progress and are granted once per reader/chapter; changing settings does not
+reset already claimed rewards.

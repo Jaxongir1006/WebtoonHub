@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { libraryApi } from '../api/library';
 import { useAuth } from '../context/AuthContext';
@@ -6,6 +6,9 @@ import { useLanguage } from '../context/LanguageContext';
 import { BookmarkItem, BookmarkStatus } from '../types';
 import { SafeImage } from '../components/common/SafeImage';
 import { getStatusLabel } from '../utils/format';
+import { getApiErrorMessage } from '../api/client';
+import { readPosition } from '../utils/readingStorage';
+import { readerUrl } from '../utils/reading';
 import {
   BookOpen,
   Bookmark,
@@ -15,11 +18,17 @@ import {
 } from 'lucide-react';
 
 export const LibraryPage: React.FC = () => {
-  const { isAuthenticated, openAuthModal } = useAuth();
+  const { user, isAuthenticated, isLoading: checkingAccount, openAuthModal } = useAuth();
   const { t } = useLanguage();
   const [items, setItems] = useState<BookmarkItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<string>('');
+  const [loadError, setLoadError] = useState(false);
+  const [mutationError, setMutationError] = useState('');
+  const [pending, setPending] = useState<number | null>(null);
+  const requestId = useRef(0);
+  const owner = useRef(user?.id); owner.current = user?.id;
+  const mutating = useRef(false);
 
   const statusTabs = useMemo(() => [
     { value: '', label: t('catalog.statusAll'), icon: '📚' },
@@ -30,46 +39,60 @@ export const LibraryPage: React.FC = () => {
   ], [t]);
 
   const fetchLibrary = useCallback(async () => {
+    const request = ++requestId.current;
+    if (checkingAccount) return;
     if (!isAuthenticated) {
+      setItems([]); setLoadError(false);
       setLoading(false);
       return;
     }
     setLoading(true);
+    setLoadError(false);
     try {
       const data = await libraryApi.getLibrary(
         activeTab ? (activeTab as BookmarkStatus) : undefined
       );
-      setItems(data || []);
+      if (request === requestId.current) setItems(data || []);
     } catch (err) {
-      console.error("Failed to fetch library", err);
+      if (request === requestId.current) setLoadError(true);
     } finally {
-      setLoading(false);
+      if (request === requestId.current) setLoading(false);
     }
-  }, [isAuthenticated, activeTab]);
+  }, [user?.id, isAuthenticated, checkingAccount, activeTab]);
 
   useEffect(() => {
     fetchLibrary();
+    return () => { requestId.current++; };
   }, [fetchLibrary]);
 
   const handleStatusChange = async (webtoonId: number, newStatus: BookmarkStatus) => {
+    if (mutating.current) return;
+    const id = user?.id; mutating.current = true; setPending(webtoonId); setMutationError('');
     try {
       await libraryApi.updateBookmark(webtoonId, newStatus);
-      await fetchLibrary();
+      if (owner.current === id) setItems(previous => previous.map(item => item.webtoon.id === webtoonId ? { ...item, reading_status: newStatus } : item).filter(item => !activeTab || item.reading_status === activeTab));
     } catch (err) {
-      console.error("Failed to update status", err);
+      if (owner.current === id) setMutationError(getApiErrorMessage(err, t('readerFix.saveError')));
+    } finally {
+      mutating.current = false; setPending(null);
     }
   };
 
   const handleRemove = async (webtoonId: number) => {
     if (!window.confirm(t('library.confirmRemove'))) return;
+    if (mutating.current) return;
+    const id = user?.id; mutating.current = true; setPending(webtoonId); setMutationError('');
     try {
       await libraryApi.removeBookmark(webtoonId);
-      await fetchLibrary();
+      if (owner.current === id) setItems(previous => previous.filter(item => item.webtoon.id !== webtoonId));
     } catch (err) {
-      console.error("Failed to remove bookmark", err);
+      if (owner.current === id) setMutationError(getApiErrorMessage(err, t('readerFix.saveError')));
+    } finally {
+      mutating.current = false; setPending(null);
     }
   };
 
+  if (checkingAccount) return <div role="status" className="py-24 text-center text-studio-300">{t('readerFix.checking')}</div>;
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen py-24 flex flex-col items-center justify-center text-center px-4">
@@ -121,8 +144,9 @@ export const LibraryPage: React.FC = () => {
             return (
               <button
                 key={tab.value}
+                aria-pressed={isActive}
                 onClick={() => setActiveTab(tab.value)}
-                className={`flex items-center gap-1.5 px-4 py-2 rounded-2xl text-xs font-bold transition-all shrink-0 ${
+                className={`min-h-[44px] flex items-center gap-1.5 px-4 py-2 rounded-2xl text-sm font-bold transition-all shrink-0 ${
                   isActive
                     ? 'bg-brand-500 text-studio-950 shadow-glow-brand'
                     : 'bg-studio-900 border border-studio-800 text-studio-400 hover:text-white hover:border-studio-700'
@@ -136,12 +160,13 @@ export const LibraryPage: React.FC = () => {
         </div>
 
         {/* Content */}
+        {mutationError && <p role="alert" className="mb-4 text-rose-200">{mutationError}</p>}
         {loading ? (
           <div className="py-24 flex flex-col items-center justify-center text-studio-400 gap-3">
             <Loader2 className="w-8 h-8 animate-spin text-brand-500" />
             <span className="text-sm">{t('common.loading')}</span>
           </div>
-        ) : items.length === 0 ? (
+        ) : loadError ? <div role="alert" className="py-12 text-center text-rose-200"><p>{t('readerFix.loadError')}</p><button className="min-h-[44px] px-4 mt-3 bg-brand-500 text-studio-950 rounded-xl font-bold" onClick={fetchLibrary}>{t('common.retry')}</button></div> : items.length === 0 ? (
           <div className="py-20 text-center bg-studio-900/40 border border-studio-800 rounded-3xl p-8 max-w-md mx-auto">
             <BookOpen className="w-12 h-12 mx-auto text-studio-600 mb-3" />
             <h3 className="font-bold text-white text-base mb-1">
@@ -159,7 +184,7 @@ export const LibraryPage: React.FC = () => {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {items.map((item) => (
+            {items.map((item) => { const local = readPosition(item.webtoon.id, user?.id); const saved = local && (!item.reading_progress || Date.parse(local.updated_at || '') > Date.parse(item.reading_progress.updated_at || '')) ? local : item.reading_progress; const chapterId = saved?.chapter_id || item.webtoon.first_chapter?.id; return (
               <div
                 key={item.webtoon.id}
                 className="flex flex-col bg-studio-900 border border-studio-800 rounded-2xl p-3.5 hover:border-studio-700 transition-all group"
@@ -196,6 +221,8 @@ export const LibraryPage: React.FC = () => {
                       {/* Status selector */}
                       <div className="relative">
                         <select
+                          aria-label={`${t('common.status')}: ${item.webtoon.title}`}
+                          disabled={pending !== null}
                           value={item.reading_status}
                           onChange={(e) =>
                             handleStatusChange(
@@ -203,7 +230,7 @@ export const LibraryPage: React.FC = () => {
                               e.target.value as BookmarkStatus
                             )
                           }
-                          className="bg-studio-800 border border-studio-700 text-brand-400 text-[11px] font-bold rounded-lg px-2 py-1 pr-6 focus:outline-none appearance-none cursor-pointer"
+                          className="min-h-[44px] max-w-full bg-studio-800 border border-studio-700 text-brand-400 text-xs font-bold rounded-lg px-2 py-2 pr-6 focus:outline-none appearance-none cursor-pointer"
                         >
                           <option value="reading">📖 {t('library.tabReading')}</option>
                           <option value="plan_to_read">📌 {t('library.tabPlanned')}</option>
@@ -215,8 +242,10 @@ export const LibraryPage: React.FC = () => {
 
                       {/* Remove button */}
                       <button
+                        aria-label={`${t('details.removeBookmark')}: ${item.webtoon.title}`}
+                        disabled={pending !== null}
                         onClick={() => handleRemove(item.webtoon.id)}
-                        className="text-studio-500 hover:text-rose-400 p-1.5 rounded-lg hover:bg-studio-800 transition-colors"
+                        className="min-w-[44px] min-h-[44px] flex items-center justify-center text-studio-400 hover:text-rose-400 p-1.5 rounded-lg hover:bg-studio-800 transition-colors"
                         title={t('details.removeBookmark')}
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -227,14 +256,14 @@ export const LibraryPage: React.FC = () => {
 
                 {/* Read Button */}
                 <Link
-                  to={`/webtoons/${item.webtoon.slug || item.webtoon.id}`}
-                  className="mt-3 w-full py-1.5 rounded-xl bg-studio-800 hover:bg-brand-500 hover:text-studio-950 text-studio-200 text-xs font-bold transition-all text-center flex items-center justify-center gap-1.5"
+                  to={chapterId ? readerUrl(chapterId) : `/webtoons/${item.webtoon.slug || item.webtoon.id}`}
+                  className="mt-3 min-h-[44px] w-full py-2 rounded-xl bg-studio-800 hover:bg-brand-500 hover:text-studio-950 text-studio-200 text-sm font-bold transition-all text-center flex items-center justify-center gap-1.5"
                 >
                   <BookOpen className="w-3.5 h-3.5" />
-                  <span>{t('library.continueReading')}</span>
+                  <span>{t(saved ? 'library.continueReading' : chapterId ? 'details.startReading' : 'details.detailsTitle')}</span>
                 </Link>
               </div>
-            ))}
+            ); })}
           </div>
         )}
       </div>

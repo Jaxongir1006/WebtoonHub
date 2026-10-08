@@ -1,66 +1,65 @@
 <template>
-  <Modal
+  <Modal ref="draftDialog" :draft="form"
+    :busy="isSubmitting"
     :model-value="modelValue"
-    :title="isEdit ? 'Rolni Tahrirlash' : 'Yangi Dinamik Rol Yaratish'"
-    description="Tizimga yangi rol kiritish va unga ruxsatlar matritsasidan tegishli huquqlarni biriktirish"
+    :title="isEdit ? $t('staff.s048') : $t('staff.s049')"
+    :description="$t('staff.s050')"
     max-width="2xl"
     @update:model-value="$emit('update:modelValue', $event)"
   >
-    <form @submit.prevent="handleSubmit" class="space-y-4">
+    <form @submit.prevent="handleSubmit">
+      <fieldset :disabled="isSubmitting" class="space-y-4">
+      <p v-if="submitError" role="alert" class="text-sm text-rose-600 dark:text-rose-300">{{ submitError }}</p>
       <!-- Role Name -->
       <div>
-        <label class="block text-xs font-semibold text-studio-300 uppercase tracking-wider mb-1.5">
-          Rol Nomi (Identifier) *
-        </label>
+        <label for="RoleFormModal-field-1" class="block text-xs font-semibold text-slate-700 dark:text-studio-300 uppercase tracking-wider mb-1.5"> {{ $t('staff.s051') }} </label>
         <input
+          id="RoleFormModal-field-1"
           v-model="form.name"
           type="text"
           required
-          :disabled="isEdit && form.name === 'superadmin'"
-          placeholder="Masalan: tarjimon, kontent_moderator"
-          class="w-full px-3.5 py-2 text-sm bg-studio-900 border border-white/10 rounded-xl text-studio-100 font-mono focus:outline-none focus:border-brand-500/70 disabled:opacity-50"
+          :placeholder="$t('staff.s052')"
+          class="w-full px-3.5 py-2 text-sm bg-slate-100 dark:bg-studio-900 border border-slate-200 dark:border-white/10 rounded-xl text-slate-900 dark:text-studio-100 font-mono focus:outline-none focus:border-brand-500/70 disabled:opacity-50"
         />
+      </div>
+
+      <div class="rounded-xl border border-slate-200 p-3 text-xs dark:border-white/10">
+        <p class="font-semibold">{{ $t('studioFixes.scope') }}: {{ $t('studioFixes.' + (role?.scope || 'global')) }}</p>
+        <p class="mt-1 text-slate-500 dark:text-studio-400">{{ $t('studioFixes.scopeHelp') }}</p>
       </div>
 
       <!-- Description -->
       <div>
-        <label class="block text-xs font-semibold text-studio-300 uppercase tracking-wider mb-1.5">
-          Tavsif (Mas'uliyat sohasi)
-        </label>
+        <label for="RoleFormModal-field-2" class="block text-xs font-semibold text-slate-700 dark:text-studio-300 uppercase tracking-wider mb-1.5"> {{ $t('staff.s053') }} </label>
         <input
+          id="RoleFormModal-field-2"
           v-model="form.description"
           type="text"
-          placeholder="Xodim nimalarga javob berishi haqida qisqacha ma'lumot"
-          class="w-full px-3.5 py-2 text-sm bg-studio-900 border border-white/10 rounded-xl text-studio-100 focus:outline-none focus:border-brand-500/70"
+          :placeholder="$t('staff.s054')"
+          class="w-full px-3.5 py-2 text-sm bg-slate-100 dark:bg-studio-900 border border-slate-200 dark:border-white/10 rounded-xl text-slate-900 dark:text-studio-100 focus:outline-none focus:border-brand-500/70"
         />
       </div>
 
       <!-- Permissions Selection -->
       <div>
         <div class="flex items-center justify-between mb-2">
-          <label class="text-xs font-semibold text-studio-300 uppercase tracking-wider">
-            Biriktirilgan Ruxsatlar ({{ form.permission_ids.length }} ta)
-          </label>
+          <label class="text-xs font-semibold text-slate-700 dark:text-studio-300 uppercase tracking-wider"> {{ $t('staff.s055') }} {{ form.permission_ids.length }} {{ $t('staff.s056') }} </label>
           <div class="flex gap-2">
             <button
               type="button"
-              class="text-xs text-brand-400 hover:underline"
+              class="text-xs text-brand-700 dark:text-brand-400 hover:underline"
               @click="selectAll"
-            >
-              Barchasini tanlash
-            </button>
-            <span class="text-studio-500">|</span>
+            > {{ $t('staff.s057') }} </button>
+            <span class="text-slate-500 dark:text-studio-500">|</span>
             <button
               type="button"
-              class="text-xs text-studio-400 hover:text-white"
+              class="text-xs text-slate-500 dark:text-studio-400 hover:text-white"
               @click="deselectAll"
-            >
-              Tozalash
-            </button>
+            > {{ $t('staff.s058') }} </button>
           </div>
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-64 overflow-y-auto p-2 bg-studio-900/60 rounded-xl border border-white/5">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-64 overflow-y-auto p-2 bg-slate-100 dark:bg-studio-900/60 rounded-xl border border-slate-200 dark:border-white/5">
           <label
             v-for="perm in availablePermissions"
             :key="perm.id"
@@ -68,7 +67,7 @@
               'p-2.5 rounded-xl border flex items-start gap-2.5 cursor-pointer transition-all',
               form.permission_ids.includes(perm.id)
                 ? 'bg-brand-500/10 border-brand-500/30 text-white'
-                : 'bg-studio-850/50 border-white/5 text-studio-400 hover:border-white/10'
+                : 'bg-slate-100/50 dark:bg-studio-850/50 border-slate-300 dark:border-white/5 text-slate-600 dark:text-studio-400 hover:border-white/10'
             ]"
           >
             <input
@@ -82,7 +81,7 @@
               <span class="block text-xs font-mono font-bold text-brand-300">
                 {{ perm.code }}
               </span>
-              <span class="text-[11px] text-studio-400 leading-tight">
+              <span class="text-[11px] text-slate-500 dark:text-studio-400 leading-tight">
                 {{ perm.description }}
               </span>
             </div>
@@ -91,25 +90,27 @@
       </div>
 
       <!-- Actions -->
-      <div class="flex items-center justify-end gap-3 pt-3 border-t border-white/5">
-        <Button variant="ghost" size="sm" @click="$emit('update:modelValue', false)">
-          Bekor qilish
-        </Button>
+      <div class="flex items-center justify-end gap-3 pt-3 border-t border-slate-200 dark:border-white/5">
+        <Button variant="ghost" size="sm" :disabled="isSubmitting" @click="$refs.draftDialog.close()"> {{ $t('staff.s019') }} </Button>
         <Button type="submit" variant="primary" size="sm" :loading="isSubmitting">
-          {{ isEdit ? 'Yangilash' : 'Rolni Yaratish' }}
+          {{ isEdit ? $t('staff.s061') : $t('staff.s059') }}
         </Button>
       </div>
+
+      </fieldset>
     </form>
   </Modal>
 </template>
 
 <script setup>
 import { reactive, watch, ref, computed } from 'vue'
+import { getErrorMessage } from '../../utils/forms'
 import Modal from '../common/Modal.vue'
 import Button from '../common/Button.vue'
 
 const props = defineProps({
   modelValue: Boolean,
+  onSave: { type: Function, required: true },
   role: {
     type: Object,
     default: null
@@ -124,6 +125,7 @@ const emit = defineEmits(['update:modelValue', 'save'])
 
 const isEdit = ref(false)
 const isSubmitting = ref(false)
+const submitError = ref('')
 const availablePermissions = computed(() => props.permissions)
 
 const form = reactive({
@@ -133,8 +135,10 @@ const form = reactive({
 })
 
 watch(
-  () => props.role,
-  (val) => {
+  () => [props.role, props.modelValue],
+  ([val, open]) => {
+    if (!open) return
+    submitError.value = ''
     if (val) {
       isEdit.value = true
       form.name = val.name
@@ -144,7 +148,7 @@ watch(
       isEdit.value = false
       form.name = ''
       form.description = ''
-      form.permission_ids = [1, 3]
+      form.permission_ids = []
     }
   },
   { immediate: true }
@@ -152,7 +156,7 @@ watch(
 
 function togglePerm(id) {
   const idx = form.permission_ids.indexOf(id)
-  if (idx > -1) {
+  if (idx> -1) {
     form.permission_ids.splice(idx, 1)
   } else {
     form.permission_ids.push(id)
@@ -160,19 +164,24 @@ function togglePerm(id) {
 }
 
 function selectAll() {
-  form.permission_ids = availablePermissions.map((p) => p.id)
+  form.permission_ids = availablePermissions.value.map((p) => p.id)
 }
 
 function deselectAll() {
   form.permission_ids = []
 }
 
-function handleSubmit() {
+async function handleSubmit() {
+  if (isSubmitting.value) return
+  submitError.value = ''
   isSubmitting.value = true
-  setTimeout(() => {
-    emit('save', { ...form, id: props.role?.id })
-    isSubmitting.value = false
+  try {
+    await props.onSave({ ...form, id: props.role?.id })
     emit('update:modelValue', false)
-  }, 400)
+  } catch (error) {
+    submitError.value = getErrorMessage(error)
+  } finally {
+    isSubmitting.value = false
+  }
 }
 </script>

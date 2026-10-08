@@ -1,12 +1,12 @@
 from typing import List, Optional
 from fastapi import HTTPException, status
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.modules.library.models import Bookmark
 from app.modules.library.schemas import BookmarkItemResponse, WebtoonBookmarkInfo
-from app.modules.webtoons.models import Webtoon
+from app.modules.webtoons.models import Webtoon, Chapter
 
 
 class LibraryService:
@@ -28,11 +28,21 @@ class LibraryService:
         result = await db.execute(query)
         bookmarks = result.scalars().all()
 
+        from app.modules.library.progress import latest_progress_query, progress_data
+        progress_rows = (await db.execute(latest_progress_query(user_id, [b.webtoon_id for b in bookmarks]))).scalars().all()
+        progress = {row.webtoon_id: progress_data(row) for row in progress_rows}
+
+        first_rows = (select(Chapter.id.label('id'), Chapter.webtoon_id.label('work_id'),
+                    Chapter.chapter_number.label('chapter_number'), Chapter.created_at.label('created_at'),
+                    func.row_number().over(partition_by=Chapter.webtoon_id, order_by=(Chapter.chapter_number.asc(), Chapter.id.asc())).label('position'))
+                    .where(Chapter.webtoon_id.in_([bookmark.webtoon_id for bookmark in bookmarks]), Chapter.status == 'published').subquery())
+        first_chapters = {row.work_id: {'id': row.id, 'chapter_number': float(row.chapter_number), 'created_at': row.created_at}
+                         for row in (await db.execute(select(first_rows).where(first_rows.c.position == 1))).all()}
         return [
             BookmarkItemResponse(
-                webtoon=WebtoonBookmarkInfo.model_validate(b.webtoon),
+                webtoon=WebtoonBookmarkInfo(**WebtoonBookmarkInfo.model_validate(b.webtoon).model_dump(exclude={"first_chapter"}), first_chapter=first_chapters.get(b.webtoon_id)),
                 reading_status=b.status,
-                updated_at=b.updated_at
+                updated_at=b.updated_at, reading_progress=progress.get(b.webtoon_id)
             )
             for b in bookmarks
             if b.webtoon is not None

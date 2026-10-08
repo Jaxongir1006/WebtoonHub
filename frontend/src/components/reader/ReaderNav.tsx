@@ -1,178 +1,57 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ChapterReaderData } from '../../types';
 import { useLanguage } from '../../context/LanguageContext';
+import { Modal } from '../common/Modal';
 import { ChevronLeft, ChevronRight, Menu, Zap, ArrowLeft, Check } from 'lucide-react';
 
 interface ReaderNavProps {
   data: ChapterReaderData;
   visible: boolean;
-  progress: number; // 0 to 100
+  progress: number;
   allChapters?: { id: number; chapter_number: number; title?: string | null }[];
   onSelectChapter?: (id: number) => void;
+  onToggle: () => void;
 }
-
-export const ReaderNav: React.FC<ReaderNavProps> = ({
-  data,
-  visible,
-  progress,
-  allChapters = [],
-  onSelectChapter
-}) => {
+export const ReaderNav: React.FC<ReaderNavProps> = ({ data, visible, progress, allChapters = [], onSelectChapter, onToggle }) => {
   const navigate = useNavigate();
   const { t } = useLanguage();
-  const [drawerOpen, setDrawerOpen] = React.useState(false);
-
-  return (
-    <>
-      {/* Scroll Progress Bar at very top */}
-      <div className="fixed top-0 left-0 right-0 h-1 bg-studio-900 z-50 pointer-events-none">
-        <div
-          className="h-full bg-gradient-to-r from-brand-500 to-amber-300 shadow-glow-brand transition-all duration-150"
-          style={{ width: `${progress}%` }}
-        />
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const headerRef = useRef<HTMLElement>(null);
+  const footerRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (headerRef.current) headerRef.current.inert = !visible;
+    if (footerRef.current) footerRef.current.inert = !visible;
+  }, [visible]);
+  const reward = data.reward_coins ?? 5;
+  return <>
+    <div aria-hidden className="fixed top-0 inset-x-0 h-1 bg-studio-900 z-50 pointer-events-none"><div className="h-full bg-brand-500" style={{ width: Math.max(0, Math.min(100, progress)) + '%' }} /></div>
+    <header ref={headerRef} aria-hidden={!visible} className={'fixed top-0 inset-x-0 z-40 bg-studio-950/95 backdrop-blur-md border-b border-studio-800 transition-transform ' + (visible ? '' : '-translate-y-full')}>
+      <div className="max-w-4xl mx-auto px-3 h-16 flex items-center justify-between gap-2">
+        <div className="flex flex-1 min-w-0 items-center gap-2">
+          <Link to={'/webtoons/' + data.webtoon_id} aria-label={t('reader.backToManhwa')} className="min-h-11 min-w-11 flex items-center justify-center rounded-xl text-studio-300 hover:bg-studio-800"><ArrowLeft className="w-5 h-5" /></Link>
+          <div className="min-w-0"><div className="text-sm font-bold text-white truncate">{data.webtoon_title}</div><div className="text-xs text-brand-400 truncate">{t('reader.chapter', { number: data.chapter_number })}{data.title ? ' · ' + data.title : ''}</div></div>
+        </div>
+        {reward > 0 && <span className="hidden sm:flex text-xs text-brand-400 gap-1 shrink-0"><Zap className="w-4 h-4" />{t(data.is_reward_claimed ? 'reader.coinsClaimedPill' : 'reader.bonusPill', { coins: reward })}</span>}
+        <button aria-label={t('reader.chaptersList')} onClick={() => setDrawerOpen(true)} className="min-h-11 min-w-11 flex items-center justify-center rounded-xl bg-studio-900 text-studio-200"><Menu className="w-5 h-5" /></button>
+        <button aria-label={t('readerFix.hideControls')} onClick={onToggle} className="min-h-11 px-2 text-studio-300 text-sm">×</button>
       </div>
-
-      {/* Top Floating Header */}
-      <header
-        className={`fixed top-0 inset-x-0 z-40 bg-studio-950/95 backdrop-blur-md border-b border-studio-800/80 transition-transform duration-300 ${
-          visible ? 'translate-y-0' : '-translate-y-full'
-        }`}
-      >
-        <div className="max-w-4xl mx-auto px-4 h-14 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2 overflow-hidden">
-            <Link
-              to={`/webtoons/${data.webtoon_id}`}
-              className="p-1.5 rounded-lg text-studio-400 hover:text-white hover:bg-studio-800 transition-colors shrink-0"
-              title={t('reader.backToManhwa')}
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </Link>
-
-            <div className="flex flex-col truncate">
-              <span className="text-xs font-bold text-white truncate">
-                {data.webtoon_title}
-              </span>
-              <span className="text-[11px] text-brand-400 font-semibold truncate">
-                {t('reader.chapter', { number: data.chapter_number })} {data.title && `— ${data.title}`}
-              </span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 shrink-0">
-            {/* Reward status pill */}
-            <span
-              className={`px-2.5 py-1 rounded-full text-xs font-bold flex items-center gap-1 border ${
-                data.is_reward_claimed
-                  ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
-                  : 'bg-brand-500/10 text-brand-400 border-brand-500/30 shadow-glow-brand animate-pulse-subtle'
-              }`}
-            >
-              <Zap className="w-3.5 h-3.5 fill-current" />
-              <span>
-                {data.is_reward_claimed
-                  ? t('reader.coinsClaimedPill', { coins: 5 })
-                  : t('reader.bonusPill', { coins: 5 })}
-              </span>
-            </span>
-
-            {/* Chapter drawer toggle */}
-            {allChapters.length > 0 && (
-              <button
-                onClick={() => setDrawerOpen(true)}
-                className="p-2 rounded-xl bg-studio-900 border border-studio-800 text-studio-300 hover:text-white transition-colors"
-                title={t('reader.chaptersList')}
-              >
-                <Menu className="w-4 h-4" />
-              </button>
-            )}
-          </div>
-        </div>
-      </header>
-
-      {/* Bottom Floating Navigation Bar */}
-      <footer
-        className={`fixed bottom-0 inset-x-0 z-40 bg-studio-950/95 backdrop-blur-md border-t border-studio-800/80 transition-transform duration-300 ${
-          visible ? 'translate-y-0' : 'translate-y-full'
-        }`}
-      >
-        <div className="max-w-md mx-auto px-4 h-14 flex items-center justify-between gap-3">
-          {/* Previous Chapter */}
-          <button
-            disabled={!data.prev_chapter_id}
-            onClick={() => data.prev_chapter_id && navigate(`/chapters/${data.prev_chapter_id}`)}
-            className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-studio-900 border border-studio-800 text-studio-200 text-xs font-bold hover:bg-studio-800 hover:text-white transition-colors disabled:opacity-30 disabled:pointer-events-none"
-          >
-            <ChevronLeft className="w-4 h-4" />
-            <span>{t('reader.prevChapter')}</span>
-          </button>
-
-          {/* Progress Percent */}
-          <div className="px-3 py-1 rounded-lg bg-studio-900 border border-studio-800 text-xs font-mono font-bold text-studio-300">
-            {Math.round(progress)}%
-          </div>
-
-          {/* Next Chapter */}
-          <button
-            disabled={!data.next_chapter_id}
-            onClick={() => data.next_chapter_id && navigate(`/chapters/${data.next_chapter_id}`)}
-            className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-brand-500 text-studio-950 text-xs font-bold hover:bg-brand-400 transition-colors shadow-glow-brand disabled:opacity-30 disabled:pointer-events-none"
-          >
-            <span>{t('reader.nextChapter')}</span>
-            <ChevronRight className="w-4 h-4" />
-          </button>
-        </div>
-      </footer>
-
-      {/* Chapter Selector Drawer */}
-      {drawerOpen && (
-        <div className="fixed inset-0 z-50 flex justify-end">
-          <div
-            className="fixed inset-0 bg-black/70 backdrop-blur-sm animate-in fade-in"
-            onClick={() => setDrawerOpen(false)}
-          />
-          <div className="relative w-80 max-w-full bg-studio-900 border-l border-studio-800 h-full p-5 flex flex-col z-10 animate-in slide-in-from-right duration-200">
-            <div className="flex items-center justify-between pb-4 border-b border-studio-800 mb-3">
-              <h3 className="font-bold text-white text-base">{t('reader.chaptersList')}</h3>
-              <button
-                onClick={() => setDrawerOpen(false)}
-                className="text-studio-400 hover:text-white p-1 rounded-lg hover:bg-studio-800"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="overflow-y-auto space-y-1 pr-1 flex-1">
-              {allChapters.map((ch) => {
-                const isCurrent = ch.id === data.id;
-                return (
-                  <button
-                    key={ch.id}
-                    onClick={() => {
-                      setDrawerOpen(false);
-                      if (onSelectChapter) {
-                        onSelectChapter(ch.id);
-                      } else {
-                        navigate(`/chapters/${ch.id}`);
-                      }
-                    }}
-                    className={`w-full text-left px-3.5 py-2.5 rounded-xl text-sm font-semibold flex items-center justify-between transition-colors ${
-                      isCurrent
-                        ? 'bg-brand-500 text-studio-950 font-bold shadow-glow-brand'
-                        : 'text-studio-200 hover:bg-studio-800 hover:text-white'
-                    }`}
-                  >
-                    <span>
-                      {t('reader.chapter', { number: ch.chapter_number })} {ch.title && `— ${ch.title}`}
-                    </span>
-                    {isCurrent && <Check className="w-4 h-4 shrink-0" />}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
-    </>
-  );
+    </header>
+    {!visible && <button aria-label={t('readerFix.showControls')} onClick={onToggle} className="fixed top-3 right-3 z-40 rounded-xl min-h-11 px-3 bg-studio-900 border border-studio-700 text-white"><Menu className="w-5 h-5" /></button>}
+    <footer ref={footerRef} aria-hidden={!visible} className={'fixed bottom-0 inset-x-0 z-40 bg-studio-950/95 border-t border-studio-800 transition-transform ' + (visible ? '' : 'translate-y-full')}>
+      <nav className="max-w-lg mx-auto px-3 h-16 flex items-center gap-2">
+        <button disabled={!data.prev_chapter_id} onClick={() => navigate('/chapters/' + data.prev_chapter_id)} className="flex-1 flex justify-center items-center gap-1 min-h-11 px-2 bg-studio-900 text-white text-xs rounded-xl disabled:opacity-30"><ChevronLeft className="w-4 h-4" />{t('reader.prevChapter')}</button>
+        <span className="text-xs text-studio-300 tabular-nums">{Math.round(progress)}%</span>
+        <button disabled={!data.next_chapter_id} onClick={() => navigate('/chapters/' + data.next_chapter_id)} className="flex-1 flex justify-center items-center gap-1 min-h-11 px-2 bg-brand-500 text-studio-950 text-xs rounded-xl disabled:opacity-30">{t('reader.nextChapter')}<ChevronRight className="w-4 h-4" /></button>
+      </nav>
+    </footer>
+    <Modal isOpen={drawerOpen} onClose={() => setDrawerOpen(false)} title={t('reader.chaptersList')}>
+      <div className="space-y-1">
+        {allChapters.length === 0 && <p role="status" className="py-4 text-studio-300">{t('common.loading')}</p>}
+        {allChapters.map(chapter => <button key={chapter.id} aria-current={chapter.id === data.id ? 'page' : undefined} onClick={() => { setDrawerOpen(false); if (onSelectChapter) onSelectChapter(chapter.id); else navigate('/chapters/' + chapter.id); }} className={'w-full text-left flex justify-between items-center gap-2 min-h-11 p-3 rounded-xl text-sm ' + (chapter.id === data.id ? 'bg-brand-500 text-studio-950 font-bold' : 'text-studio-200 hover:bg-studio-800')}>
+          <span>{t('reader.chapter', { number: chapter.chapter_number })}{chapter.title ? ' · ' + chapter.title : ''}</span>{chapter.id === data.id && <Check className="w-4 h-4 shrink-0" />}
+        </button>)}
+      </div>
+    </Modal>
+  </>;
 };

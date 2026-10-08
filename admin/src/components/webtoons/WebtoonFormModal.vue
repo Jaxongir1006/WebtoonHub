@@ -1,129 +1,124 @@
 <template>
-  <Modal
+  <Modal ref="draftDialog" :draft="form"
+    :busy="isSubmitting"
     :model-value="modelValue"
-    :title="isEdit ? 'Loyiha Ma\'lumotlarini Tahrirlash' : 'Yangi Loyiha Qo\'shish'"
-    description="Format turi (Manhwa/Manga/Novel), asosiy ma'lumotlar va muqova rasmini kiriting"
+    :title="isEdit ? $t('staff.s215') : $t('staff.s216')"
+    :description="$t('staff.s217')"
     max-width="2xl"
     @update:model-value="$emit('update:modelValue', $event)"
   >
-    <form @submit.prevent="handleSubmit" class="space-y-4">
+    <form @submit.prevent="handleSubmit">
+      <fieldset :disabled="isSubmitting" class="space-y-4">
+      <p v-if="submitError" role="alert" class="text-sm text-rose-600 dark:text-rose-300">{{ submitError }}</p>
       <!-- Content Format / Type -->
-      <div>
-        <label class="block text-xs font-semibold text-studio-300 uppercase tracking-wider mb-2">
-          Format (Turi) *
-        </label>
+      <div role="group" aria-labelledby="webtoon-format-label">
+        <p id="webtoon-format-label" class="block text-xs font-semibold text-slate-700 dark:text-studio-300 uppercase tracking-wider mb-2"> {{ $t('staff.s218') }} </p>
         <div class="grid grid-cols-3 gap-3">
           <button
             type="button"
+            :aria-pressed="form.type === 'manhwa'"
             :class="[
               'p-3 rounded-xl border text-left transition-all flex flex-col justify-between gap-1',
               form.type === 'manhwa'
-                ? 'border-indigo-500/80 bg-indigo-500/15 text-white shadow-sm ring-1 ring-indigo-500/50'
-                : 'border-white/10 bg-studio-900/60 text-studio-400 hover:border-white/20 hover:text-studio-200'
+                ? 'border-indigo-500/80 bg-indigo-500/15 text-indigo-900 dark:text-white shadow-sm ring-1 ring-indigo-500/50'
+                : 'border-slate-300 dark:border-white/10 bg-slate-100/60 dark:bg-studio-900/60 text-slate-600 dark:text-studio-400 hover:border-white/20 hover:text-slate-900 dark:hover:text-studio-200'
             ]"
             @click="form.type = 'manhwa'"
           >
             <div class="flex items-center gap-1.5 font-bold text-xs">
-              <span>📱</span> Manhwa
-            </div>
-            <p class="text-[10px] text-studio-400">Vertikal skroll</p>
+              <span>📱</span> {{ $t('staff.s219') }} </div>
+            <p class="text-[10px] text-slate-500 dark:text-studio-400"> {{ $t('staff.s220') }} </p>
           </button>
 
           <button
             type="button"
+            :aria-pressed="form.type === 'manga'"
             :class="[
               'p-3 rounded-xl border text-left transition-all flex flex-col justify-between gap-1',
               form.type === 'manga'
-                ? 'border-rose-500/80 bg-rose-500/15 text-white shadow-sm ring-1 ring-rose-500/50'
-                : 'border-white/10 bg-studio-900/60 text-studio-400 hover:border-white/20 hover:text-studio-200'
+                ? 'border-rose-500/80 bg-rose-500/15 text-rose-900 dark:text-white shadow-sm ring-1 ring-rose-500/50'
+                : 'border-slate-300 dark:border-white/10 bg-slate-100/60 dark:bg-studio-900/60 text-slate-600 dark:text-studio-400 hover:border-white/20 hover:text-slate-900 dark:hover:text-studio-200'
             ]"
             @click="form.type = 'manga'"
           >
             <div class="flex items-center gap-1.5 font-bold text-xs">
-              <span>📖</span> Manga
-            </div>
-            <p class="text-[10px] text-studio-400">RTL sahifali</p>
+              <span>📖</span> {{ $t('staff.s221') }} </div>
+            <p class="text-[10px] text-slate-500 dark:text-studio-400"> {{ $t('staff.s222') }} </p>
           </button>
 
           <button
             type="button"
+            :aria-pressed="form.type === 'novel'"
             :class="[
               'p-3 rounded-xl border text-left transition-all flex flex-col justify-between gap-1',
               form.type === 'novel'
-                ? 'border-emerald-500/80 bg-emerald-500/15 text-white shadow-sm ring-1 ring-emerald-500/50'
-                : 'border-white/10 bg-studio-900/60 text-studio-400 hover:border-white/20 hover:text-studio-200'
+                ? 'border-emerald-500/80 bg-emerald-500/15 text-emerald-900 dark:text-white shadow-sm ring-1 ring-emerald-500/50'
+                : 'border-slate-300 dark:border-white/10 bg-slate-100/60 dark:bg-studio-900/60 text-slate-600 dark:text-studio-400 hover:border-white/20 hover:text-slate-900 dark:hover:text-studio-200'
             ]"
             @click="form.type = 'novel'"
           >
             <div class="flex items-center gap-1.5 font-bold text-xs">
-              <span>📜</span> Novel
-            </div>
-            <p class="text-[10px] text-studio-400">Ranobe matni</p>
+              <span>📜</span> {{ $t('staff.s223') }} </div>
+            <p class="text-[10px] text-slate-500 dark:text-studio-400"> {{ $t('staff.s224') }} </p>
           </button>
         </div>
       </div>
 
       <!-- Title -->
       <div>
-        <label class="block text-xs font-semibold text-studio-300 uppercase tracking-wider mb-1.5">
-          Loyiha Nomi *
-        </label>
+        <label for="WebtoonFormModal-field-1" class="block text-xs font-semibold text-slate-700 dark:text-studio-300 uppercase tracking-wider mb-1.5"> {{ $t('staff.s225') }} </label>
         <input
+          id="WebtoonFormModal-field-1"
           v-model="form.title"
           type="text"
           required
-          placeholder="Masalan: Yakkaxon Ko'tarilish (Solo Leveling)"
-          class="w-full px-3.5 py-2 text-sm bg-studio-900 border border-white/10 rounded-xl text-studio-100 focus:outline-none focus:border-brand-500/70 focus:ring-1 focus:ring-brand-500/50"
+          :placeholder="$t('staff.s226')"
+          class="w-full px-3.5 py-2 text-sm bg-slate-100 dark:bg-studio-900 border border-slate-200 dark:border-white/10 rounded-xl text-slate-900 dark:text-studio-100 focus:outline-none focus:border-brand-500/70 focus:ring-1 focus:ring-brand-500/50"
         />
       </div>
 
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <!-- Author Name -->
         <div>
-          <label class="block text-xs font-semibold text-studio-300 uppercase tracking-wider mb-1.5">
-            Asl Muallif (Author / Artist)
-          </label>
+          <label for="WebtoonFormModal-field-2" class="block text-xs font-semibold text-slate-700 dark:text-studio-300 uppercase tracking-wider mb-1.5"> {{ $t('staff.s227') }} </label>
           <input
+            id="WebtoonFormModal-field-2"
             v-model="form.author_name"
             type="text"
-            placeholder="Masalan: Chugong / DUBU"
-            class="w-full px-3.5 py-2 text-sm bg-studio-900 border border-white/10 rounded-xl text-studio-100 focus:outline-none focus:border-brand-500/70"
+            :placeholder="$t('staff.s228')"
+            class="w-full px-3.5 py-2 text-sm bg-slate-100 dark:bg-studio-900 border border-slate-200 dark:border-white/10 rounded-xl text-slate-900 dark:text-studio-100 focus:outline-none focus:border-brand-500/70"
           />
         </div>
 
         <!-- Status -->
         <div>
-          <label class="block text-xs font-semibold text-studio-300 uppercase tracking-wider mb-1.5">
-            Chiqarilish Holati *
-          </label>
+          <label for="WebtoonFormModal-field-3" class="block text-xs font-semibold text-slate-700 dark:text-studio-300 uppercase tracking-wider mb-1.5"> {{ $t('staff.s229') }} </label>
           <select
+            id="WebtoonFormModal-field-3"
             v-model="form.status"
-            class="w-full px-3.5 py-2 text-sm bg-studio-900 border border-white/10 rounded-xl text-studio-100 focus:outline-none focus:border-brand-500/70"
+            class="w-full px-3.5 py-2 text-sm bg-slate-100 dark:bg-studio-900 border border-slate-200 dark:border-white/10 rounded-xl text-slate-900 dark:text-studio-100 focus:outline-none focus:border-brand-500/70"
           >
-            <option value="ongoing">Davom etmoqda (Ongoing)</option>
-            <option value="completed">Tugallangan (Completed)</option>
+            <option value="ongoing"> {{ $t('staff.s230') }} </option>
+            <option value="completed"> {{ $t('staff.s231') }} </option>
           </select>
         </div>
       </div>
 
       <!-- Genres Multi-Select -->
-      <div>
-        <label class="block text-xs font-semibold text-studio-300 uppercase tracking-wider mb-1.5">
-          Janrlar (Bir nechta tanlang)
-        </label>
-        <div class="flex flex-wrap gap-2 p-3 bg-studio-900/50 rounded-xl border border-white/5">
-          <p v-if="availableGenres.length === 0" class="text-xs text-studio-400">
-            Avval «Janrlar» bo'limida janr yarating.
-          </p>
+      <div role="group" aria-labelledby="webtoon-genres-label">
+        <p id="webtoon-genres-label" class="block text-xs font-semibold text-slate-700 dark:text-studio-300 uppercase tracking-wider mb-1.5"> {{ $t('staff.s232') }} </p>
+        <div class="flex flex-wrap gap-2 p-3 bg-slate-100 dark:bg-studio-900/50 rounded-xl border border-slate-200 dark:border-white/5">
+          <p v-if="availableGenres.length === 0" class="text-xs text-slate-500 dark:text-studio-400"> {{ $t('staff.s233') }} </p>
           <button
             v-for="genre in availableGenres"
             :key="genre.id"
             type="button"
+            :aria-pressed="form.genre_ids.includes(genre.id)"
             :class="[
               'px-2.5 py-1 rounded-lg text-xs font-medium transition-all',
               form.genre_ids.includes(genre.id)
                 ? 'bg-brand-500 text-slate-950 font-semibold shadow-sm'
-                : 'bg-studio-800 text-studio-300 hover:text-white hover:bg-studio-700'
+                : 'bg-slate-100 dark:bg-studio-800 text-slate-700 dark:text-studio-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-studio-700'
             ]"
             @click="toggleGenre(genre.id)"
           >
@@ -134,99 +129,93 @@
 
       <!-- Description -->
       <div>
-        <label class="block text-xs font-semibold text-studio-300 uppercase tracking-wider mb-1.5">
-          Tavsif (Sinopsis)
-        </label>
+        <label for="WebtoonFormModal-field-4" class="block text-xs font-semibold text-slate-700 dark:text-studio-300 uppercase tracking-wider mb-1.5"> {{ $t('staff.s234') }} </label>
         <textarea
+          id="WebtoonFormModal-field-4"
           v-model="form.description"
           rows="3"
-          placeholder="Komiks syujeti haqida qisqacha ma'lumot..."
-          class="w-full px-3.5 py-2 text-sm bg-studio-900 border border-white/10 rounded-xl text-studio-100 focus:outline-none focus:border-brand-500/70"
+          :placeholder="$t('staff.s235')"
+          class="w-full px-3.5 py-2 text-sm bg-slate-100 dark:bg-studio-900 border border-slate-200 dark:border-white/10 rounded-xl text-slate-900 dark:text-studio-100 focus:outline-none focus:border-brand-500/70"
         />
       </div>
 
       <!-- Cover Image Upload & Preview -->
       <div>
-        <label class="block text-xs font-semibold text-studio-300 uppercase tracking-wider mb-1.5">
-          Muqova Rasmi (Cover Image)
-        </label>
+        <label for="WebtoonFormModal-label-6757" class="block text-xs font-semibold text-slate-700 dark:text-studio-300 uppercase tracking-wider mb-1.5"> {{ $t('staff.s236') }} </label>
         <div class="flex items-start gap-4">
           <!-- Thumbnail preview -->
-          <div class="w-24 h-32 rounded-xl bg-studio-900 border border-white/10 overflow-hidden shrink-0 flex items-center justify-center relative">
+          <div class="w-24 h-32 rounded-xl bg-slate-100 dark:bg-studio-900 border border-slate-200 dark:border-white/10 overflow-hidden shrink-0 flex items-center justify-center relative">
             <img
               v-if="form.cover_image_url"
               :src="form.cover_image_url"
-              alt="Cover preview"
+              :alt="$t('staff.s237')"
               class="w-full h-full object-cover"
             />
-            <div v-else class="text-center p-2 text-studio-400 text-[10px]">
-              Muqova yo'q
-            </div>
+            <div v-else class="text-center p-2 text-slate-500 dark:text-studio-400 text-[10px]"> {{ $t('staff.s238') }} </div>
           </div>
 
           <div class="flex-1 space-y-2">
             <div
-              class="border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-colors border-white/15 hover:border-brand-500/50 bg-studio-950/60"
+              class="border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-colors border-slate-200 dark:border-white/15 hover:border-brand-500/50 bg-slate-100 dark:bg-studio-950/60"
               @click="$refs.coverFileInput.click()"
             >
-              <input
+              <input id="WebtoonFormModal-label-6757"
                 ref="coverFileInput"
                 type="file"
-                accept="image/*"
+                accept="image/jpeg,image/png,image/webp,image/gif"
                 class="hidden"
                 @change="handleFileUpload"
               />
               <div class="flex flex-col items-center justify-center gap-1.5">
-                <svg class="w-6 h-6 text-brand-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg class="w-6 h-6 text-brand-700 dark:text-brand-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
-                <span class="text-xs font-semibold text-studio-200">
-                  {{ form.cover_image_file ? form.cover_image_file.name : "Kompyuterdan muqova rasmini tanlang" }}
+                <span class="text-xs font-semibold text-slate-800 dark:text-studio-200">
+                  {{ form.cover_image_file ? form.cover_image_file.name : $t('staff.s239') }}
                 </span>
-                <span class="text-[11px] text-studio-400">
-                  JPG, PNG, WebP formatlar (Maksimal: 5MB)
-                </span>
+                <span class="text-[11px] text-slate-500 dark:text-studio-400"> {{ $t('staff.s240') }} </span>
               </div>
             </div>
-            <div v-if="form.cover_image_url" class="flex items-center justify-between text-xs text-studio-400">
-              <span class="text-emerald-400 font-semibold flex items-center gap-1">
-                ✓ Muqova yuklandi
-              </span>
+            <div v-if="form.cover_image_url" class="flex items-center justify-between text-xs text-slate-500 dark:text-studio-400">
+              <span class="text-emerald-700 dark:text-emerald-400 font-semibold flex items-center gap-1"> {{ $t('staff.s241') }} </span>
               <button
                 type="button"
-                class="text-rose-400 hover:text-rose-300 font-semibold"
+                class="text-rose-700 dark:text-rose-400 hover:text-rose-300 font-semibold"
                 @click="form.cover_image_url = ''; form.cover_image_file = null"
-              >
-                O'chirish
-              </button>
+              > {{ $t('staff.s132') }} </button>
             </div>
           </div>
         </div>
       </div>
 
-      <p v-if="formError" class="text-xs text-rose-400">{{ formError }}</p>
+      <p v-if="formError" class="text-xs text-rose-700 dark:text-rose-400">{{ formError }}</p>
 
       <!-- Action Buttons -->
-      <div class="flex items-center justify-end gap-3 pt-4 border-t border-white/5">
-        <Button variant="ghost" size="sm" @click="$emit('update:modelValue', false)">
-          Bekor qilish
-        </Button>
+      <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-200 dark:border-white/5">
+        <Button variant="ghost" size="sm" :disabled="isSubmitting" @click="$refs.draftDialog.close()"> {{ $t('staff.s019') }} </Button>
         <Button type="submit" variant="primary" size="sm" :loading="isSubmitting">
-          {{ isEdit ? 'Saqlash' : 'Yaratish' }}
+          {{ isEdit ? $t('staff.s077') : $t('staff.s242') }}
         </Button>
       </div>
+
+      </fieldset>
     </form>
   </Modal>
 </template>
 
 <script setup>
+import i18n from '../../i18n/index.js'
+const tr = (...args) => i18n.global.t(...args)
+
 import { reactive, watch, ref, computed, onMounted } from 'vue'
+import { getErrorMessage } from '../../utils/forms'
 import Modal from '../common/Modal.vue'
 import Button from '../common/Button.vue'
 import { webtoonsApi } from '../../api/webtoons'
 
 const props = defineProps({
   modelValue: Boolean,
+  onSave: { type: Function, required: true },
   webtoon: {
     type: Object,
     default: null
@@ -241,22 +230,26 @@ const emit = defineEmits(['update:modelValue', 'save'])
 
 const isEdit = ref(false)
 const isSubmitting = ref(false)
+const submitError = ref('')
 const formError = ref('')
 const loadedGenres = ref([])
 
-onMounted(async () => {
-  if (!props.genres || props.genres.length === 0) {
+watch(() => props.modelValue, async open => {
+  if (!open) return
+  submitError.value = ''
+
+  if (!props.genres?.length) {
     try {
       const res = await webtoonsApi.getGenres()
       loadedGenres.value = res.data || []
     } catch (e) {
-      console.error(e)
+      submitError.value = getErrorMessage(e)
     }
   }
 })
 
 const availableGenres = computed(() => {
-  if (props.genres && props.genres.length > 0) return props.genres
+  if (props.genres && props.genres.length> 0) return props.genres
   return loadedGenres.value
 })
 
@@ -272,8 +265,10 @@ const form = reactive({
 })
 
 watch(
-  () => props.webtoon,
-  (val) => {
+  () => [props.webtoon, props.modelValue],
+  ([val, open]) => {
+    if (!open) return
+    submitError.value = ''
     formError.value = ''
     if (val) {
       isEdit.value = true
@@ -302,10 +297,8 @@ watch(
 
 function toggleGenre(id) {
   const index = form.genre_ids.indexOf(id)
-  if (index > -1) {
-    if (form.genre_ids.length > 1) {
-      form.genre_ids.splice(index, 1)
-    }
+  if (index> -1) {
+    form.genre_ids.splice(index, 1)
   } else {
     form.genre_ids.push(id)
   }
@@ -314,6 +307,7 @@ function toggleGenre(id) {
 function handleFileUpload(e) {
   const file = e.target.files[0]
   if (file) {
+    if (!['image/jpeg','image/png','image/webp','image/gif'].includes(file.type) || file.size> 20 * 1024 * 1024) { formError.value = tr('staff.s135'); return }
     form.cover_image_file = file
     const reader = new FileReader()
     reader.onload = (event) => {
@@ -323,17 +317,22 @@ function handleFileUpload(e) {
   }
 }
 
-function handleSubmit() {
+async function handleSubmit() {
+  if (isSubmitting.value) return
+  submitError.value = ''
   formError.value = ''
   if (!isEdit.value && !form.cover_image_file) {
-    formError.value = 'Haqiqiy muqova rasmini tanlang.'
+    formError.value = tr('staff.s243')
     return
   }
   isSubmitting.value = true
-  setTimeout(() => {
-    emit('save', { ...form, id: props.webtoon?.id })
-    isSubmitting.value = false
+  try {
+    await props.onSave({ ...form, id: props.webtoon?.id })
     emit('update:modelValue', false)
-  }, 400)
+  } catch (error) {
+    submitError.value = getErrorMessage(error)
+  } finally {
+    isSubmitting.value = false
+  }
 }
 </script>

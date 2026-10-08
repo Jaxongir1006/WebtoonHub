@@ -35,7 +35,7 @@ export const WebtoonCard: React.FC<WebtoonCardProps> = ({ webtoon, className = '
 
         {/* Top Badges */}
         <div className="absolute top-2.5 inset-x-2.5 flex items-center justify-between pointer-events-none">
-          <div className="flex items-center gap-1.5">
+          <div className="flex flex-wrap items-center gap-1.5">
             <span
               className={`px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wide uppercase ${
                 isOngoing
@@ -76,7 +76,7 @@ export const WebtoonCard: React.FC<WebtoonCardProps> = ({ webtoon, className = '
             </span>
           ) : (
             <span className="px-2 py-0.5 rounded-lg bg-studio-800/80 backdrop-blur-sm text-studio-400 text-[10px]">
-              Coming soon
+              {t('ux.comingSoon')}
             </span>
           )}
         </div>
@@ -100,7 +100,7 @@ export const WebtoonCard: React.FC<WebtoonCardProps> = ({ webtoon, className = '
           )}
 
           {/* Title */}
-          <h3 className="font-bold text-sm text-white line-clamp-1 group-hover:text-brand-400 transition-colors">
+          <h3 title={webtoon.title} className="font-bold text-sm text-white line-clamp-2 min-h-[2.5rem] group-hover:text-brand-400 transition-colors">
             {webtoon.title}
           </h3>
 

@@ -1,9 +1,20 @@
 import { apiClient } from './client';
 import { ApiResponse, ClanDetail, ClanMemberItem, ClanMessageItem, ClanSummary } from '../types';
 
+type ClanListResponse = ApiResponse<ClanSummary[]> & { pagination?: { offset: number; limit: number; total: number; has_more: boolean } };
+
 export const clansApi = {
-  getClans: async (params?: { q?: string; sort?: string }): Promise<ApiResponse<ClanSummary[]>> => {
-    const response = await apiClient.get<ApiResponse<ClanSummary[]>>('/clans', { params });
+  getSettings: async (): Promise<ApiResponse<{ clan_creation_cost: number; levels: unknown[] }>> => {
+    const response = await apiClient.get('/clans/settings');
+    return response.data;
+  },
+
+  transferLeadership: async (clanId: number, userId: number): Promise<ApiResponse<any>> => {
+    const response = await apiClient.patch(`/clans/${clanId}/members/${userId}/role`, { role: 'leader' });
+    return response.data;
+  },
+  getClans: async (params?: { q?: string; sort?: string; offset?: number; limit?: number }): Promise<ClanListResponse> => {
+    const response = await apiClient.get<ClanListResponse>('/clans', { params });
     return response.data;
   },
 
@@ -24,8 +35,9 @@ export const clansApi = {
     avatar_url?: string;
     frame_url?: string;
     banner_url?: string;
-  }): Promise<ApiResponse<{ id: number; name: string; tag: string }>> => {
-    const response = await apiClient.post<ApiResponse<{ id: number; name: string; tag: string }>>('/clans', data);
+    expected_cost: number;
+  }): Promise<ApiResponse<{ id: number; name: string; tag: string; remaining_coins?: number }>> => {
+    const response = await apiClient.post<ApiResponse<{ id: number; name: string; tag: string; remaining_coins?: number }>>('/clans', data);
     return response.data;
   },
 
@@ -53,10 +65,10 @@ export const clansApi = {
   },
 
   upgradeClanLevel: async (
-    clanId: number
-  ): Promise<ApiResponse<{ level: number; xp: number; max_members: number }>> => {
-    const response = await apiClient.post<ApiResponse<{ level: number; xp: number; max_members: number }>>(
-      `/clans/${clanId}/upgrade-level`
+    clanId: number, expectedCost: number
+  ): Promise<ApiResponse<{ level: number; xp: number; max_members: number; remaining_coins: number }>> => {
+    const response = await apiClient.post<ApiResponse<{ level: number; xp: number; max_members: number; remaining_coins: number }>>(
+      `/clans/${clanId}/upgrade-level`, { expected_cost: expectedCost }
     );
     return response.data;
   },
@@ -66,16 +78,17 @@ export const clansApi = {
     return response.data;
   },
 
-  getClanMessages: async (clanId: number, limit = 50): Promise<ApiResponse<ClanMessageItem[]>> => {
+  getClanMessages: async (clanId: number, limit = 50, beforeId?: number, afterId?: number): Promise<ApiResponse<ClanMessageItem[]> & { has_more?: boolean; next_after_id?: number; pagination?: { has_more: boolean } }> => {
     const response = await apiClient.get<ApiResponse<ClanMessageItem[]>>(`/clans/${clanId}/chat/messages`, {
-      params: { limit },
+      params: { limit, before_id: beforeId, after_id: afterId },
     });
     return response.data;
   },
 
-  sendClanMessage: async (clanId: number, content: string): Promise<ApiResponse<ClanMessageItem>> => {
+  sendClanMessage: async (clanId: number, content: string, clientMessageId?: string): Promise<ApiResponse<ClanMessageItem>> => {
     const response = await apiClient.post<ApiResponse<ClanMessageItem>>(`/clans/${clanId}/chat/send`, {
       content,
+      client_message_id: clientMessageId,
     });
     return response.data;
   },
@@ -83,7 +96,7 @@ export const clansApi = {
   uploadClanAvatar: async (clanId: number, file: File): Promise<ApiResponse<{ avatar_url: string }>> => {
     const formData = new FormData();
     formData.append('file', file);
-    const response = await apiClient.post<ApiResponse<{ avatar_url: string }>>(`/clans/${clanId}/upload-avatar`, formData, {
+    const response = await apiClient.post<ApiResponse<{ avatar_url: string }>>('/clans/uploads/avatar', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
     return response.data;
@@ -92,7 +105,7 @@ export const clansApi = {
   uploadClanBanner: async (clanId: number, file: File): Promise<ApiResponse<{ banner_url: string }>> => {
     const formData = new FormData();
     formData.append('file', file);
-    const response = await apiClient.post<ApiResponse<{ banner_url: string }>>(`/clans/${clanId}/upload-banner`, formData, {
+    const response = await apiClient.post<ApiResponse<{ banner_url: string }>>('/clans/uploads/banner', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
     return response.data;
@@ -101,7 +114,7 @@ export const clansApi = {
   uploadClanFrame: async (clanId: number, file: File): Promise<ApiResponse<{ frame_url: string }>> => {
     const formData = new FormData();
     formData.append('file', file);
-    const response = await apiClient.post<ApiResponse<{ frame_url: string }>>(`/clans/${clanId}/upload-frame`, formData, {
+    const response = await apiClient.post<ApiResponse<{ frame_url: string }>>('/clans/uploads/frame', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
     return response.data;

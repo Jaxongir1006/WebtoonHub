@@ -25,8 +25,8 @@ import {
 } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
-  const { user, isAuthenticated, logout, openAuthModal } = useAuth();
-  const { openModal: openDailyBonusModal, isClaimedToday } = useDailyBonus();
+  const { user, isAuthenticated, isLoading, profileError, refreshProfile, logout, openAuthModal } = useAuth();
+  const { openModal: openDailyBonusModal, isClaimedToday, rewardAmount } = useDailyBonus();
   const { t } = useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
@@ -44,14 +44,16 @@ export const Navbar: React.FC = () => {
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    const escape = (event: KeyboardEvent) => { if (event.key === 'Escape') { setMobileMenuOpen(false); setUserDropdownOpen(false); } };
+    document.addEventListener('keydown', escape);
+    return () => { document.removeEventListener('mousedown', handleClickOutside); document.removeEventListener('keydown', escape); };
   }, []);
 
   // Close mobile menu on route change
   useEffect(() => {
     setMobileMenuOpen(false);
     setUserDropdownOpen(false);
-  }, [location.pathname]);
+  }, [location.pathname, location.search]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -89,13 +91,14 @@ export const Navbar: React.FC = () => {
           </Link>
 
           {/* Desktop Navigation Links */}
-          <nav className="hidden lg:flex items-center gap-1">
+          <nav className="hidden xl:flex items-center gap-1 shrink-0">
             {navLinks.map((link) => {
               const isActive = location.pathname === link.path;
               return (
                 <Link
                   key={link.path}
                   to={link.path}
+                  aria-current={isActive ? 'page' : undefined}
                   className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-1.5 relative ${
                     isActive
                       ? 'text-brand-400 bg-brand-500/10'
@@ -117,18 +120,20 @@ export const Navbar: React.FC = () => {
           {/* Search bar */}
           <form
             onSubmit={handleSearchSubmit}
-            className="hidden md:flex items-center relative flex-1 max-w-xs"
+            className="hidden md:flex items-center relative flex-1 min-w-[160px] max-w-xs"
           >
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-studio-400">
               <Search className="w-4 h-4" />
             </div>
             <input
               type="text"
+              aria-label={t('ux.search')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={t('nav.searchPlaceholder')}
-              className="w-full pl-9 pr-3 py-1.5 bg-studio-900 border border-studio-800 rounded-full text-xs text-white placeholder-studio-500 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all"
+              className="w-full min-h-[44px] pl-9 pr-10 py-2 bg-studio-900 border border-studio-800 rounded-full text-sm text-white placeholder-studio-400 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all"
             />
+            <button type="submit" aria-label={t('ux.search')} className="absolute right-0 top-0 min-w-[44px] min-h-[44px] flex items-center justify-center text-brand-400"><Search className="w-4 h-4" /></button>
           </form>
 
           {/* Right Action Items */}
@@ -140,13 +145,13 @@ export const Navbar: React.FC = () => {
             {!isClaimedToday && (
               <button
                 onClick={openDailyBonusModal}
-                className="hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-brand-500/10 to-amber-500/20 border border-brand-500/30 text-brand-300 hover:border-brand-400 hover:text-white text-xs font-bold transition-all shadow-glow-brand shrink-0"
-                title={`${t('nav.dailyBonus')} (+15 ⚡)`}
+                className="hidden 2xl:flex min-h-[44px] items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-brand-500/10 to-amber-500/20 border border-brand-500/30 text-brand-300 hover:border-brand-400 hover:text-white text-xs font-bold transition-all shadow-glow-brand shrink-0"
+                title={t('nav.dailyBonus')}
               >
                 <Sparkles className="w-3.5 h-3.5 text-brand-400 animate-spin" style={{ animationDuration: '8s' }} />
                 <span className="hidden sm:inline">{t('nav.dailyBonus')}</span>
                 <span className="bg-brand-500 text-studio-950 px-1.5 py-0.2 rounded-full text-[10px] font-black">
-                  +15 ⚡
+                  {rewardAmount !== null ? `+${rewardAmount} ⚡` : t('nav.dailyBonus')}
                 </span>
               </button>
             )}
@@ -196,7 +201,7 @@ export const Navbar: React.FC = () => {
                           </span>
                         ) : (
                           <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-brand-500/10 text-brand-400 border border-brand-500/20">
-                            User
+                            {t('nav.profile')}
                           </span>
                         )}
                       </div>
@@ -286,8 +291,10 @@ export const Navbar: React.FC = () => {
                   </div>
                 )}
               </div>
+            ) : isLoading || profileError ? (
+              <button disabled={isLoading} onClick={() => refreshProfile().catch(() => {})} className="min-h-[44px] px-2 text-sm text-studio-300">{isLoading ? t('readerFix.checking') : t('common.retry')}</button>
             ) : (
-              <div className="hidden lg:flex items-center gap-2">
+              <div className="hidden xl:flex items-center gap-2">
                 <button
                   onClick={() => openAuthModal('login')}
                   className="px-3 py-1.5 text-xs font-semibold text-studio-200 hover:text-white transition-colors"
@@ -306,7 +313,7 @@ export const Navbar: React.FC = () => {
             {/* Mobile menu toggle */}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="lg:hidden p-2 text-studio-400 hover:text-white rounded-lg hover:bg-studio-800"
+              className="xl:hidden min-w-[44px] min-h-[44px] flex items-center justify-center text-studio-400 hover:text-white rounded-lg hover:bg-studio-800"
               aria-label={mobileMenuOpen ? t('common.close') : t('nav.menu')}
               aria-expanded={mobileMenuOpen}
             >
@@ -317,14 +324,14 @@ export const Navbar: React.FC = () => {
 
         {/* Mobile menu drawer */}
         {mobileMenuOpen && (
-          <div className="lg:hidden py-4 border-t border-studio-800/80 space-y-3 animate-in slide-in-from-top-2 duration-200">
+          <div className="xl:hidden py-4 border-t border-studio-800/80 space-y-3 max-h-[calc(100dvh-4rem)] overflow-y-auto">
             <div className="flex items-center justify-between gap-3 px-3 sm:hidden">
-              <LanguageSwitcher />
+              <LanguageSwitcher align="left" />
               {isAuthenticated && user && <CoinBadge amount={user.lightning_coins} size="sm" onClick={() => navigate('/shop')} />}
             </div>
             {!isClaimedToday && (
               <button onClick={openDailyBonusModal} className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-sm font-semibold text-brand-300 hover:bg-studio-800">
-                <span>{t('nav.dailyBonus')}</span><span>+15 ⚡</span>
+                <span>{t('nav.dailyBonus')}</span>{rewardAmount !== null && <span>+{rewardAmount} ⚡</span>}
               </button>
             )}
             {/* Mobile search */}
@@ -332,11 +339,13 @@ export const Navbar: React.FC = () => {
               <Search className="absolute left-3 top-2.5 w-4 h-4 text-studio-400" />
               <input
                 type="text"
+                aria-label={t('ux.search')}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder={t('nav.searchPlaceholder')}
-                className="w-full pl-9 pr-3 py-2 bg-studio-900 border border-studio-800 rounded-xl text-xs text-white placeholder-studio-500 focus:outline-none focus:border-brand-500"
+                className="w-full min-h-[44px] pl-9 pr-12 py-2 bg-studio-900 border border-studio-800 rounded-xl text-sm text-white placeholder-studio-400 focus:outline-none focus:border-brand-500"
               />
+              <button type="submit" aria-label={t('ux.search')} className="absolute right-0 top-0 min-w-[44px] min-h-[44px] flex items-center justify-center text-brand-400"><Search className="w-4 h-4" /></button>
             </form>
 
             <div className="space-y-1">
@@ -359,7 +368,7 @@ export const Navbar: React.FC = () => {
               ))}
             </div>
 
-            {!isAuthenticated && (
+            {!isAuthenticated && !isLoading && !profileError && (
               <div className="grid grid-cols-2 gap-2 pt-3 border-t border-studio-800">
                 <button onClick={() => { openAuthModal('login'); setMobileMenuOpen(false); }} className="px-3 py-2 rounded-xl bg-studio-800 text-sm font-semibold text-white">{t('nav.login')}</button>
                 <button onClick={() => { openAuthModal('register'); setMobileMenuOpen(false); }} className="px-3 py-2 rounded-xl bg-brand-500 text-sm font-bold text-studio-950">{t('nav.register')}</button>

@@ -7,7 +7,7 @@ import { shopApi } from '../api/shop';
 import { UserSession, InventoryItem } from '../types';
 import { AvatarFrame } from '../components/common/AvatarFrame';
 import { formatDate, formatRelativeTime } from '../utils/date';
-import { getApiErrorMessage } from '../api/client';
+import { clearReaderSession, getApiErrorMessage } from '../api/client';
 import {
   User,
   Zap,
@@ -33,17 +33,27 @@ import {
   X
 } from 'lucide-react';
 import { usersApi } from '../api/users';
+import { Modal } from '../components/common/Modal';
+import { CardCollectionPanel } from '../components/cards/CardCollectionPanel';
 
 export const ProfilePage: React.FC = () => {
-  const { user, isAuthenticated, logout, refreshProfile, openAuthModal } = useAuth();
+  const { user, isAuthenticated, isLoading: authLoading, logout, refreshProfile, openAuthModal } = useAuth();
   const { t, language } = useLanguage();
   const navigate = useNavigate();
+  const actorIdentity = useRef(user?.id);
+  actorIdentity.current = user?.id;
 
   // Inventory state
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
   const [loadingInventory, setLoadingInventory] = useState(false);
   const [inventoryFilter, setInventoryFilter] = useState<'all' | 'frame' | 'background'>('all');
   const [invActionLoadingId, setInvActionLoadingId] = useState<number | null>(null);
+  const inventoryLock = useRef(false);
+  const inventoryRequest = useRef(0);
+  const sessionRequest = useRef(0);
+  const [inventoryError, setInventoryError] = useState(false);
+  const [sessionError, setSessionError] = useState(false);
+  const [sessionBusy, setSessionBusy] = useState(false);
 
   // Sessions state
   const [sessions, setSessions] = useState<UserSession[]>([]);
@@ -55,14 +65,17 @@ export const ProfilePage: React.FC = () => {
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [savingProfile, setSavingProfile] = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [passwordChanged, setPasswordChanged] = useState(false);
+  const profileSaveLock = useRef(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
-  const avatarInputRef = useRef<HTMLInputElement>(null);
   const editModalAvatarInputRef = useRef<HTMLInputElement>(null);
 
   // Dedicated Edit Profile Modal state
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editModalUsername, setEditModalUsername] = useState('');
   const [editModalBio, setEditModalBio] = useState('');
+  const [editModalAvatar, setEditModalAvatar] = useState<string | null>(null);
   const [editModalError, setEditModalError] = useState<string | null>(null);
   const [editModalSuccess, setEditModalSuccess] = useState<string | null>(null);
   const [savingEditModal, setSavingEditModal] = useState(false);
@@ -74,6 +87,7 @@ export const ProfilePage: React.FC = () => {
     if (user) {
       setEditModalUsername(user.username || '');
       setEditModalBio(user.bio || '');
+      setEditModalAvatar(user.avatar_url || null);
       setEditModalError(null);
       setEditModalSuccess(null);
     }
@@ -82,49 +96,51 @@ export const ProfilePage: React.FC = () => {
 
   const handleSaveEditModal = async (e: React.FormEvent) => {
     e.preventDefault();
+    const actor = actorIdentity.current;
+    if (!actor || savingEditModal || uploadingAvatar || profileSaveLock.current) return;
+    profileSaveLock.current = true;
     setSavingEditModal(true);
     setEditModalError(null);
     setEditModalSuccess(null);
     try {
-      let updatedSomething = false;
-      if (editModalUsername.trim() && editModalUsername.trim() !== user?.username) {
-        await authApi.updateProfile({ username: editModalUsername.trim() });
-        updatedSomething = true;
-      }
-      if (editModalBio.trim() !== (user?.bio || '')) {
-        await usersApi.updateProfile({ bio: editModalBio.trim() });
-        updatedSomething = true;
-      }
-      if (!updatedSomething) {
-        setEditModalError("Hech qanday o'zgarish kiritilmadi");
-        setSavingEditModal(false);
+      if (editModalUsername.trim() === user?.username && editModalBio.trim() === (user?.bio || '') && editModalAvatar === (user?.avatar_url || null)) {
+        setEditModalError(t('socialFix.unchanged'));
         return;
       }
-      await refreshProfile();
-      setEditModalSuccess("Profil ma'lumotlari muvaffaqiyatli saqlandi!");
+      if (actor !== actorIdentity.current) return;
+      await usersApi.updateProfile({ username: editModalUsername.trim(), bio: editModalBio.trim(), avatar_url: editModalAvatar || undefined });
+      if (actor !== actorIdentity.current) return;
+      await refreshProfile().catch(() => undefined);
+      if (actor !== actorIdentity.current) return;
+      setEditModalSuccess(t('socialFix.saved'));
       setTimeout(() => {
-        setIsEditModalOpen(false);
+        if (actor === actorIdentity.current) setIsEditModalOpen(false);
       }, 900);
     } catch (err) {
-      setEditModalError(getApiErrorMessage(err, "Profilni yangilashda xatolik"));
+      if (actor === actorIdentity.current) setEditModalError(getApiErrorMessage(err, t('socialFix.loadFailed')));
     } finally {
-      setSavingEditModal(false);
+      profileSaveLock.current = false;
+      if (actor === actorIdentity.current) setSavingEditModal(false);
     }
   };
 
   const handleModalAvatarFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const actor = actorIdentity.current;
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!actor || !file || uploadingAvatar || savingEditModal) return;
+    if (file.size > 5 * 1024 * 1024 || !['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) { setEditModalError(t('socialFix.photoSize')); e.target.value = ''; return; }
     setUploadingAvatar(true);
     setEditModalError(null);
     try {
-      await usersApi.uploadAvatar(file);
-      await refreshProfile();
-      setEditModalSuccess("Yangi profil rasmi yuklandi!");
+      const result = await usersApi.uploadAvatarDraft(file);
+      if (actor !== actorIdentity.current) return;
+      setEditModalAvatar(result.data.avatar_url);
+      setEditModalSuccess(t('socialFix.photoDraft'));
     } catch (err) {
-      setEditModalError(getApiErrorMessage(err, "Avatar yuklashda xatolik yuz berdi"));
+      if (actor === actorIdentity.current) setEditModalError(getApiErrorMessage(err, t('socialFix.loadFailed')));
     } finally {
-      setUploadingAvatar(false);
+      if (actor === actorIdentity.current) setUploadingAvatar(false);
+      e.target.value = "";
     }
   };
 
@@ -132,24 +148,10 @@ export const ProfilePage: React.FC = () => {
     if (user) {
       setNewUsername(user.username || '');
       setBio(user.bio || '');
+      setPasswordChanged(false);
     }
-  }, [user]);
-
-  const handleAvatarFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setUploadingAvatar(true);
-    setFeedback(null);
-    try {
-      await usersApi.uploadAvatar(file);
-      await refreshProfile();
-      setFeedback({ type: 'success', message: "Profil rasmi muvaffaqiyatli yuklandi!" });
-    } catch (err) {
-      setFeedback({ type: 'error', message: getApiErrorMessage(err, "Rasm yuklashda xatolik") });
-    } finally {
-      setUploadingAvatar(false);
-    }
-  };
+  }, [user?.id, user?.username, user?.bio]);
+  useEffect(() => { setOldPassword(''); setNewPassword(''); setFeedback(null); setInvFeedback(null); setSavingProfile(false); setSavingEditModal(false); setChangingPassword(false); setUploadingAvatar(false); }, [user?.id]);
 
   const showInvFeedback = (type: 'success' | 'error', message: string) => {
     setInvFeedback({ type, message });
@@ -157,22 +159,28 @@ export const ProfilePage: React.FC = () => {
   };
 
   const fetchInventory = useCallback(async () => {
+    const request = ++inventoryRequest.current;
     setLoadingInventory(true);
+    setInventoryError(false);
     try {
       const data = await shopApi.getMyInventory();
-      setInventoryItems(data || []);
+      if (request === inventoryRequest.current) setInventoryItems(data || []);
     } catch (err) {
-      console.error("Failed to load inventory", err);
+      if (request === inventoryRequest.current) setInventoryError(true);
     } finally {
-      setLoadingInventory(false);
+      if (request === inventoryRequest.current) setLoadingInventory(false);
     }
-  }, []);
+  }, [user?.id]);
 
   const handleEquipItem = async (item: InventoryItem) => {
+    const actor = actorIdentity.current;
+    if (inventoryLock.current) return;
+    inventoryLock.current = true;
     setInvActionLoadingId(item.id);
     try {
       const res = await shopApi.equipItem(item.id);
-      showInvFeedback('success', res.message || t('shop.equipSuccess'));
+      if (actor !== actorIdentity.current) return ;
+      if (actor === actorIdentity.current) showInvFeedback('success', t('shop.equipSuccess'));
       setInventoryItems((prev) =>
         prev.map((i) => {
           if (i.item_type === item.item_type) {
@@ -181,122 +189,142 @@ export const ProfilePage: React.FC = () => {
           return i;
         })
       );
-      await refreshProfile();
+      if (actor !== actorIdentity.current) return;
+      await refreshProfile().catch(() => undefined);
     } catch (err) {
-      showInvFeedback('error', getApiErrorMessage(err, t('common.error')));
+      if (actor === actorIdentity.current) showInvFeedback('error', getApiErrorMessage(err, t('common.error')));
     } finally {
+      inventoryLock.current = false;
       setInvActionLoadingId(null);
     }
   };
 
   const handleUnequipItem = async (item: InventoryItem) => {
+    const actor = actorIdentity.current;
+    if (inventoryLock.current) return;
+    inventoryLock.current = true;
     setInvActionLoadingId(item.id);
     try {
       const res = await shopApi.unequipItem(item.id);
-      showInvFeedback('success', res.message || t('shop.unequipSuccess'));
+      if (actor !== actorIdentity.current) return ;
+      if (actor === actorIdentity.current) showInvFeedback('success', t('shop.unequipSuccess'));
       setInventoryItems((prev) =>
         prev.map((i) => (i.id === item.id ? { ...i, is_active: false } : i))
       );
-      await refreshProfile();
+      if (actor !== actorIdentity.current) return;
+      await refreshProfile().catch(() => undefined);
     } catch (err) {
-      showInvFeedback('error', getApiErrorMessage(err, t('common.error')));
+      if (actor === actorIdentity.current) showInvFeedback('error', getApiErrorMessage(err, t('common.error')));
     } finally {
+      inventoryLock.current = false;
       setInvActionLoadingId(null);
     }
   };
 
   const fetchSessions = useCallback(async () => {
+    const request = ++sessionRequest.current;
     setLoadingSessions(true);
+    setSessionError(false);
     try {
       const data = await authApi.listSessions();
-      setSessions(data || []);
+      if (request === sessionRequest.current) setSessions(data || []);
     } catch (err) {
-      console.error("Failed to load sessions", err);
+      if (request === sessionRequest.current) setSessionError(true);
     } finally {
-      setLoadingSessions(false);
+      if (request === sessionRequest.current) setLoadingSessions(false);
     }
-  }, []);
+  }, [user?.id]);
 
   useEffect(() => {
-    if (isAuthenticated) {
+    setSessions([]); setInventoryItems([]); setIsEditModalOpen(false);
+    if (isAuthenticated && !authLoading) {
       fetchSessions();
       fetchInventory();
       if (user) {
         setNewUsername(user.username);
       }
     }
-  }, [isAuthenticated, user?.username, fetchSessions, fetchInventory]);
+    return () => { inventoryRequest.current++; sessionRequest.current++; };
+  }, [isAuthenticated, authLoading, fetchSessions, fetchInventory]);
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
+    const actor = user?.id;
+    if (!actor || profileSaveLock.current || changingPassword) return;
+    profileSaveLock.current = true;
     setSavingProfile(true);
     setFeedback(null);
     try {
-      let updatedSomething = false;
-      const payload: { username?: string; old_password?: string; new_password?: string } = {};
+      const payload: { username?: string; bio?: string } = {};
       if (newUsername.trim() && newUsername.trim() !== user?.username) {
         payload.username = newUsername.trim();
       }
-      if (newPassword.trim()) {
-        if (!oldPassword.trim()) {
-          setFeedback({ type: 'error', message: t('profile.currentPassword') });
-          setSavingProfile(false);
-          return;
-        }
-        payload.old_password = oldPassword;
-        payload.new_password = newPassword;
-      }
-
-      if (Object.keys(payload).length > 0) {
-        await authApi.updateProfile(payload);
-        updatedSomething = true;
-      }
-
       if (bio.trim() !== (user?.bio || '')) {
-        await usersApi.updateProfile({ bio: bio.trim() });
-        updatedSomething = true;
+        payload.bio = bio.trim();
       }
-
-      if (!updatedSomething) {
-        setFeedback({ type: 'error', message: "Hech qanday o'zgarish kiritilmadi" });
-        setSavingProfile(false);
+      if (!Object.keys(payload).length) {
+        setFeedback({ type: 'error', message: t('socialFix.unchanged') });
         return;
       }
-
-      setFeedback({ type: 'success', message: "Profil ma'lumotlari muvaffaqiyatli saqlandi!" });
-      setOldPassword('');
-      setNewPassword('');
-      await refreshProfile();
+      if (actor !== actorIdentity.current) return;
+      await usersApi.updateProfile(payload);
+      if (actor !== actorIdentity.current) return;
+      setFeedback({ type: 'success', message: t('socialFix.saved') });
+      await refreshProfile().catch(() => undefined);
     } catch (err) {
-      setFeedback({
+      if (actor === actorIdentity.current) setFeedback({
         type: 'error',
         message: getApiErrorMessage(err, t('common.error'))
       });
     } finally {
+      profileSaveLock.current = false;
       setSavingProfile(false);
     }
   };
 
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const actor = user?.id;
+    if (!actor || profileSaveLock.current || changingPassword) return;
+    profileSaveLock.current = true; setChangingPassword(true); setFeedback(null);
+    try {
+      await authApi.updateProfile({ old_password: oldPassword, new_password: newPassword });
+      if (actor !== actorIdentity.current) return;
+      setOldPassword(''); setNewPassword('');
+      clearReaderSession();
+      setPasswordChanged(true);
+    } catch (err) {
+      if (actor === actorIdentity.current) setFeedback({ type: 'error', message: getApiErrorMessage(err, t('common.error')) });
+    } finally { profileSaveLock.current = false; setChangingPassword(false); }
+  };
+
   const handleRevokeSession = async (sessionId: string) => {
-    if (!window.confirm(t('profile.confirmRevoke'))) return;
+    if (sessionBusy || !window.confirm(t('profile.confirmRevoke'))) return;
+    const actor = actorIdentity.current;
+    setSessionBusy(true);
     try {
       await authApi.revokeSession(sessionId);
+      if (actor !== actorIdentity.current) return;
       await fetchSessions();
     } catch (err) {
-      console.error("Failed to revoke session", err);
-    }
+      if (actor === actorIdentity.current) setFeedback({ type: 'error', message: getApiErrorMessage(err, t('common.error')) });
+    } finally { if (actor === actorIdentity.current) setSessionBusy(false); }
   };
 
   const handleRevokeOtherSessions = async () => {
-    if (!window.confirm(t('profile.confirmRevokeOthers'))) return;
+    if (sessionBusy || !window.confirm(t('profile.confirmRevokeOthers'))) return;
+    const actor = actorIdentity.current;
+    setSessionBusy(true);
     try {
       await authApi.revokeOtherSessions();
+      if (actor !== actorIdentity.current) return;
       await fetchSessions();
     } catch (err) {
-      console.error("Failed to revoke other sessions", err);
-    }
+      if (actor === actorIdentity.current) setFeedback({ type: 'error', message: getApiErrorMessage(err, t('common.error')) });
+    } finally { if (actor === actorIdentity.current) setSessionBusy(false); }
   };
 
+  if (authLoading) return <div role="status" className="py-24 text-center">{t('common.loading')}</div>;
   if (!isAuthenticated || !user) {
     return (
       <div className="min-h-screen py-24 flex flex-col items-center justify-center text-center px-4">
@@ -304,6 +332,7 @@ export const ProfilePage: React.FC = () => {
           <User className="w-8 h-8" />
         </div>
         <h2 className="text-2xl font-black text-white mb-2">{t('profile.title')}</h2>
+        {passwordChanged && <p role="status" className="text-sm text-emerald-300 max-w-md mb-6">{t('profile.passwordChanged')}</p>}
         <p className="text-xs text-studio-400 max-w-sm mb-6">
           {t('library.loginRequired')}
         </p>
@@ -320,6 +349,7 @@ export const ProfilePage: React.FC = () => {
   const framesCount = inventoryItems.filter((i) => i.item_type === 'frame').length;
   const backgroundsCount = inventoryItems.filter((i) => i.item_type === 'background').length;
   const filteredInventoryItems = inventoryItems.filter((i) => {
+    if (i.item_type === 'card') return false;
     if (inventoryFilter === 'all') return true;
     return i.item_type === inventoryFilter;
   });
@@ -354,9 +384,9 @@ export const ProfilePage: React.FC = () => {
                 />
                 <button
                   type="button"
-                  onClick={() => avatarInputRef.current?.click()}
+                  onClick={handleOpenEditModal}
                   disabled={uploadingAvatar}
-                  title="Profil rasmini yuklash yoki o'zgartirish"
+                  title={t('socialFix.changePhoto')} aria-label={t('socialFix.changePhoto')}
                   className="absolute bottom-0 right-0 p-2 rounded-full bg-brand-500 hover:bg-brand-400 text-studio-950 shadow-glow-brand transition-transform hover:scale-110 z-20 cursor-pointer"
                 >
                   {uploadingAvatar ? (
@@ -365,13 +395,6 @@ export const ProfilePage: React.FC = () => {
                     <Camera className="w-4 h-4" />
                   )}
                 </button>
-                <input
-                  type="file"
-                  ref={avatarInputRef}
-                  onChange={handleAvatarFileChange}
-                  accept="image/png,image/jpeg,image/jpg,image/webp"
-                  className="hidden"
-                />
               </div>
 
               <div className="mt-2 text-center flex flex-col gap-1 items-center">
@@ -431,7 +454,7 @@ export const ProfilePage: React.FC = () => {
                   className="px-3.5 py-1.5 rounded-xl bg-brand-500 hover:bg-brand-400 text-studio-950 font-black text-xs shadow-glow-brand transition-all flex items-center gap-1.5 cursor-pointer"
                 >
                   <Edit3 className="w-3.5 h-3.5" />
-                  <span>Profilni tahrirlash</span>
+                  <span>{t('socialFix.editProfile')}</span>
                 </button>
 
                 <Link
@@ -439,7 +462,7 @@ export const ProfilePage: React.FC = () => {
                   className="px-3 py-1.5 rounded-xl bg-studio-800 hover:bg-studio-700 text-white font-bold text-xs border border-studio-700 transition-all flex items-center gap-1.5"
                 >
                   <User className="w-3.5 h-3.5 text-brand-400" />
-                  <span>Ommaviy profil</span>
+                  <span>{t('socialFix.publicProfile')}</span>
                 </Link>
 
                 <Link
@@ -447,7 +470,7 @@ export const ProfilePage: React.FC = () => {
                   className="px-3 py-1.5 rounded-xl bg-purple-950/40 hover:bg-purple-900/50 text-purple-300 font-bold text-xs border border-purple-500/30 transition-all flex items-center gap-1.5"
                 >
                   <Shield className="w-3.5 h-3.5 text-purple-400" />
-                  <span>Klanlar</span>
+                  <span>{t('clans.title')}</span>
                 </Link>
 
                 <Link
@@ -455,7 +478,7 @@ export const ProfilePage: React.FC = () => {
                   className="px-3 py-1.5 rounded-xl bg-emerald-950/40 hover:bg-emerald-900/50 text-emerald-300 font-bold text-xs border border-emerald-500/30 transition-all flex items-center gap-1.5"
                 >
                   <Users className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Do'stlar</span>
+                  <span>{t('socialFix.friends')}</span>
                 </Link>
               </div>
             </div>
@@ -474,6 +497,8 @@ export const ProfilePage: React.FC = () => {
           </div>
         </div>
 
+        <CardCollectionPanel key={user.id} ownerId={user.id} summary={user.card_collection} onSaved={refreshProfile} />
+
         {/* My Decorations & Inventory Section */}
         <div id="inventory" className="bg-studio-900 border border-studio-800 rounded-3xl p-6 sm:p-8 shadow-xl space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-studio-800">
@@ -482,7 +507,7 @@ export const ProfilePage: React.FC = () => {
                 <Sparkles className="w-5 h-5" />
               </div>
               <div>
-                <h2 className="text-lg font-bold text-white">{t('profile.myInventory')}</h2>
+                <h2 className="text-lg font-bold text-white">{t('cards.decorationsTitle')}</h2>
                 <p className="text-xs text-studio-400">
                   {t('profile.myInventorySubtitle')}
                 </p>
@@ -520,7 +545,7 @@ export const ProfilePage: React.FC = () => {
           {/* Filter Tabs */}
           <div className="flex flex-wrap items-center gap-2">
             <button
-              onClick={() => setInventoryFilter('all')}
+              aria-pressed={inventoryFilter === 'all'} onClick={() => setInventoryFilter('all')}
               className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
                 inventoryFilter === 'all'
                   ? 'bg-brand-500 text-studio-950 shadow-glow-brand'
@@ -528,14 +553,14 @@ export const ProfilePage: React.FC = () => {
               }`}
             >
               <Layers className="w-3.5 h-3.5" />
-              <span>{t('inventory.tabAll')}</span>
+              <span>{t('cards.allDecorations')}</span>
               <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-studio-950/40 text-current">
-                {inventoryItems.length}
+                {inventoryItems.filter(item => item.item_type !== 'card').length}
               </span>
             </button>
 
             <button
-              onClick={() => setInventoryFilter('frame')}
+              aria-pressed={inventoryFilter === 'frame'} onClick={() => setInventoryFilter('frame')}
               className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
                 inventoryFilter === 'frame'
                   ? 'bg-brand-500 text-studio-950 shadow-glow-brand'
@@ -550,7 +575,7 @@ export const ProfilePage: React.FC = () => {
             </button>
 
             <button
-              onClick={() => setInventoryFilter('background')}
+              aria-pressed={inventoryFilter === 'background'} onClick={() => setInventoryFilter('background')}
               className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
                 inventoryFilter === 'background'
                   ? 'bg-brand-500 text-studio-950 shadow-glow-brand'
@@ -571,15 +596,17 @@ export const ProfilePage: React.FC = () => {
               <Loader2 className="w-5 h-5 animate-spin text-brand-500" />
               <span className="text-xs">{t('common.loading')}</span>
             </div>
+          ) : inventoryError ? (
+            <div role="alert" className="text-center space-y-4"><p>{t('socialFix.loadFailed')}</p><button onClick={fetchInventory} className="px-4 py-3 bg-brand-500 text-studio-950 rounded-xl">{t('socialFix.retry')}</button></div>
           ) : filteredInventoryItems.length === 0 ? (
             <div className="py-12 px-4 text-center rounded-2xl bg-studio-850 border border-studio-800 space-y-3">
               <div className="w-12 h-12 mx-auto rounded-2xl bg-studio-800 border border-studio-700 flex items-center justify-center text-studio-400">
                 <PackageOpen className="w-6 h-6" />
               </div>
               <div>
-                <h4 className="text-sm font-bold text-white">{t('inventory.empty')}</h4>
+                <h4 className="text-sm font-bold text-white">{t('cards.decorationsEmpty')}</h4>
                 <p className="text-xs text-studio-400 max-w-sm mx-auto mt-1">
-                  {t('inventory.emptyDesc')}
+                  {t('cards.decorationsEmptyDetail')}
                 </p>
               </div>
               <Link
@@ -622,6 +649,7 @@ export const ProfilePage: React.FC = () => {
                       {item.item_type === 'frame' ? (
                         <AvatarFrame
                           username={user.username}
+                          avatarUrl={user.avatar_url}
                           frameUrl={item.asset_url}
                           size="md"
                         />
@@ -645,7 +673,7 @@ export const ProfilePage: React.FC = () => {
                       {isEquipped ? (
                         <button
                           onClick={() => handleUnequipItem(item)}
-                          disabled={isItemActionLoading}
+                          disabled={invActionLoadingId !== null}
                           className="w-full py-2 rounded-xl font-bold text-xs bg-studio-800 hover:bg-rose-500/10 text-rose-400 border border-studio-700 hover:border-rose-500/30 transition-all flex items-center justify-center gap-1.5 disabled:opacity-40"
                         >
                           {isItemActionLoading ? (
@@ -656,7 +684,7 @@ export const ProfilePage: React.FC = () => {
                       ) : (
                         <button
                           onClick={() => handleEquipItem(item)}
-                          disabled={isItemActionLoading}
+                          disabled={invActionLoadingId !== null}
                           className="w-full py-2 rounded-xl font-bold text-xs bg-brand-500 hover:bg-brand-400 text-studio-950 active:scale-95 shadow-glow-brand transition-all flex items-center justify-center gap-1.5 disabled:opacity-40"
                         >
                           {isItemActionLoading ? (
@@ -700,12 +728,14 @@ export const ProfilePage: React.FC = () => {
           )}
 
           <form onSubmit={handleUpdateProfile} className="space-y-4 max-w-lg">
+            <fieldset disabled={savingProfile || changingPassword} className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold text-studio-300 mb-1.5">
+              <label className="block text-xs font-semibold text-studio-300 mb-1.5" htmlFor="profilepage-field-1">
                 {t('profile.username')}
               </label>
-              <input
+              <input id="profilepage-field-1"
                 type="text"
+                required minLength={3} maxLength={50} pattern="[a-zA-Z0-9_-]+" autoComplete="username"
                 value={newUsername}
                 onChange={(e) => setNewUsername(e.target.value)}
                 placeholder={t('profile.username')}
@@ -714,32 +744,40 @@ export const ProfilePage: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-studio-300 mb-1.5 flex items-center justify-between">
-                <span>Biografiya / Haqimda (Bio)</span>
+              <label className="block text-xs font-semibold text-studio-300 mb-1.5 flex items-center justify-between" htmlFor="profilepage-field-2">
+                <span>{t('socialFix.bio')}</span>
                 <span className="text-[10px] text-studio-500 font-mono">{bio.length}/500</span>
               </label>
-              <textarea
+              <textarea id="profilepage-field-2"
                 value={bio}
                 onChange={(e) => setBio(e.target.value)}
                 rows={3}
                 maxLength={500}
-                placeholder="O'zingiz haqingizda qisqacha ma'lumot yozing..."
+                placeholder={t('socialFix.bioPlaceholder')}
                 className="w-full px-3.5 py-2.5 bg-studio-800 border border-studio-700 rounded-xl text-sm text-white placeholder-studio-500 focus:outline-none focus:border-brand-500"
               />
             </div>
 
+            <button type="submit" disabled={savingProfile || changingPassword} className="min-h-11 px-6 rounded-xl bg-brand-500 text-studio-950 text-sm font-bold disabled:opacity-50">{t(savingProfile ? 'common.loading' : 'common.save')}</button>
+            </fieldset>
+          </form>
+          <form onSubmit={handleChangePassword} className="mt-8 space-y-4 max-w-lg">
+            <fieldset disabled={savingProfile || changingPassword} className="space-y-4">
             <div className="pt-2 border-t border-studio-800/80">
               <span className="text-xs font-bold text-studio-400 uppercase tracking-wider block mb-3">
-                {t('profile.changePasswordOptional')}
+                {t('profile.passwordAction')}
               </span>
+              <p className="mb-4 text-sm text-studio-300">{t('profile.passwordNotice')}</p>
 
               <div className="space-y-3">
                 <div>
-                  <label className="block text-xs font-medium text-studio-300 mb-1">
+                  <label className="block text-xs font-medium text-studio-300 mb-1" htmlFor="profilepage-field-3">
                     {t('profile.currentPassword')}
                   </label>
-                  <input
+                  <input id="profilepage-field-3"
                     type="password"
+                    required maxLength={100}
+                    autoComplete="current-password"
                     value={oldPassword}
                     onChange={(e) => setOldPassword(e.target.value)}
                     placeholder="••••••••"
@@ -748,11 +786,12 @@ export const ProfilePage: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-studio-300 mb-1">
+                  <label className="block text-xs font-medium text-studio-300 mb-1" htmlFor="profilepage-field-4">
                     {t('profile.newPasswordHint')}
                   </label>
-                  <input
+                  <input id="profilepage-field-4"
                     type="password"
+                    required minLength={8} maxLength={100} autoComplete="new-password"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                     placeholder="••••••••"
@@ -765,13 +804,14 @@ export const ProfilePage: React.FC = () => {
             <div className="pt-2">
               <button
                 type="submit"
-                disabled={savingProfile}
+                disabled={savingProfile || changingPassword}
                 className="px-6 py-2.5 rounded-xl font-bold bg-brand-500 text-studio-950 text-xs hover:bg-brand-400 active:scale-95 shadow-glow-brand transition-all flex items-center gap-1.5 disabled:opacity-40"
               >
-                {savingProfile ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                <span>{t('common.save')}</span>
+                {changingPassword ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                <span>{t('profile.passwordAction')}</span>
               </button>
             </div>
+            </fieldset>
           </form>
         </div>
 
@@ -790,6 +830,7 @@ export const ProfilePage: React.FC = () => {
 
             {sessions.length > 1 && (
               <button
+                disabled={sessionBusy}
                 onClick={handleRevokeOtherSessions}
                 className="px-3.5 py-1.5 rounded-xl bg-studio-800 text-rose-400 hover:bg-rose-500/10 border border-studio-700 hover:border-rose-500/30 text-xs font-bold transition-colors"
               >
@@ -803,6 +844,8 @@ export const ProfilePage: React.FC = () => {
               <Loader2 className="w-4 h-4 animate-spin text-brand-500" />
               <span className="text-xs">{t('common.loading')}</span>
             </div>
+          ) : sessionError ? (
+            <div role="alert" className="text-center space-y-4"><p>{t('socialFix.loadFailed')}</p><button onClick={fetchSessions} className="px-4 py-3 bg-brand-500 text-studio-950 rounded-xl">{t('socialFix.retry')}</button></div>
           ) : sessions.length === 0 ? (
             <p className="text-xs text-studio-500 text-center py-4">{t('common.notFound')}</p>
           ) : (
@@ -844,6 +887,7 @@ export const ProfilePage: React.FC = () => {
 
                     {!sess.is_current && (
                       <button
+                        disabled={sessionBusy}
                         onClick={() => handleRevokeSession(sess.id)}
                         className="px-3 py-1.5 rounded-xl bg-studio-800 hover:bg-rose-500/10 text-rose-400 text-xs font-semibold border border-studio-700 transition-colors"
                       >
@@ -860,31 +904,17 @@ export const ProfilePage: React.FC = () => {
 
       {/* Edit Profile Modal */}
       {isEditModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in">
-          <div className="relative w-full max-w-lg bg-studio-900 border border-studio-800 rounded-3xl p-6 sm:p-8 shadow-2xl overflow-hidden">
-            <div className="flex items-center justify-between pb-4 border-b border-studio-800 mb-6">
-              <div className="flex items-center gap-2">
-                <Edit3 className="w-5 h-5 text-brand-400" />
-                <h3 className="text-lg font-black text-white">Profilni Tahrirlash</h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsEditModalOpen(false)}
-                className="p-1 rounded-xl text-studio-400 hover:text-white hover:bg-studio-800 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
+        <Modal isOpen={isEditModalOpen} onClose={() => { if (!savingEditModal && !uploadingAvatar) setIsEditModalOpen(false); }} title={t('socialFix.editProfile')}>
+          <div className="w-full">
             {editModalError && (
-              <div className="mb-4 p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs flex items-center gap-2">
+              <div role="alert" className="mb-4 p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs flex items-center gap-2">
                 <AlertCircle className="w-4 h-4 shrink-0" />
                 <span>{editModalError}</span>
               </div>
             )}
 
             {editModalSuccess && (
-              <div className="mb-4 p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs flex items-center gap-2">
+              <div role="status" className="mb-4 p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 shrink-0" />
                 <span>{editModalSuccess}</span>
               </div>
@@ -893,10 +923,10 @@ export const ProfilePage: React.FC = () => {
             <form onSubmit={handleSaveEditModal} className="space-y-5">
               {/* Avatar Preview with Equipped Frame & Direct Change Button */}
               <div className="flex flex-col items-center justify-center gap-3 py-2">
-                <div className="relative group cursor-pointer" onClick={() => editModalAvatarInputRef.current?.click()}>
+                <div className="relative group">
                   <AvatarFrame
                     username={editModalUsername || user.username}
-                    avatarUrl={user.avatar_url}
+                    avatarUrl={editModalAvatar}
                     frameUrl={user.active_frame?.asset_url}
                     size="xl"
                   />
@@ -909,11 +939,11 @@ export const ProfilePage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => editModalAvatarInputRef.current?.click()}
-                    disabled={uploadingAvatar}
+                    disabled={uploadingAvatar || savingEditModal}
                     className="px-3 py-1.5 rounded-xl bg-studio-800 hover:bg-studio-700 text-studio-200 text-xs font-bold border border-studio-700 transition-all flex items-center gap-1.5"
                   >
                     {uploadingAvatar ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Camera className="w-3.5 h-3.5 text-brand-400" />}
-                    <span>Rasmni almashtirish</span>
+                    <span>{t('socialFix.changePhoto')}</span>
                   </button>
                   <input
                     type="file"
@@ -926,51 +956,52 @@ export const ProfilePage: React.FC = () => {
 
                 {user.active_frame && (
                   <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-brand-500/20 text-brand-400 border border-brand-500/30">
-                    Faol ramka: {user.active_frame.name}
+                    {t('shop.equipped')}: {user.active_frame.name}
                   </span>
                 )}
               </div>
 
               {/* Username Input */}
               <div>
-                <label className="block text-xs font-bold text-studio-300 uppercase tracking-wider mb-1.5">
-                  Taxallus (Username)
+                <label className="block text-xs font-bold text-studio-300 uppercase tracking-wider mb-1.5" htmlFor="profilepage-field-5">
+                  {t('profile.username')}
                 </label>
-                <input
+                <input id="profilepage-field-5"
                   type="text"
-                  required
+                  required minLength={3} maxLength={50} pattern="[a-zA-Z0-9_-]+"
                   value={editModalUsername}
                   onChange={(e) => setEditModalUsername(e.target.value)}
-                  placeholder="Taxallusingizni kiriting"
+                  placeholder={t('profile.username')}
                   className="w-full px-4 py-2.5 bg-studio-950 border border-studio-800 rounded-xl text-white text-sm focus:outline-none focus:border-brand-500"
                 />
+                <p className="mt-2 text-xs text-studio-400">{t('socialFix.usernameHint')}</p>
               </div>
 
               {/* Bio Textarea */}
               <div>
-                <label className="block text-xs font-bold text-studio-300 uppercase tracking-wider mb-1.5 flex items-center justify-between">
-                  <span>Haqimda / Bio</span>
+                <label className="block text-xs font-bold text-studio-300 uppercase tracking-wider mb-1.5 flex items-center justify-between" htmlFor="profilepage-field-6">
+                  <span>{t('socialFix.bio')}</span>
                   <span className="text-[10px] text-studio-500 font-mono">{editModalBio.length}/500</span>
                 </label>
-                <textarea
+                <textarea id="profilepage-field-6"
                   value={editModalBio}
                   onChange={(e) => setEditModalBio(e.target.value)}
                   rows={3}
                   maxLength={500}
-                  placeholder="O'zingiz haqingizda bir necha so'z (qiziqishlaringiz, sevimli manhvalaringiz)..."
+                  placeholder={t('socialFix.bioPlaceholder')}
                   className="w-full px-4 py-2.5 bg-studio-950 border border-studio-800 rounded-xl text-white text-sm focus:outline-none focus:border-brand-500 resize-none"
                 />
               </div>
 
               {/* Bezaklar info link */}
               <div className="p-3.5 rounded-2xl bg-studio-950 border border-studio-800 flex items-center justify-between text-xs">
-                <span className="text-studio-400">Ramkalar va fonlarni almashtirish:</span>
+                <span className="text-studio-400">{t('profile.myInventory')}:</span>
                 <Link
                   to="/inventory"
                   className="text-brand-400 hover:text-brand-300 font-bold flex items-center gap-1"
-                  onClick={() => setIsEditModalOpen(false)}
+                  onClick={(event) => { if (savingEditModal || uploadingAvatar) event.preventDefault(); else setIsEditModalOpen(false); }}
                 >
-                  <span>Inventarga o'tish</span>
+                  <span>{t('inventory.title')}</span>
                   <ArrowRight className="w-3.5 h-3.5" />
                 </Link>
               </div>
@@ -979,23 +1010,23 @@ export const ProfilePage: React.FC = () => {
               <div className="pt-2 flex items-center justify-end gap-3">
                 <button
                   type="button"
-                  onClick={() => setIsEditModalOpen(false)}
+                  disabled={savingEditModal || uploadingAvatar} onClick={() => setIsEditModalOpen(false)}
                   className="px-4 py-2.5 text-xs font-bold text-studio-400 hover:text-white"
                 >
-                  Bekor qilish
+                  {t('common.cancel')}
                 </button>
                 <button
                   type="submit"
-                  disabled={savingEditModal}
+                  disabled={savingEditModal || uploadingAvatar}
                   className="px-6 py-2.5 bg-brand-500 hover:bg-brand-400 text-studio-950 font-black text-xs rounded-xl shadow-glow-brand transition-all flex items-center gap-2 disabled:opacity-50"
                 >
                   {savingEditModal && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                  <span>O'zgarishlarni saqlash</span>
+                  <span>{t('common.save')}</span>
                 </button>
               </div>
             </form>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

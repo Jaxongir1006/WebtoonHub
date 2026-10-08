@@ -1,53 +1,52 @@
 <template>
-  <Modal
+  <Modal ref="draftDialog" :draft="form" :busy="isSubmitting"
     :model-value="modelValue"
-    title="🏷 Janrlarni Boshqarish"
-    description="Platformadagi manhvalar uchun janrlar katalogini yaratish, tahrirlash va o'chirish"
+    :title="$t('staff.s191')"
+    :description="$t('staff.s192')"
     max-width="lg"
     @update:model-value="$emit('update:modelValue', $event)"
   >
+    <LoadState :error="loadError" @retry="loadGenres" />
     <div class="space-y-6">
       <!-- Create or Edit Form -->
       <div class="p-4 rounded-2xl bg-slate-100/80 dark:bg-studio-900 border border-slate-200 dark:border-white/10 space-y-3">
         <div class="flex items-center justify-between">
           <span class="text-xs font-bold text-slate-800 dark:text-studio-200 uppercase tracking-wider">
-            {{ editingGenreId ? '✏️ Janrni Tahrirlash' : '➕ Yangi Janr Qo\'shish' }}
+            {{ editingGenreId ? $t('staff.s193') : $t('staff.s194') }}
           </span>
           <button
             v-if="editingGenreId"
             type="button"
+            :disabled="isSubmitting"
             class="text-xs text-slate-500 dark:text-studio-400 hover:text-slate-700 dark:hover:text-white"
             @click="cancelEdit"
-          >
-            Bekor qilish
-          </button>
+          > {{ $t('staff.s019') }} </button>
         </div>
 
-        <form @submit.prevent="handleSave" class="space-y-3">
+        <form @submit.prevent="handleSave">
+      <fieldset :disabled="isSubmitting" class="space-y-3">
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label class="block text-[11px] font-semibold text-slate-600 dark:text-studio-400 mb-1">
-                Janr Nomi *
-              </label>
+              <label for="GenreManageModal-field-1" class="block text-[11px] font-semibold text-slate-600 dark:text-studio-400 mb-1"> {{ $t('staff.s195') }} </label>
               <input
+                id="GenreManageModal-field-1"
                 v-model="form.name"
                 type="text"
                 required
-                placeholder="Masalan: Qasos (Revenge)"
+                :placeholder="$t('staff.s196')"
                 class="w-full px-3 py-2 text-xs bg-white dark:bg-studio-850 border border-slate-200 dark:border-white/10 rounded-xl text-slate-900 dark:text-studio-100 focus:outline-none focus:border-brand-500"
                 @input="onNameInput"
               />
             </div>
 
             <div>
-              <label class="block text-[11px] font-semibold text-slate-600 dark:text-studio-400 mb-1">
-                Slug (URL identifikatori) *
-              </label>
+              <label for="GenreManageModal-field-2" class="block text-[11px] font-semibold text-slate-600 dark:text-studio-400 mb-1"> {{ $t('staff.s197') }} </label>
               <input
+                id="GenreManageModal-field-2"
                 v-model="form.slug"
                 type="text"
                 required
-                placeholder="revenge"
+                :placeholder="$t('staff.s198')"
                 class="w-full px-3 py-2 text-xs bg-white dark:bg-studio-850 border border-slate-200 dark:border-white/10 rounded-xl text-slate-900 dark:text-studio-100 font-mono focus:outline-none focus:border-brand-500"
               />
             </div>
@@ -60,17 +59,19 @@
               size="xs"
               :loading="isSubmitting"
             >
-              {{ editingGenreId ? 'Yangilash' : 'Janrni Saqlash' }}
+              {{ editingGenreId ? $t('staff.s061') : $t('staff.s199') }}
             </Button>
           </div>
-        </form>
+
+      </fieldset>
+    </form>
       </div>
 
       <!-- Genres List Table -->
       <div class="space-y-2">
         <div class="flex items-center justify-between text-xs text-slate-500 dark:text-studio-400 px-1 font-mono">
-          <span>Mavjud janrlar ro'yxati</span>
-          <span>Jami: <strong>{{ genres.length }}</strong> ta</span>
+          <span> {{ $t('staff.s200') }} </span>
+          <span> {{ $t('staff.s201') }} <strong>{{ genres.length }}</strong> {{ $t('staff.s202') }} </span>
         </div>
 
         <div class="max-h-80 overflow-y-auto rounded-2xl border border-slate-200 dark:border-white/10 overflow-hidden divide-y divide-slate-100 dark:divide-white/5">
@@ -85,11 +86,9 @@
                   {{ genre.name }}
                 </span>
                 <Badge variant="default" size="xs">
-                  {{ getManhwasCount(genre.id) }} ta manhva
-                </Badge>
+                  {{ (genre.webtoon_count ?? 0) }} {{ $t('staff.s203') }} </Badge>
               </div>
-              <span class="text-xs font-mono text-slate-400 dark:text-studio-500">
-                slug: /genres/{{ genre.slug }}
+              <span class="text-xs font-mono text-slate-600 dark:text-studio-400 dark:text-studio-500"> {{ $t('staff.s204') }} {{ genre.slug }}
               </span>
             </div>
 
@@ -97,16 +96,16 @@
             <div class="flex items-center gap-1.5 shrink-0">
               <button
                 type="button"
-                class="p-1.5 text-xs text-brand-600 dark:text-brand-400 hover:bg-brand-500/10 rounded-lg transition-colors font-medium"
-                title="Tahrirlash"
+                :disabled="isSubmitting"
+                class="p-1.5 text-xs text-brand-700 dark:text-brand-400 hover:bg-brand-500/10 rounded-lg transition-colors font-medium"
+                :title="$t('staff.s164')" :aria-label="$t('staff.s164')"
                 @click="startEdit(genre)"
-              >
-                ✏️ Tahrirlash
-              </button>
+              > {{ $t('staff.s205') }} </button>
               <button
                 type="button"
+                :disabled="isSubmitting"
                 class="p-1.5 text-xs text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors font-medium"
-                title="O'chirish"
+                :title="$t('staff.s132')" :aria-label="$t('staff.s132')"
                 @click="handleDelete(genre)"
               >
                 🗑️
@@ -120,20 +119,26 @@
 </template>
 
 <script setup>
-import { reactive, ref, onMounted } from 'vue'
+import i18n from '../../i18n/index.js'
+const tr = (...args) => i18n.global.t(...args)
+
+import { reactive, ref, onMounted, watch } from 'vue'
 import { webtoonsApi } from '../../api/webtoons'
 import { useSystemStore } from '../../stores/system'
+import LoadState from '../common/LoadState.vue'
+import { getErrorMessage } from '../../utils/forms'
 import Modal from '../common/Modal.vue'
 import Button from '../common/Button.vue'
 import Badge from '../common/Badge.vue'
 
-defineProps({
+const props = defineProps({
   modelValue: Boolean
 })
 
 const emit = defineEmits(['update:modelValue', 'changed'])
 const systemStore = useSystemStore()
 
+const loadError = ref('')
 const isSubmitting = ref(false)
 const editingGenreId = ref(null)
 const genres = ref([])
@@ -144,11 +149,12 @@ const form = reactive({
 })
 
 async function loadGenres() {
+  loadError.value = ''
   try {
     const res = await webtoonsApi.getGenres()
     genres.value = res.data || []
   } catch (err) {
-    console.error('Failed to load genres', err)
+    loadError.value = getErrorMessage(err)
   }
 }
 
@@ -180,6 +186,8 @@ function cancelEdit() {
 }
 
 async function handleSave() {
+  if (isSubmitting.value) return
+  loadError.value = ''
   isSubmitting.value = true
   try {
     if (editingGenreId.value) {
@@ -189,8 +197,8 @@ async function handleSave() {
       })
       systemStore.addToast({
         type: 'success',
-        title: 'Janr yangilandi',
-        message: `"${form.name}" janri muvaffaqiyatli saqlandi`
+        title: tr('staff.s206'),
+        message: tr('staff.s207', { value0: form.name })
       })
     } else {
       await webtoonsApi.createGenre({
@@ -199,18 +207,19 @@ async function handleSave() {
       })
       systemStore.addToast({
         type: 'success',
-        title: 'Janr yaratildi',
-        message: `"${form.name}" janri katalogga qo'shildi`
+        title: tr('staff.s208'),
+        message: tr('staff.s209', { value0: form.name })
       })
     }
     cancelEdit()
     await loadGenres()
     emit('changed')
   } catch (err) {
+    loadError.value = getErrorMessage(err)
     systemStore.addToast({
       type: 'error',
-      title: 'Xatolik',
-      message: err.message || 'Janrni saqlashda xatolik yuz berdi'
+      title: tr('staff.s024'),
+      message: err.message || tr('staff.s210')
     })
   } finally {
     isSubmitting.value = false
@@ -218,10 +227,12 @@ async function handleSave() {
 }
 
 async function handleDelete(genre) {
-  if (!confirm(`"${genre.name}" janrini o'chirishni tasdiqlaysizmi?`)) {
+  if (isSubmitting.value) return
+  if (!confirm(tr('staff.s211', { value0: genre.name }))) {
     return
   }
 
+  isSubmitting.value = true
   try {
     await webtoonsApi.deleteGenre(genre.id)
     if (editingGenreId.value === genre.id) {
@@ -229,17 +240,21 @@ async function handleDelete(genre) {
     }
     systemStore.addToast({
       type: 'success',
-      title: 'Janr o\'chirildi',
-      message: `"${genre.name}" muvaffaqiyatli o'chirildi`
+      title: tr('staff.s212'),
+      message: tr('staff.s213', { value0: genre.name })
     })
     await loadGenres()
     emit('changed')
   } catch (err) {
+    loadError.value = getErrorMessage(err)
     systemStore.addToast({
       type: 'error',
-      title: 'Xatolik',
-      message: err.response?.data?.detail || err.message || 'Janrni o\'chirishda xatolik yuz berdi'
+      title: tr('staff.s024'),
+      message: err.response?.data?.detail || err.message || tr('staff.s214')
     })
+  } finally {
+    isSubmitting.value = false
   }
 }
+watch(() => props.modelValue, open => { if (open) loadGenres() })
 </script>

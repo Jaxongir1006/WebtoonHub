@@ -37,7 +37,7 @@ async def send_email(
         return False
 
 
-async def send_welcome_email(to_email: str, username: str) -> bool:
+async def send_welcome_email(to_email: str, username: str, bonus_coins: int = 50) -> bool:
     """Send welcome email upon successful user registration"""
     subject = "⚡ WebtoonHub platformasiga xush kelibsiz!"
     html = f"""
@@ -64,7 +64,7 @@ async def send_welcome_email(to_email: str, username: str) -> bool:
                 <p>Salom, <strong>{username}</strong>!</p>
                 <p>WebtoonHub platformasiga xush kelibsiz! O'zbek tilidagi eng sara manhva va webtoonlarni qulay mutolaa qilishingiz mumkin.</p>
                 <div style="text-align: center;">
-                    <div class="badge">🎁 Sizga +50 ⚡ Chaqmoq bonusi berildi!</div>
+                    <div class="badge">🎁 Sizga +{bonus_coins} ⚡ Chaqmoq bonusi berildi!</div>
                 </div>
                 <p>To'plangan Chaqmoqlaringizni profil sozlamalarida va Do'konda yangi avatar ramkalari hamda fonlarni xarid qilish uchun sarflashingiz mumkin.</p>
                 <p>Maroqli mutolaa tilaymiz!</p>

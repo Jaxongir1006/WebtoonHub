@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { creatorApi } from '../api/creator';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
@@ -18,36 +18,47 @@ import {
 } from 'lucide-react';
 
 export const CreatorApplyPage: React.FC = () => {
-  const { isAuthenticated, openAuthModal } = useAuth();
+  const { user, isAuthenticated, isLoading: checkingAccount, openAuthModal } = useAuth();
   const { t, language } = useLanguage();
   const [existingRequest, setExistingRequest] = useState<CreatorRequest | null>(null);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [loadError, setLoadError] = useState(false);
+  const generation = useRef(0);
+  const pending = useRef(false);
+  const owner = useRef(user?.id); owner.current = user?.id;
+  useEffect(() => { setMessage(''); setFeedback(null); setExistingRequest(null); }, [user?.id]);
 
   const fetchMyRequest = useCallback(async () => {
+    const request = ++generation.current;
+    if (checkingAccount) return;
     if (!isAuthenticated) {
       setLoading(false);
+      setExistingRequest(null);
       return;
     }
     setLoading(true);
+    setLoadError(false);
     try {
       const data = await creatorApi.getMyRequest();
-      setExistingRequest(data);
+      if (generation.current === request) setExistingRequest(data);
     } catch (err) {
-      console.error("Failed to load creator request", err);
+      if (generation.current === request) setLoadError(true);
     } finally {
-      setLoading(false);
+      if (generation.current === request) setLoading(false);
     }
-  }, [isAuthenticated]);
+  }, [user?.id, isAuthenticated, checkingAccount]);
 
   useEffect(() => {
     fetchMyRequest();
+    return () => { generation.current++; };
   }, [fetchMyRequest]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (pending.current) return;
     if (!isAuthenticated) {
       openAuthModal('login');
       return;
@@ -60,26 +71,30 @@ export const CreatorApplyPage: React.FC = () => {
       return;
     }
 
-    setSubmitting(true);
+    pending.current = true; const id = user?.id; setSubmitting(true);
     setFeedback(null);
     try {
       const res = await creatorApi.submitRequest(message.trim());
+      if (id !== owner.current) return;
       setFeedback({
         type: 'success',
-        message: res.message || t('creator.successTitle')
+        message: t('creator.successTitle')
       });
       setMessage('');
+      // This refresh handles its own failure; the acknowledged application remains successful.
       await fetchMyRequest();
     } catch (err) {
-      setFeedback({
+      if (id === owner.current) setFeedback({
         type: 'error',
         message: getApiErrorMessage(err, t('common.error'))
       });
     } finally {
+      pending.current = false;
       setSubmitting(false);
     }
   };
 
+  if (checkingAccount) return <div role="status" className="py-24 text-center">{t('readerFix.checking')}</div>;
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen py-24 flex flex-col items-center justify-center text-center px-4">
@@ -121,6 +136,7 @@ export const CreatorApplyPage: React.FC = () => {
           </div>
         </div>
 
+        {loadError && <div role="alert" className="p-4 text-center text-rose-200"><p>{t('readerFix.loadError')}</p><button className="min-h-[44px] px-4 underline" onClick={fetchMyRequest}>{t('common.retry')}</button></div>}
         {/* Existing Application Status Card */}
         {loading ? (
           <div className="py-12 flex justify-center items-center text-studio-400 gap-2">
@@ -198,7 +214,7 @@ export const CreatorApplyPage: React.FC = () => {
         ) : null}
 
         {/* New Application Form (if no request or if rejected) */}
-        {(!existingRequest || existingRequest.status === 'rejected') && !loading && (
+        {(!existingRequest || existingRequest.status === 'rejected') && !loading && !loadError && (
           <div className="bg-studio-900 border border-studio-800 rounded-3xl p-6 sm:p-8 shadow-xl">
             <div className="flex items-center gap-2 pb-4 border-b border-studio-800 mb-6">
               <PenTool className="w-5 h-5 text-brand-400" />
@@ -207,6 +223,7 @@ export const CreatorApplyPage: React.FC = () => {
 
             {feedback && (
               <div
+                role="status"
                 className={`mb-6 p-4 rounded-xl text-xs flex items-center gap-2 ${
                   feedback.type === 'success'
                     ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-400'
@@ -224,10 +241,14 @@ export const CreatorApplyPage: React.FC = () => {
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-studio-300 mb-1.5">
+                <label htmlFor="creator-experience" className="block text-xs font-semibold text-studio-300 mb-1.5">
                   {t('creator.experienceFieldLabel')}
                 </label>
                 <textarea
+                  id="creator-experience"
+                  minLength={10}
+                  maxLength={5000}
+                  disabled={submitting}
                   required
                   rows={5}
                   value={message}

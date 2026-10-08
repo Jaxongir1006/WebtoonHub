@@ -1,22 +1,38 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import axios from 'axios';
 import { shopApi } from '../api/shop';
 import { useAuth } from '../context/AuthContext';
 import { useDailyBonus } from '../context/DailyBonusContext';
 import { useLanguage } from '../context/LanguageContext';
-import { ShopItem } from '../types';
+import { ShopItem, ShopItemType, CardRarity } from '../types';
 import { ShopItemCard } from '../components/shop/ShopItemCard';
 import { AvatarFrame } from '../components/common/AvatarFrame';
 import { Zap, ShoppingBag, Sparkles, Gift, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
 import { getApiErrorMessage } from '../api/client';
+import { useSearchParams } from 'react-router-dom';
+import { CARD_RARITIES, cardRarity } from '../utils/cards';
 
 export const ShopPage: React.FC = () => {
-  const { user, isAuthenticated, refreshProfile, updateCoinsLocally, openAuthModal } = useAuth();
+  const { user, isAuthenticated, isLoading: authLoading, refreshProfile, updateCoinsLocally, openAuthModal } = useAuth();
   const { openModal: openDailyBonusModal, isClaimedToday } = useDailyBonus();
   const { t } = useLanguage();
+  const actorIdentity = useRef(user?.id);
+  actorIdentity.current = user?.id;
 
   const [items, setItems] = useState<ShopItem[]>([]);
-  const [filterType, setFilterType] = useState<'all' | 'frame' | 'background'>('all');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialType = searchParams.get('type');
+  const [filterType, setFilterType] = useState<'all' | ShopItemType>(initialType === 'card' || initialType === 'frame' || initialType === 'background' ? initialType : 'all');
+  const [rarity, setRarity] = useState<CardRarity | 'all'>('all');
+  useEffect(() => {
+    const type = searchParams.get('type');
+    setFilterType(type === 'card' || type === 'frame' || type === 'background' ? type : 'all');
+  }, [searchParams]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const requestId = useRef(0);
+  const actionLock = useRef(false);
+  const [actionBusy, setActionBusy] = useState(false);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   const showToast = (type: 'success' | 'error', message: string) => {
@@ -25,68 +41,96 @@ export const ShopPage: React.FC = () => {
   };
 
   const fetchItems = useCallback(async () => {
+    const request = ++requestId.current;
     setLoading(true);
+    setLoadError(false);
     try {
       const typeParam = filterType === 'all' ? undefined : filterType;
       const data = await shopApi.listItems(typeParam);
-      setItems(data || []);
+      if (request === requestId.current) setItems(data || []);
     } catch (err) {
       console.error("Failed to load shop items", err);
+      if (request === requestId.current) setLoadError(true);
     } finally {
-      setLoading(false);
+      if (request === requestId.current) setLoading(false);
     }
-  }, [filterType]);
+  }, [filterType, user?.id]);
 
   useEffect(() => {
-    fetchItems();
-  }, [fetchItems]);
+    if (!authLoading) { setItems([]); fetchItems(); }
+    return () => { requestId.current++; };
+  }, [fetchItems, authLoading]);
 
   const handleBuy = async (itemId: number): Promise<boolean> => {
+    if (actionLock.current) return false;
+    const actor = actorIdentity.current;
+    const offer = items.find(item => item.id === itemId);
+    if (!actor || !offer) return false;
+    actionLock.current = true; setActionBusy(true);
+    const isCardPurchase = items.some(item => item.id === itemId && item.item_type === 'card');
     try {
-      const res = await shopApi.buyItem(itemId);
+      const res = await shopApi.buyItem(itemId, offer.price_coins);
+      if (actor !== actorIdentity.current) return false;
       if (res.data) {
         updateCoinsLocally(res.data.remaining_coins);
       }
-      showToast('success', res.message || t('shop.buySuccess'));
+      setItems(previous => previous.map(item => item.id === itemId ? { ...item, is_owned: true } : item));
+      showToast('success', `${isCardPurchase ? t('cards.collectSuccess') + ' ' : ''}${t('shop.receipt', { name: res.data.item_name, price: res.data.price_paid })}`);
       await fetchItems();
-      await refreshProfile();
+      if (actor !== actorIdentity.current) return true;
+      await refreshProfile().catch(() => undefined);
       return true;
     } catch (err) {
-      showToast('error', getApiErrorMessage(err, t('common.error')));
+      if (actor === actorIdentity.current) {
+        showToast('error', axios.isAxiosError(err) && err.response?.status === 409 ? t('shop.priceChanged') : getApiErrorMessage(err, t('common.error')));
+        await fetchItems();
+      }
       return false;
-    }
+    } finally { actionLock.current = false; setActionBusy(false); }
   };
 
   const handleEquip = async (itemId: number): Promise<boolean> => {
+    const actor = actorIdentity.current;
+    if (actionLock.current) return false;
+    actionLock.current = true; setActionBusy(true);
     try {
       const res = await shopApi.equipItem(itemId);
-      showToast('success', res.message || t('shop.equipSuccess'));
-      await refreshProfile();
+      if (actor !== actorIdentity.current) return false;
+      if (actor === actorIdentity.current) showToast('success', t('shop.equipSuccess'));
+      if (actor !== actorIdentity.current) return false;
+      await refreshProfile().catch(() => undefined);
       return true;
     } catch (err) {
-      showToast('error', getApiErrorMessage(err, t('common.error')));
+      if (actor === actorIdentity.current) showToast('error', getApiErrorMessage(err, t('common.error')));
       return false;
-    }
+    } finally { actionLock.current = false; setActionBusy(false); }
   };
 
   const handleUnequip = async (itemId: number): Promise<boolean> => {
+    const actor = actorIdentity.current;
+    if (actionLock.current) return false;
+    actionLock.current = true; setActionBusy(true);
     try {
       const res = await shopApi.unequipItem(itemId);
-      showToast('success', res.message || t('shop.unequipSuccess'));
-      await refreshProfile();
+      if (actor !== actorIdentity.current) return false;
+      if (actor === actorIdentity.current) showToast('success', t('shop.unequipSuccess'));
+      if (actor !== actorIdentity.current) return false;
+      await refreshProfile().catch(() => undefined);
       return true;
     } catch (err) {
-      showToast('error', getApiErrorMessage(err, t('common.error')));
+      if (actor === actorIdentity.current) showToast('error', getApiErrorMessage(err, t('common.error')));
       return false;
-    }
+    } finally { actionLock.current = false; setActionBusy(false); }
   };
 
+  if (authLoading) return <div role="status" className="py-24 text-center">{t('common.loading')}</div>;
+  const visibleItems = items.filter(item => item.item_type !== 'card' || rarity === 'all' || cardRarity(item.rarity) === rarity);
   return (
     <div className="min-h-screen pb-16">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Floating Toast Notification */}
         {toast && (
-          <div className="fixed bottom-6 right-6 z-50 animate-in slide-in-from-bottom duration-300">
+          <div role="status" className="fixed bottom-6 right-6 left-6 sm:left-auto z-50 animate-in slide-in-from-bottom duration-300">
             <div
               className={`p-4 rounded-2xl shadow-2xl flex items-center gap-3 border ${
                 toast.type === 'success'
@@ -116,10 +160,10 @@ export const ShopPage: React.FC = () => {
                 <span>{t('shop.title')}</span>
               </div>
               <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight">
-                {t('shop.tabFrames')} &amp; {t('shop.tabBackgrounds')}
+                {t('cards.shopTitle')}
               </h1>
               <p className="text-xs sm:text-sm text-studio-400 max-w-lg leading-relaxed">
-                {t('shop.subtitle')}
+                {t('cards.shopSubtitle')}
               </p>
             </div>
 
@@ -130,6 +174,7 @@ export const ShopPage: React.FC = () => {
                   <div className="flex items-center gap-3">
                     <AvatarFrame
                       username={user.username}
+                      avatarUrl={user.avatar_url}
                       frameUrl={user.active_frame?.asset_url}
                       size="lg"
                     />
@@ -176,15 +221,17 @@ export const ShopPage: React.FC = () => {
         </div>
 
         {/* Filter Tabs */}
-        <div className="flex items-center gap-2 mb-8 select-none">
+        <div className="flex flex-wrap items-center gap-2 mb-5 select-none">
           {[
             { label: t('shop.tabAll'), value: 'all' },
             { label: t('shop.tabFrames'), value: 'frame' },
             { label: t('shop.tabBackgrounds'), value: 'background' },
+            { label: t('cards.title'), value: 'card' },
           ].map((tab) => (
             <button
               key={tab.value}
-              onClick={() => setFilterType(tab.value as any)}
+              onClick={() => { setFilterType(tab.value as 'all' | ShopItemType); setRarity('all'); const next = new URLSearchParams(searchParams); if (tab.value === 'all') next.delete('type'); else next.set('type', tab.value); setSearchParams(next, { replace: true }); }}
+              aria-pressed={filterType === tab.value}
               className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all ${
                 filterType === tab.value
                   ? 'bg-brand-500 text-studio-950 shadow-glow-brand'
@@ -195,6 +242,7 @@ export const ShopPage: React.FC = () => {
             </button>
           ))}
         </div>
+        {filterType === 'card' && <div className="mb-8 space-y-3"><p className="max-w-2xl text-xs leading-relaxed text-studio-300">{t('cards.description')}</p><div className="flex flex-wrap gap-2" aria-label={t('cards.all')}>{(['all', ...CARD_RARITIES] as const).map(value => <button type="button" key={value} aria-pressed={rarity === value} onClick={() => setRarity(value)} className={`min-h-11 rounded-xl border px-3 text-xs font-bold ${rarity === value ? 'border-brand-500 bg-brand-500 text-studio-950' : 'border-studio-700 text-studio-300'}`}>{t(value === 'all' ? 'cards.all' : 'cards.rarity.' + value)}</button>)}</div></div>}
 
         {/* Items Grid */}
         {loading ? (
@@ -202,17 +250,22 @@ export const ShopPage: React.FC = () => {
             <Loader2 className="w-8 h-8 animate-spin text-brand-500" />
             <span className="text-sm">{t('common.loading')}</span>
           </div>
-        ) : items.length === 0 ? (
+        ) : loadError ? (
+          <div role="alert" className="py-16 text-center space-y-4">
+            <p>{t('socialFix.loadFailed')}</p>
+            <button onClick={fetchItems} className="px-5 py-3 rounded-xl bg-brand-500 text-studio-950">{t('socialFix.retry')}</button>
+          </div>
+        ) : visibleItems.length === 0 ? (
           <div className="py-20 text-center bg-studio-900/40 border border-studio-800 rounded-3xl p-8 max-w-md mx-auto">
             <ShoppingBag className="w-12 h-12 mx-auto text-studio-600 mb-3" />
-            <h3 className="font-bold text-white text-base mb-1">{t('catalog.emptyTitle')}</h3>
+            <h3 className="font-bold text-white text-base mb-1">{t('socialFix.shopEmpty')}</h3>
             <p className="text-xs text-studio-400">
-              {t('shop.empty')}
+              {t(filterType === 'card' && items.length ? 'cards.emptyFilter' : 'shop.empty')}
             </p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {items.map((item) => {
+            {visibleItems.map((item) => {
               const isEquipped =
                 (item.item_type === 'frame' && user?.active_frame?.id === item.id) ||
                 (item.item_type === 'background' && user?.active_background?.id === item.id);
@@ -220,7 +273,8 @@ export const ShopPage: React.FC = () => {
               return (
                 <ShopItemCard
                   key={item.id}
-                  item={item}
+                  actionBusy={actionBusy}
+              item={item}
                   isEquipped={!!isEquipped}
                   onBuy={handleBuy}
                   onEquip={handleEquip}

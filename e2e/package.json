@@ -1,0 +1,13 @@
+{
+  "name": "webtoonhub-integration-tests",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "install:browser": "playwright install chromium"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.58.2"
+  }
+}

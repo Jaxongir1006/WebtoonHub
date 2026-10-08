@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
-import { SupportedLocale, translations, localeMeta, defaultLocale, getTranslation } from '../i18n';
+import { SupportedLocale, translations, localeMeta, defaultLocale, getTranslation, getExtraTranslation } from '../i18n';
 
 interface LanguageContextType {
   language: SupportedLocale;
@@ -15,7 +15,8 @@ const STORAGE_KEY = 'webtoonhub_lang';
 
 export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [language, setLanguageState] = useState<SupportedLocale>(() => {
-    const saved = localStorage.getItem(STORAGE_KEY) as SupportedLocale | null;
+    let saved: SupportedLocale | null = null;
+    try { saved = localStorage.getItem(STORAGE_KEY) as SupportedLocale | null; } catch { /* Use the browser locale if storage is unavailable. */ }
     if (saved && (saved === 'uz' || saved === 'ru' || saved === 'en')) {
       return saved;
     }
@@ -28,7 +29,7 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const setLanguage = useCallback((newLang: SupportedLocale) => {
     setLanguageState(newLang);
-    localStorage.setItem(STORAGE_KEY, newLang);
+    try { localStorage.setItem(STORAGE_KEY, newLang); } catch { /* Language changes still work for this session. */ }
     document.documentElement.lang = newLang;
   }, []);
 
@@ -40,7 +41,7 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     (path: string, params?: Record<string, string | number>): string => {
       const activeDict = translations[language] || translations[defaultLocale];
       const fallbackDict = translations[defaultLocale];
-      return getTranslation(activeDict, path, params, fallbackDict);
+      return getExtraTranslation(language, path, params) ?? getTranslation(activeDict, path, params, fallbackDict);
     },
     [language]
   );

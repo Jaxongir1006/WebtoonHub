@@ -6,13 +6,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
+from app.core.media_cleanup import delete_unreferenced_media
 from app.modules.clans.models import Clan, ClanLevelConfig, ClanMember
 from app.modules.clans.schemas import ClanLevelConfigItem
 from app.modules.staff.dependencies import require_any_permission
 from app.modules.staff.models import StaffUser, SystemSetting
 
 staff_router = APIRouter(prefix="/staff/clans", tags=["Staff Clan Management"])
-clan_permission = require_any_permission(["settings:manage", "users:manage", "roles:manage"])
+clan_permission = require_any_permission("settings:manage", "users:manage", "roles:manage")
 
 
 class CreationCostUpdatePayload(BaseModel):
@@ -170,6 +171,9 @@ async def delete_clan_admin(
     if not clan:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Klan topilmadi")
 
+    old_assets = [clan.avatar_url, clan.frame_url, clan.banner_url]
     await db.delete(clan)
     await db.commit()
+    for url in old_assets:
+        await delete_unreferenced_media(db, url)
     return {"success": True, "message": f"'{clan.name}' klani tizimdan o'chirildi"}

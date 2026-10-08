@@ -1,9 +1,11 @@
 import { apiClient } from './client';
 import { ApiResponse, FriendRequestItem, FriendUserSummary } from '../types';
 
+type FriendListResponse = ApiResponse<FriendUserSummary[]> & { pagination?: { offset: number; limit: number; total: number; has_more: boolean } };
+
 export const friendsApi = {
-  getFriends: async (): Promise<ApiResponse<FriendUserSummary[]>> => {
-    const response = await apiClient.get<ApiResponse<FriendUserSummary[]>>('/friends');
+  getFriends: async (offset = 0, limit = 40): Promise<FriendListResponse> => {
+    const response = await apiClient.get<FriendListResponse>('/friends', { params: { offset, limit } });
     return response.data;
   },
 

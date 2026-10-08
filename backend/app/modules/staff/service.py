@@ -1,4 +1,5 @@
 import hashlib
+import asyncio
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
@@ -52,7 +53,14 @@ class StaffService:
         result = await db.execute(stmt)
         staff = result.scalar_one_or_none()
 
-        if not staff or not verify_password(password, staff.hashed_password):
+        password_hash = staff.hashed_password if staff else ''
+        if staff and staff.user_id:
+            from app.modules.users.models import User
+            reader = await db.get(User, staff.user_id)
+            if not reader or not reader.is_active:
+                raise HTTPException(403, 'Linked reader account is unavailable')
+            password_hash = reader.hashed_password
+        if not staff or not await asyncio.to_thread(verify_password, password, password_hash):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Kiritilgan email yoki parol xodimlar ro'yxatida topilmadi"
@@ -98,6 +106,7 @@ class StaffService:
         role_item = RoleItem(
             id=staff.role.id,
             name=staff.role.name,
+            system_key=staff.role.system_key, scope=staff.role.scope,
             description=staff.role.description,
             permissions=[PermissionItem.model_validate(p) for p in staff.role.permissions]
         )
@@ -134,6 +143,7 @@ class StaffService:
         role_item = RoleItem(
             id=staff.role.id,
             name=staff.role.name,
+            system_key=staff.role.system_key, scope=staff.role.scope,
             description=staff.role.description,
             permissions=[PermissionItem.model_validate(p) for p in staff.role.permissions]
         )
@@ -155,6 +165,7 @@ class StaffService:
             RoleItem(
                 id=r.id,
                 name=r.name,
+                system_key=r.system_key, scope=r.scope,
                 description=r.description,
                 permissions=[PermissionItem.model_validate(p) for p in r.permissions]
             )
@@ -163,6 +174,8 @@ class StaffService:
 
     @staticmethod
     async def create_role(db: AsyncSession, data: RoleCreateRequest) -> RoleItem:
+        if data.name.strip().lower() in {'creator', 'superadmin'}:
+            raise HTTPException(422, 'This name is reserved for a system role')
         stmt = select(Role).where(Role.name == data.name)
         result = await db.execute(stmt)
         if result.scalar_one_or_none():
@@ -179,7 +192,7 @@ class StaffService:
             perms = list(p_res.scalars().all())
 
         new_role = Role(
-            name=data.name,
+            name=data.name.strip(), system_key=None, scope='global',
             description=data.description,
             permissions=perms
         )
@@ -190,6 +203,7 @@ class StaffService:
         return RoleItem(
             id=new_role.id,
             name=new_role.name,
+            system_key=new_role.system_key, scope=new_role.scope,
             description=new_role.description,
             permissions=[PermissionItem.model_validate(p) for p in perms]
         )
@@ -223,7 +237,7 @@ class StaffService:
     ) -> List[StaffSessionItem]:
         stmt = (
             select(StaffSession)
-            .where(StaffSession.staff_id == staff_id, StaffSession.is_active.is_(True))
+            .where(StaffSession.staff_id == staff_id, StaffSession.is_active.is_(True), StaffSession.expires_at > datetime.now(timezone.utc))
             .order_by(StaffSession.last_active_at.desc())
         )
         result = await db.execute(stmt)
@@ -287,7 +301,7 @@ class StaffService:
         # Check uniqueness
         stmt = select(StaffUser).where((StaffUser.email == data.email) | (StaffUser.username == data.username))
         res = await db.execute(stmt)
-        if res.scalar_one_or_none():
+        if res.scalars().first():
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="Ushbu email yoki username orqali xodim allaqachon mavjud"
@@ -304,7 +318,7 @@ class StaffService:
         new_staff = StaffUser(
             username=data.username,
             email=data.email,
-            hashed_password=hash_password(data.password),
+            hashed_password=await asyncio.to_thread(hash_password, data.password),
             role_id=data.role_id,
             is_active=True
         )
@@ -351,10 +365,11 @@ class StaffService:
         if not user:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Foydalanuvchi topilmadi")
 
-        if data.lightning_coins is not None:
-            user.lightning_coins = data.lightning_coins
         if data.is_active is not None:
             user.is_active = data.is_active
+            if not data.is_active:
+                from app.modules.auth.recovery import revoke_user_sessions
+                await revoke_user_sessions(db, user.id)
 
         await db.commit()
         await db.refresh(user)
@@ -381,6 +396,7 @@ class StaffService:
             total_readers=r_count,
             total_webtoons=w_count,
             total_chapters=ch_count,
+            published_chapters=await db.scalar(select(func.count(Chapter.id)).where(Chapter.status == "published")),
             pending_chapters=pending_ch,
             pending_creator_requests=pending_req,
             total_comments=comm_count,
@@ -397,7 +413,13 @@ class StaffService:
     @staticmethod
     async def update_settings(db: AsyncSession, settings_data):
         from app.modules.staff.models import SystemSetting
+        from app.core.economy import ALIASES, DEFAULTS
         for entry in settings_data:
+            canonical = ALIASES.get(entry.key, entry.key)
+            if canonical in DEFAULTS or entry.key == "clan_creation_cost":
+                if not entry.value.isdigit() or int(entry.value) > 1000000:
+                    raise HTTPException(422, "Economy settings must be nonnegative integers")
+                entry.key = canonical
             stmt = select(SystemSetting).where(SystemSetting.key == entry.key)
             res = await db.execute(stmt)
             obj = res.scalar_one_or_none()
@@ -406,22 +428,6 @@ class StaffService:
             else:
                 obj = SystemSetting(key=entry.key, value=entry.value)
                 db.add(obj)
-
-            if entry.key == "register_bonus_coins":
-                try:
-                    settings.INITIAL_COINS = int(entry.value)
-                except ValueError:
-                    pass
-            elif entry.key == "daily_checkin_coins":
-                try:
-                    settings.DAILY_LOGIN_COINS = int(entry.value)
-                except ValueError:
-                    pass
-            elif entry.key == "chapter_read_coins":
-                try:
-                    settings.CHAPTER_READ_COINS = int(entry.value)
-                except ValueError:
-                    pass
 
         await db.commit()
         stmt = select(SystemSetting).order_by(SystemSetting.key.asc())
@@ -439,6 +445,8 @@ class StaffService:
 
         if data.name is not None and data.name.strip():
             if data.name.strip() != role.name:
+                if data.name.strip().lower() in {'creator', 'superadmin'} and role.system_key != data.name.strip().lower():
+                    raise HTTPException(422, 'This name is reserved for a system role')
                 name_stmt = select(Role).where(Role.name == data.name.strip())
                 existing = (await db.execute(name_stmt)).scalar_one_or_none()
                 if existing:
@@ -467,11 +475,11 @@ class StaffService:
         if not role:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rol topilmadi")
 
-        if role.name == "superadmin":
+        if role.system_key in {'superadmin', 'creator'}:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Superadmin rolini o'chirib bo'lmaydi")
 
         st_check = select(StaffUser).where(StaffUser.role_id == role_id)
-        assigned_staff = (await db.execute(st_check)).scalar_one_or_none()
+        assigned_staff = (await db.execute(st_check.limit(1))).scalar_one_or_none()
         if assigned_staff:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -513,7 +521,14 @@ class StaffService:
             staff.is_active = data.is_active
 
         if data.password is not None and len(data.password) >= 6:
-            staff.hashed_password = hash_password(data.password)
+            staff.hashed_password = await asyncio.to_thread(hash_password, data.password)
+            if staff.user_id:
+                from app.modules.users.models import User
+                from app.modules.auth.recovery import revoke_user_sessions
+                reader = await db.get(User, staff.user_id)
+                reader.hashed_password = staff.hashed_password
+                await revoke_user_sessions(db, reader.id)
+            await db.execute(update(StaffSession).where(StaffSession.staff_id == staff.id).values(is_active=False))
 
         await db.commit()
         stmt = select(StaffUser).options(selectinload(StaffUser.role).selectinload(Role.permissions)).where(StaffUser.id == staff_id)
@@ -559,6 +574,9 @@ class StaffService:
         if not user:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Foydalanuvchi topilmadi")
         user.is_active = not user.is_active
+        if not user.is_active:
+            from app.modules.auth.recovery import revoke_user_sessions
+            await revoke_user_sessions(db, user.id)
         await db.commit()
         await db.refresh(user)
         return user

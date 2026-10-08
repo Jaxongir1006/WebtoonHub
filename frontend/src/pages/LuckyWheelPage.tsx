@@ -1,10 +1,14 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import axios from 'axios';
 import { Link } from 'react-router-dom';
 import confetti from 'canvas-confetti';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { wheelApi, WheelSummary, WheelDetail, WheelItem, SpinResult, SpinHistoryItem } from '../api/wheel';
 import { getApiErrorMessage } from '../api/client';
+import { Modal } from '../components/common/Modal';
+import { useReducedMotion } from '../hooks/useReducedMotion';
+import { PendingSpin, readPendingSpin, storePendingSpin, clearPendingSpin } from '../utils/spinIntent';
 import {
   Sparkles,
   Zap,
@@ -24,13 +28,26 @@ import {
 } from 'lucide-react';
 
 export const LuckyWheelPage: React.FC = () => {
-  const { user, isAuthenticated, openAuthModal, updateCoinsLocally } = useAuth();
+  const { user, isAuthenticated, isLoading: authLoading, openAuthModal, updateCoinsLocally, refreshProfile } = useAuth();
   const { t, language } = useLanguage();
+  const reducedMotion = useReducedMotion();
+  const motionPreference = useRef(reducedMotion); motionPreference.current = reducedMotion;
+  const [pendingIntent, setPendingIntent] = useState<PendingSpin | null>(null);
+  const pendingIntentRef = useRef<PendingSpin | null>(null);
 
   const [wheels, setWheels] = useState<WheelSummary[]>([]);
   const [selectedWheelId, setSelectedWheelId] = useState<number | null>(null);
   const [wheelDetail, setWheelDetail] = useState<WheelDetail | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const detailRequest = useRef(0);
+  const listRequest = useRef(0);
+  const historyRequest = useRef(0);
+  const spinTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const tickTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const finishSpin = useRef<(() => void) | null>(null);
+  const mounted = useRef(true);
+  const spinLock = useRef(false);
   const [spinning, setSpinning] = useState<boolean>(false);
   const [rotation, setRotation] = useState<number>(0);
   const [activeTab, setActiveTab] = useState<'public_history' | 'my_history' | 'odds'>('public_history');
@@ -48,7 +65,7 @@ export const LuckyWheelPage: React.FC = () => {
 
   // Play tick sound synthesized via Web Audio API
   const playTickSound = () => {
-    if (!soundEnabled) return;
+    if (!soundEnabled || motionPreference.current) return;
     try {
       if (!audioCtxRef.current) {
         audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -74,7 +91,7 @@ export const LuckyWheelPage: React.FC = () => {
 
   // Play fanfare victory sound
   const playWinSound = (isJackpot = false) => {
-    if (!soundEnabled) return;
+    if (!soundEnabled || motionPreference.current) return;
     try {
       if (!audioCtxRef.current) {
         audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -102,162 +119,160 @@ export const LuckyWheelPage: React.FC = () => {
 
   // Load available wheels
   const loadWheels = async () => {
+    const request = ++listRequest.current;
     try {
       setLoading(true);
       const data = await wheelApi.listWheels();
+      if (!mounted.current || request !== listRequest.current) return;
       setWheels(data);
       if (data.length > 0) {
-        const targetId = selectedWheelId || data[0].id;
+        const remembered = pendingIntentRef.current?.wheel_id ?? selectedWheelId;
+        const targetId = data.some(wheel => wheel.id === remembered) ? remembered! : data[0].id;
         setSelectedWheelId(targetId);
         await loadWheelDetail(targetId);
+      } else {
+        detailRequest.current++; historyRequest.current++;
+        setSelectedWheelId(null); setWheelDetail(null); setPublicHistory([]); setMyHistory([]);
       }
     } catch (err) {
-      setErrorToast(getApiErrorMessage(err, t('wheel.errorLoadingWheel')));
+      if (mounted.current && request === listRequest.current) setErrorToast(getApiErrorMessage(err, t('wheel.errorLoadingWheel')));
     } finally {
-      setLoading(false);
+      if (mounted.current && request === listRequest.current) setLoading(false);
     }
   };
 
   // Load wheel detail
   const loadWheelDetail = async (wheelId: number) => {
+    const request = ++detailRequest.current;
+    setDetailLoading(true);
+    setWheelDetail(null);
     try {
       const data = await wheelApi.getWheel(wheelId);
+      if (!mounted.current || request !== detailRequest.current) return;
       setWheelDetail(data);
       loadHistory(wheelId);
     } catch (err) {
-      setErrorToast(getApiErrorMessage(err, t('wheel.errorLoadingDetail')));
+      if (mounted.current && request === detailRequest.current) setErrorToast(getApiErrorMessage(err, t('wheel.errorLoadingDetail')));
+    } finally {
+      if (mounted.current && request === detailRequest.current) setDetailLoading(false);
     }
   };
 
   const loadHistory = async (wheelId: number) => {
+    const request = ++historyRequest.current;
     setHistoryLoading(true);
     try {
-      const pub = await wheelApi.getWheelHistory(wheelId, 20);
+      const [pub, my] = await Promise.all([wheelApi.getWheelHistory(wheelId, 20), isAuthenticated ? wheelApi.getMyHistory(20) : Promise.resolve([])]);
+      if (!mounted.current || request !== historyRequest.current) return;
       setPublicHistory(pub);
-      if (isAuthenticated) {
-        const my = await wheelApi.getMyHistory(20);
-        setMyHistory(my);
-      }
-    } catch {
-      // silent
+      setMyHistory(my);
+    } catch (err) {
+      if (mounted.current && request === historyRequest.current) setErrorToast(getApiErrorMessage(err, t('socialFix.loadFailed')));
     } finally {
-      setHistoryLoading(false);
+      if (mounted.current && request === historyRequest.current) setHistoryLoading(false);
     }
   };
 
   useEffect(() => {
-    loadWheels();
-  }, [isAuthenticated]);
+    mounted.current = true;
+    const remembered = user ? readPendingSpin(user.id) : null;
+    pendingIntentRef.current = remembered; setPendingIntent(remembered);
+    setWheelDetail(null); setSpinning(false); setShowWinModal(false); setWinResult(null); setErrorToast(null);
+    setPublicHistory([]);
+    setMyHistory([]);
+    if (!authLoading) loadWheels();
+    return () => {
+      mounted.current = false;
+      listRequest.current++;
+      detailRequest.current++;
+      historyRequest.current++;
+      if (spinTimer.current) clearTimeout(spinTimer.current);
+      if (tickTimer.current) clearInterval(tickTimer.current);
+      spinLock.current = false; finishSpin.current = null;
+    };
+  }, [user?.id, authLoading]);
 
   // Handle Wheel Selection Change
   const handleSelectWheel = (w: WheelSummary) => {
-    if (spinning) return;
+    if (spinning || spinLock.current || pendingIntentRef.current) return;
     setSelectedWheelId(w.id);
     loadWheelDetail(w.id);
   };
 
-  // Spin Wheel Action
+  useEffect(() => {
+    if (reducedMotion) finishSpin.current?.();
+  }, [reducedMotion]);
+
+  // Persist one intent before sending. An uncertain response always retries that intent.
   const handleSpin = async () => {
-    if (!isAuthenticated) {
-      openAuthModal('login');
-      return;
+    if (!isAuthenticated || !user) { openAuthModal('login'); return; }
+    if (spinning || spinLock.current) return;
+    const existing = pendingIntentRef.current?.owner_id === user.id ? pendingIntentRef.current : readPendingSpin(user.id);
+    if (!existing && (!wheelDetail || detailLoading || wheelDetail.id !== selectedWheelId)) return;
+    const recovering = !!existing;
+    const isFree = existing?.expected_mode === 'free' || (!existing && !!wheelDetail?.is_free_spin_available);
+    const cost = existing?.expected_cost ?? (isFree ? 0 : wheelDetail!.cost_coins);
+    if (!existing && !isFree && user.lightning_coins < cost) {
+      setErrorToast(t('socialFix.insufficientCoins', { cost, balance: user.lightning_coins })); return;
     }
-    if (!wheelDetail || spinning) return;
-
-    // Check if free spin or has enough coins
-    const isFree = wheelDetail.is_free_spin_available;
-    const cost = isFree ? 0 : wheelDetail.cost_coins;
-    const userCoins = user?.lightning_coins || 0;
-
-    if (!isFree && userCoins < cost) {
-      setErrorToast(`Balansingizda yetarli Chaqmoq mavjud emas! (Kerak: ${cost} ⚡, sizda: ${userCoins} ⚡)`);
-      return;
-    }
-
+    const intent: PendingSpin = existing ?? {
+      owner_id: user.id, wheel_id: wheelDetail!.id, operation_key: crypto.randomUUID(),
+      expected_mode: isFree ? 'free' : 'paid', expected_cost: cost, created_at: new Date().toISOString()
+    };
+    if (!existing && !storePendingSpin(intent)) { setErrorToast(t('wheel.pendingStorage')); return; }
+    pendingIntentRef.current = intent; setPendingIntent(intent);
+    const identityRequest = listRequest.current;
+    const active = () => mounted.current && identityRequest === listRequest.current;
+    spinLock.current = true; setSpinning(true); setErrorToast(null);
     try {
-      setSpinning(true);
-      setErrorToast(null);
-
-      // Call API to determine win
-      const result = await wheelApi.spinWheel(wheelDetail.id);
-
-      // Deduct coins locally
-      updateCoinsLocally(result.new_balance);
-
-      // Calculate Rotation Angle
-      // Pointer is at 12 o'clock (0 degrees). Slices start from 12 o'clock going clockwise.
-      // Slices: items array in order. Each slice has angle step = 360 / items.length.
-      // Winning slice center angle = (winning_index + 0.5) * step.
-      // To bring this slice center to top (0 deg), rotate clockwise by:
-      // target = 360 - center_angle.
-      const items = wheelDetail.items;
-      const n = items.length;
-      const step = 360 / n;
-      const targetSliceCenter = (result.winning_index + 0.5) * step;
-
-      // Add slight jitter (-25% to +25% of slice) so it lands naturally within the sector
-      const jitter = (Math.random() - 0.5) * (step * 0.5);
-
-      // Align with previous rotation: add at least 6 full rounds (2160 deg)
-      const currentNorm = rotation % 360;
-      const deltaToTarget = (360 - targetSliceCenter + jitter) - currentNorm;
-      const normalizedDelta = ((deltaToTarget % 360) + 360) % 360;
-      const extraSpins = 6 * 360;
-      const nextRotation = rotation + extraSpins + normalizedDelta;
-
-      // Simulate tick sound during spin
-      let tickInterval: any;
-      let ticksCount = 0;
-      const totalTicks = 35;
-      tickInterval = setInterval(() => {
-        playTickSound();
-        ticksCount++;
-        if (ticksCount >= totalTicks) {
-          clearInterval(tickInterval);
+      const result = await wheelApi.spinWheel(intent.wheel_id, {
+        expected_mode: intent.expected_mode, expected_cost: intent.expected_cost, operation_key: intent.operation_key
+      });
+      if (!active()) return;
+      if (!recovering) updateCoinsLocally(result.new_balance);
+      const finish = () => {
+        if (!active()) return;
+        if (spinTimer.current) clearTimeout(spinTimer.current);
+        if (tickTimer.current) clearInterval(tickTimer.current);
+        spinTimer.current = null; tickTimer.current = null; finishSpin.current = null;
+        clearPendingSpin(intent); pendingIntentRef.current = null; setPendingIntent(null);
+        spinLock.current = false; setSpinning(false); setWinResult(result); setShowWinModal(true);
+        if (!motionPreference.current && !recovering) {
+          playWinSound(result.winning_item.is_jackpot);
+          confetti({ particleCount: result.winning_item.is_jackpot ? 180 : 90, spread: 70,
+            origin: { y: 0.6 }, colors: ['#F59E0B', '#FBBF24', '#FFFFFF', '#6366F1'] });
         }
-      }, 130);
-
-      setRotation(nextRotation);
-
-      // Wait for animation (5 seconds) to complete
-      setTimeout(() => {
-        clearInterval(tickInterval);
-        setSpinning(false);
-        setWinResult(result);
-        setShowWinModal(true);
-
-        // Sound & Confetti
-        const isJackpot = result.winning_item.is_jackpot;
-        playWinSound(isJackpot);
-
-        if (isJackpot) {
-          confetti({
-            particleCount: 180,
-            spread: 100,
-            origin: { y: 0.5 },
-            colors: ['#EF4444', '#F59E0B', '#10B981', '#3B82F6', '#8B5CF6', '#EC4899']
-          });
-        } else {
-          confetti({
-            particleCount: 90,
-            spread: 70,
-            origin: { y: 0.6 },
-            colors: ['#F59E0B', '#FBBF24', '#FFFFFF', '#6366F1']
-          });
+        if (result.is_free_spin) {
+          setWheelDetail(previous => previous?.id === intent.wheel_id ? { ...previous, is_free_spin_available: false } : previous);
+          setWheels(previous => previous.map(wheel => wheel.id === intent.wheel_id ? { ...wheel, is_free_spin_available: false } : wheel));
         }
-
-        // Update wheel status (free spin now consumed)
-        setWheelDetail((prev) => (prev ? { ...prev, is_free_spin_available: false } : null));
-        setWheels((prev) =>
-          prev.map((w) => (w.id === wheelDetail.id ? { ...w, is_free_spin_available: false } : w))
-        );
-
-        // Refresh History
-        loadHistory(wheelDetail.id);
-      }, 5100);
-    } catch (err: any) {
-      setSpinning(false);
-      setErrorToast(getApiErrorMessage(err, "Aylantirishda xatolik yuz berdi"));
+        loadHistory(intent.wheel_id);
+        if (active()) void refreshProfile().catch(() => undefined);
+      };
+      finishSpin.current = finish;
+      if (motionPreference.current || recovering || wheelDetail?.id !== intent.wheel_id || !wheelDetail.items.length) {
+        finish(); return;
+      }
+      const step = 360 / wheelDetail.items.length;
+      const target = 360 - (result.winning_index + 0.5) * step + (Math.random() - 0.5) * step * 0.5;
+      const delta = ((target - rotation % 360) % 360 + 360) % 360;
+      let ticks = 0;
+      tickTimer.current = setInterval(() => { playTickSound(); if (++ticks >= 35 && tickTimer.current) clearInterval(tickTimer.current); }, 130);
+      setRotation(rotation + 6 * 360 + delta);
+      spinTimer.current = setTimeout(finish, 5100);
+    } catch (error) {
+      if (!active()) return;
+      spinLock.current = false; setSpinning(false); finishSpin.current = null;
+      const status = axios.isAxiosError(error) ? error.response?.status : undefined;
+      const detail = axios.isAxiosError(error) ? error.response?.data?.error?.message ?? error.response?.data?.detail ?? '' : '';
+      const operationUnresolved = status === 409 && /operation.*(?:in progress|different action)/i.test(String(detail));
+      if (!operationUnresolved && status && status >= 400 && status < 500 && status !== 408 && status !== 429) {
+        clearPendingSpin(intent); pendingIntentRef.current = null; setPendingIntent(null);
+        setErrorToast(getApiErrorMessage(error, t('common.error')));
+        if (selectedWheelId) loadWheelDetail(selectedWheelId);
+      } else {
+        setErrorToast(t('wheel.pendingSpin'));
+      }
     }
   };
 
@@ -306,14 +321,16 @@ export const LuckyWheelPage: React.FC = () => {
     try {
       const d = new Date(iso);
       const localeStr = language === 'uz' ? 'uz-UZ' : language === 'ru' ? 'ru-RU' : 'en-US';
-      return d.toLocaleTimeString(localeStr, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      return d.toLocaleString(localeStr, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
     } catch {
       return '';
     }
   };
 
+  if (authLoading) return <div role="status" className="py-24 text-center">{t('common.loading')}</div>;
+
   return (
-    <div className="min-h-screen bg-studio-950 text-studio-100 py-8 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
+    <div className="wheel-page min-h-screen bg-studio-950 text-studio-100 py-8 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
       {/* Background Decorative Ambient Glows */}
       <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[700px] h-[700px] bg-brand-500/10 rounded-full blur-[140px] pointer-events-none -z-10" />
       <div className="absolute bottom-10 right-10 w-[450px] h-[450px] bg-purple-600/10 rounded-full blur-[120px] pointer-events-none -z-10" />
@@ -345,7 +362,8 @@ export const LuckyWheelPage: React.FC = () => {
             {wheels.map((w) => (
               <button
                 key={w.id}
-                disabled={spinning}
+                aria-pressed={selectedWheelId === w.id}
+                disabled={spinning || !!pendingIntent}
                 onClick={() => handleSelectWheel(w)}
                 className={`px-5 py-2.5 rounded-2xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 border ${
                   selectedWheelId === w.id
@@ -367,12 +385,13 @@ export const LuckyWheelPage: React.FC = () => {
 
         {/* Error Notification Toast */}
         {errorToast && (
-          <div className="max-w-md mx-auto p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs sm:text-sm flex items-center justify-between gap-3 shadow-lg">
+          <div role="alert" className="max-w-md mx-auto p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs sm:text-sm flex items-center justify-between gap-3 shadow-lg">
             <div className="flex items-center gap-2">
               <AlertCircle className="w-5 h-5 shrink-0 text-rose-400" />
               <span>{errorToast}</span>
             </div>
             <button
+              aria-label={t('common.close')}
               onClick={() => setErrorToast(null)}
               className="text-rose-400 hover:text-white font-bold text-xs"
             >
@@ -381,8 +400,17 @@ export const LuckyWheelPage: React.FC = () => {
           </div>
         )}
 
+        {pendingIntent && !spinning && <div role="status" className="max-w-xl mx-auto p-4 rounded-2xl border border-amber-500/30 bg-amber-500/10 text-sm space-y-3">
+          <p>{t('wheel.pendingSpin')}</p>
+          <button onClick={handleSpin} className="min-h-11 px-4 rounded-xl bg-brand-500 text-studio-950 font-bold">{t('wheel.retrySpin')}</button>
+        </div>}
+
         {/* Main Content Layout: Wheel on Left, History & Odds on Right */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        {loading || detailLoading ? (
+          <div role="status" className="py-24 text-center">{t('socialFix.selectWheel')}</div>
+        ) : !wheelDetail || wheelDetail.items.length < 2 ? (
+          <div className="py-24 text-center space-y-4"><p>{t('socialFix.noWheels')}</p><button onClick={loadWheels} className="px-5 py-3 bg-brand-500 text-studio-950 rounded-xl">{t('socialFix.retry')}</button></div>
+        ) : <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           {/* Wheel Arena Column (7 cols) */}
           <div className="lg:col-span-7 flex flex-col items-center">
             <div className="w-full glass-card rounded-3xl p-6 sm:p-8 border border-studio-800/80 bg-studio-900/40 backdrop-blur-xl relative flex flex-col items-center shadow-2xl">
@@ -396,7 +424,7 @@ export const LuckyWheelPage: React.FC = () => {
                     </span>
                   ) : (
                     <span className="px-3 py-1 rounded-full bg-studio-800 border border-studio-700 text-studio-400 font-medium">
-                      {t('wheel.costLabel')} <strong className="text-amber-400 font-mono">{wheelDetail?.cost_coins || 100} ⚡</strong>
+                      {t('wheel.costLabel')} <strong className="text-amber-400 font-mono">{wheelDetail?.cost_coins ?? 0} ⚡</strong>
                     </span>
                   )}
                 </div>
@@ -411,7 +439,7 @@ export const LuckyWheelPage: React.FC = () => {
               </div>
 
               {/* Interactive Wheel Component */}
-              <div className="relative w-[320px] h-[320px] sm:w-[400px] sm:h-[400px] my-4 flex items-center justify-center select-none">
+              <div className="relative w-full max-w-[320px] sm:max-w-[400px] aspect-square my-4 flex items-center justify-center select-none">
                 {/* Outer Decorative Neon Frame */}
                 <div className="absolute inset-0 rounded-full border-8 border-studio-800 shadow-[0_0_50px_rgba(245,158,11,0.25)] pointer-events-none" />
                 <div className="absolute -inset-2 rounded-full border-2 border-dashed border-amber-500/40 animate-[spin_60s_linear_infinite] pointer-events-none" />
@@ -421,7 +449,7 @@ export const LuckyWheelPage: React.FC = () => {
                   className="w-full h-full rounded-full overflow-hidden transition-transform ease-out will-change-transform"
                   style={{
                     transform: `rotate(${rotation}deg)`,
-                    transitionDuration: spinning ? '5000ms' : '0ms',
+                    transitionDuration: spinning && !reducedMotion ? '5000ms' : '0ms',
                     transitionTimingFunction: 'cubic-bezier(0.12, 0.8, 0.2, 1.0)'
                   }}
                 >
@@ -478,7 +506,7 @@ export const LuckyWheelPage: React.FC = () => {
                   }`}
                 >
                   <Zap className={`w-5 h-5 sm:w-6 sm:h-6 fill-current ${spinning ? 'animate-spin' : ''}`} />
-                  <span className="mt-0.5 font-extrabold">{spinning ? '...' : 'SPIN'}</span>
+                  <span className="mt-0.5 font-extrabold">{spinning ? '...' : t(pendingIntent ? 'wheel.retrySpin' : 'socialFix.spin')}</span>
                 </button>
               </div>
 
@@ -500,7 +528,7 @@ export const LuckyWheelPage: React.FC = () => {
                       <RotateCw className="w-5 h-5 animate-spin" />
                       <span>{t('wheel.spinning')}</span>
                     </>
-                  ) : !isAuthenticated ? (
+                  ) : pendingIntent ? <span>{t('wheel.retrySpin')}</span> : !isAuthenticated ? (
                     <>
                       <Zap className="w-5 h-5 fill-current" />
                       <span>{t('wheel.loginToSpin')}</span>
@@ -513,7 +541,7 @@ export const LuckyWheelPage: React.FC = () => {
                   ) : (
                     <>
                       <Zap className="w-5 h-5 fill-current" />
-                      <span>{t('wheel.spinWithCoins').replace('{cost}', String(wheelDetail?.cost_coins || 100))}</span>
+                      <span>{wheelDetail.cost_coins === 0 ? t('socialFix.freeSpin') : t('wheel.spinWithCoins').replace('{cost}', String(wheelDetail.cost_coins))}</span>
                     </>
                   )}
                 </button>
@@ -536,8 +564,8 @@ export const LuckyWheelPage: React.FC = () => {
             {/* Tabs Header */}
             <div className="glass-card rounded-2xl p-1.5 border border-studio-800/80 bg-studio-900/60 flex items-center gap-1">
               <button
-                onClick={() => setActiveTab('public_history')}
-                className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                aria-pressed={activeTab === 'public_history'} onClick={() => setActiveTab('public_history')}
+                className={`flex-1 min-w-0 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
                   activeTab === 'public_history'
                     ? 'bg-brand-500 text-slate-950 shadow-sm'
                     : 'text-studio-400 hover:text-white hover:bg-studio-800/60'
@@ -548,8 +576,8 @@ export const LuckyWheelPage: React.FC = () => {
               </button>
 
               <button
-                onClick={() => setActiveTab('my_history')}
-                className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                aria-pressed={activeTab === 'my_history'} onClick={() => setActiveTab('my_history')}
+                className={`flex-1 min-w-0 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
                   activeTab === 'my_history'
                     ? 'bg-brand-500 text-slate-950 shadow-sm'
                     : 'text-studio-400 hover:text-white hover:bg-studio-800/60'
@@ -560,8 +588,8 @@ export const LuckyWheelPage: React.FC = () => {
               </button>
 
               <button
-                onClick={() => setActiveTab('odds')}
-                className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                aria-pressed={activeTab === 'odds'} onClick={() => setActiveTab('odds')}
+                className={`flex-1 min-w-0 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
                   activeTab === 'odds'
                     ? 'bg-brand-500 text-slate-950 shadow-sm'
                     : 'text-studio-400 hover:text-white hover:bg-studio-800/60'
@@ -687,7 +715,7 @@ export const LuckyWheelPage: React.FC = () => {
                         <span className="font-bold text-white">{it.label}</span>
                         {it.is_jackpot && (
                           <span className="px-1.5 py-0.2 rounded text-[9px] font-black bg-rose-500/20 text-rose-400 border border-rose-500/30">
-                            JACKPOT
+                            {t('socialFix.jackpot')}
                           </span>
                         )}
                       </div>
@@ -704,20 +732,16 @@ export const LuckyWheelPage: React.FC = () => {
               </div>
             )}
           </div>
-        </div>
+        </div>}
       </div>
 
       {/* ======================================================= */}
       {/* WINNER ANNOUNCEMENT MODAL                               */}
       {/* ======================================================= */}
       {showWinModal && winResult && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in"
-          onClick={() => setShowWinModal(false)}
-        >
+        <Modal isOpen={showWinModal} onClose={() => setShowWinModal(false)} title={t('wheel.congratulations')}>
           <div
             className="w-full max-w-md rounded-3xl p-6 sm:p-8 bg-gradient-to-b from-studio-900 via-studio-900 to-studio-950 border-2 border-amber-400/40 shadow-[0_0_60px_rgba(245,158,11,0.3)] text-center space-y-5 relative overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
           >
             {/* Ambient burst behind icon */}
             <div className="absolute top-0 left-1/2 -translate-x-1/2 w-48 h-48 bg-amber-500/20 rounded-full blur-3xl pointer-events-none" />
@@ -744,7 +768,7 @@ export const LuckyWheelPage: React.FC = () => {
 
             {/* Notification message */}
             <div className="p-3.5 rounded-2xl bg-studio-800/80 border border-studio-700/80 text-xs sm:text-sm text-studio-200">
-              {winResult.message}
+              {t(winResult.outcome === 'duplicate_item' ? 'wheel.duplicateResult' : winResult.outcome === 'item' || winResult.winning_item.reward_type === 'shop_item' && !winResult.outcome ? 'wheel.itemResult' : 'wheel.coinResult', { amount: winResult.reward_coins ?? winResult.winning_item.reward_coins, name: winResult.reward_item_name ?? winResult.winning_item.shop_item?.name ?? winResult.winning_item.label })}
             </div>
 
             {/* Balance info */}
@@ -776,7 +800,7 @@ export const LuckyWheelPage: React.FC = () => {
               </button>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

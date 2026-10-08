@@ -14,6 +14,8 @@ export const CatalogPage: React.FC = () => {
   const searchParam = searchParams.get('search') || '';
   const typeParam = (searchParams.get('type') as 'manhwa' | 'manga' | 'novel') || '';
   const genreParam = searchParams.get('genre') || '';
+  const requestedSort = searchParams.get('sort');
+  const sortParam: 'popular' | 'updated' | 'newest' = requestedSort === 'updated' || requestedSort === 'newest' ? requestedSort : 'popular';
   const statusParam = (searchParams.get('status') as 'ongoing' | 'completed') || '';
   const requestedPage = parseInt(searchParams.get('page') || '1', 10);
   const pageParam = Number.isFinite(requestedPage) && requestedPage > 0 ? requestedPage : 1;
@@ -48,6 +50,7 @@ export const CatalogPage: React.FC = () => {
         search: searchParam || undefined,
         genre: genreParam || undefined,
         status: statusParam || undefined,
+        sort: sortParam,
       });
       if (currentRequest !== requestId.current) return;
       setWebtoons(data.items || []);
@@ -59,10 +62,11 @@ export const CatalogPage: React.FC = () => {
     } finally {
       if (currentRequest === requestId.current) setLoading(false);
     }
-  }, [pageParam, typeParam, searchParam, genreParam, statusParam, retryCount]);
+  }, [pageParam, typeParam, searchParam, genreParam, statusParam, sortParam, retryCount]);
 
   useEffect(() => {
     fetchCatalog();
+    return () => { requestId.current++; };
   }, [fetchCatalog]);
 
   const updateFilters = (newParams: Record<string, string | undefined>) => {
@@ -94,7 +98,7 @@ export const CatalogPage: React.FC = () => {
   const hasActiveFilters = !!searchParam || !!genreParam || !!statusParam || !!typeParam;
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen" aria-busy={loading}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Page Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
@@ -109,27 +113,33 @@ export const CatalogPage: React.FC = () => {
           </div>
 
           {/* Search bar */}
-          <form onSubmit={handleSearchSubmit} className="relative w-full md:w-80">
+          <form onSubmit={handleSearchSubmit} className="relative w-full md:w-96 flex flex-wrap gap-2">
+            <div className="relative flex-1 min-w-0">
             <Search className="absolute left-3.5 top-3 w-4 h-4 text-studio-400" />
             <input
               type="text"
+              aria-label={t('ux.search')}
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               placeholder={t('catalog.searchPlaceholder')}
-              className="w-full pl-10 pr-10 py-2.5 bg-studio-900 border border-studio-800 rounded-2xl text-xs text-white placeholder-studio-500 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all"
+              className="w-full min-h-[44px] pl-10 pr-12 py-2.5 bg-studio-900 border border-studio-800 rounded-2xl text-sm text-white placeholder-studio-400 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all"
             />
             {searchInput && (
               <button
                 type="button"
+                aria-label={t('readerFix.clearSearch')}
                 onClick={() => {
                   setSearchInput('');
                   updateFilters({ search: undefined });
                 }}
-                className="absolute right-3 top-3 text-studio-400 hover:text-white"
+                className="absolute right-0 top-0 min-h-[44px] min-w-[44px] flex items-center justify-center text-studio-400 hover:text-white"
               >
                 <X className="w-4 h-4" />
               </button>
             )}
+            </div>
+            <button type="submit" className="min-h-[44px] px-4 rounded-xl bg-brand-500 text-studio-950 font-bold text-sm">{t('ux.search')}</button>
+            <p className="w-full text-xs text-studio-400">{t('readerFix.searchHint')}</p>
           </form>
         </div>
 
@@ -137,7 +147,7 @@ export const CatalogPage: React.FC = () => {
         <div className="bg-studio-900/60 border border-studio-800 rounded-3xl p-5 mb-8 space-y-4">
           {/* Content Type Filter */}
           <div className="flex flex-wrap items-center gap-2 pb-3 border-b border-studio-800/80">
-            <span className="text-xs font-semibold text-studio-400 mr-1">Format:</span>
+            <span className="text-sm font-semibold text-studio-300 mr-1">{t('ux.format')}:</span>
             {[
               { label: t('types.all'), value: '' },
               { label: t('types.manhwa'), value: 'manhwa' },
@@ -149,8 +159,9 @@ export const CatalogPage: React.FC = () => {
                 <button
                   key={tp.value}
                   type="button"
+                  aria-pressed={isSelected}
                   onClick={() => updateFilters({ type: tp.value || undefined })}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                  className={`min-h-[44px] px-3.5 py-2 rounded-xl text-sm font-bold transition-all ${
                     isSelected
                       ? 'bg-brand-500 text-studio-950 shadow-glow-brand'
                       : 'bg-studio-800/80 text-studio-300 hover:text-white hover:bg-studio-700'
@@ -174,7 +185,7 @@ export const CatalogPage: React.FC = () => {
 
           {/* Status filters & Clear */}
           <div className="flex flex-wrap items-center justify-between gap-4 pt-3 border-t border-studio-800/80">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <span className="text-xs font-semibold text-studio-400 mr-1">{t('common.status')}:</span>
               {[
                 { label: t('catalog.statusAll'), value: '' },
@@ -186,8 +197,9 @@ export const CatalogPage: React.FC = () => {
                   <button
                     key={st.value}
                     type="button"
+                    aria-pressed={isSelected}
                     onClick={() => updateFilters({ status: st.value || undefined })}
-                    className={`px-3 py-1 rounded-xl text-xs font-semibold transition-all ${
+                    className={`min-h-[44px] px-3 py-2 rounded-xl text-sm font-semibold transition-all ${
                       isSelected
                         ? 'bg-studio-700 text-white shadow-sm'
                         : 'text-studio-400 hover:text-white hover:bg-studio-800'
@@ -198,6 +210,12 @@ export const CatalogPage: React.FC = () => {
                 );
               })}
             </div>
+
+            <label className="flex items-center gap-2 text-sm text-studio-300">{t('readerFix.sort')}
+              <select value={sortParam} onChange={event => updateFilters({ sort: event.target.value })} className="min-h-[44px] bg-studio-800 text-white px-3 rounded-xl border border-studio-700">
+                <option value="popular">{t('readerFix.popular')}</option><option value="updated">{t('ux.recent')}</option><option value="newest">{t('ux.newest')}</option>
+              </select>
+            </label>
 
             {hasActiveFilters && (
               <button
@@ -222,7 +240,7 @@ export const CatalogPage: React.FC = () => {
 
         {/* Webtoons Grid */}
         {loading ? (
-          <div className="py-24 flex flex-col items-center justify-center text-studio-400 gap-3">
+          <div role="status" className="py-24 flex flex-col items-center justify-center text-studio-400 gap-3">
             <Loader2 className="w-8 h-8 animate-spin text-brand-500" />
             <span className="text-sm">{t('common.loading')}</span>
           </div>
@@ -236,8 +254,9 @@ export const CatalogPage: React.FC = () => {
             <BookOpen className="w-12 h-12 mx-auto text-studio-600 mb-3" />
             <h3 className="font-bold text-white text-base mb-1">{t('catalog.emptyTitle')}</h3>
             <p className="text-xs text-studio-400 mb-4">
-              {t('catalog.emptyDesc')}
+              {pageParam > 1 && pageParam > totalPages ? t('ux.outOfRange') : t('catalog.emptyDesc')}
             </p>
+            {pageParam > 1 && pageParam > totalPages && <button onClick={() => updateFilters({ page: '1' })} className="min-h-[44px] px-4 rounded-xl bg-brand-500 text-studio-950">1</button>}
             {hasActiveFilters && (
               <button
                 onClick={handleClearFilters}
@@ -259,6 +278,7 @@ export const CatalogPage: React.FC = () => {
         {totalPages > 1 && (
           <div className="mt-12 flex items-center justify-center gap-2">
             <button
+              aria-label={t('reader.prevPage')}
               disabled={pageParam <= 1 || loading}
               onClick={() => updateFilters({ page: (pageParam - 1).toString() })}
               className="p-2.5 rounded-xl bg-studio-900 border border-studio-800 text-studio-200 hover:text-white hover:bg-studio-800 disabled:opacity-30 disabled:pointer-events-none transition-colors"
@@ -271,6 +291,7 @@ export const CatalogPage: React.FC = () => {
             </span>
 
             <button
+              aria-label={t('reader.nextPage')}
               disabled={pageParam >= totalPages || loading}
               onClick={() => updateFilters({ page: (pageParam + 1).toString() })}
               className="p-2.5 rounded-xl bg-studio-900 border border-studio-800 text-studio-200 hover:text-white hover:bg-studio-800 disabled:opacity-30 disabled:pointer-events-none transition-colors"

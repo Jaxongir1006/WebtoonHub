@@ -1,11 +1,12 @@
 import uuid
 from typing import List, Optional, Tuple
-from fastapi import APIRouter, Depends, Query, Request, status
+from fastapi import APIRouter, Body, Depends, Query, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.modules.staff.dependencies import get_current_staff_and_session, require_permission
+from app.modules.staff.dependencies import require_any_permission, get_current_staff_and_session, require_permission, security_bearer
+from app.core.logout import LogoutRequest, revoke_captured_session
 from app.modules.staff.models import StaffUser
 from app.modules.staff.schemas import (
     DashboardStatsResponse,
@@ -83,7 +84,7 @@ async def list_staff_sessions(
     }
 
 
-@router.delete("/auth/sessions/{id}", status_code=status.HTTP_200_OK)
+@router.delete("/auth/sessions/{id:uuid}", status_code=status.HTTP_200_OK)
 async def revoke_staff_session(
     id: uuid.UUID,
     auth_data: Tuple[StaffUser, str] = Depends(get_current_staff_and_session),
@@ -115,7 +116,7 @@ async def revoke_other_staff_sessions(
 # 4. Roles Management
 @router.get("/roles", status_code=status.HTTP_200_OK)
 async def list_roles(
-    _staff: StaffUser = Depends(require_permission("roles:manage")),
+    _staff: StaffUser = Depends(require_any_permission("roles:manage", "staff:manage")),
     db: AsyncSession = Depends(get_db)
 ):
     roles = await StaffService.list_roles(db)
@@ -152,6 +153,7 @@ async def update_role(
         "data": RoleItem(
             id=role.id,
             name=role.name,
+            system_key=role.system_key, scope=role.scope,
             description=role.description,
             permissions=[PermissionItem.model_validate(p) for p in role.permissions]
         ),
@@ -211,7 +213,7 @@ async def list_staff_users(
     users = await StaffService.list_staff_users(db)
     return {
         "success": True,
-        "data": users
+        "data": [StaffUserResponse.model_validate(user) for user in users]
     }
 
 
@@ -224,7 +226,7 @@ async def create_staff_user(
     new_user = await StaffService.create_staff_user(db, data)
     return {
         "success": True,
-        "data": new_user,
+        "data": StaffUserResponse.model_validate(new_user),
         "message": "Yangi xodim muvaffaqiyatli yaratildi"
     }
 
@@ -246,6 +248,7 @@ async def update_staff_user(
             role=RoleItem(
                 id=staff_obj.role.id,
                 name=staff_obj.role.name,
+                system_key=staff_obj.role.system_key, scope=staff_obj.role.scope,
                 description=staff_obj.role.description,
                 permissions=[PermissionItem.model_validate(p) for p in staff_obj.role.permissions]
             ),
@@ -352,57 +355,20 @@ async def get_dashboard_analytics(
     }
 
 
-# 10. Economy & Rewards Rates Configuration
-@router.get("/economy/settings", status_code=status.HTTP_200_OK)
-async def get_economy_settings(
-    _staff: StaffUser = Depends(require_permission("users:manage"))
-):
-    from app.core.config import settings
-    return {
-        "success": True,
-        "data": {
-            "chapter_read_reward": settings.CHAPTER_READ_COINS,
-            "daily_checkin_reward": settings.DAILY_LOGIN_COINS,
-            "welcome_bonus": settings.INITIAL_COINS,
-            "creator_chapter_reward": 25,
-            "comment_reward": 2,
-            "daily_max_limit": 100,
-            "reset_timezone": settings.TIMEZONE,
-            "reset_time": "00:00",
-            "anti_farming_cooldown_min": 3
-        }
-    }
+from app.core.economy import EconomyUpdate, economy_settings, save_economy
 
+@router.get('/economy/settings')
+async def get_economy_settings(_staff: StaffUser = Depends(require_permission('users:manage')), db=Depends(get_db)):
+    return {'success': True, 'data': await economy_settings(db)}
 
-@router.patch("/economy/settings", status_code=status.HTTP_200_OK)
-async def update_economy_settings(
-    data: dict,
-    _staff: StaffUser = Depends(require_permission("users:manage"))
-):
-    from app.core.config import settings
-    if "chapter_read_reward" in data:
-        settings.CHAPTER_READ_COINS = int(data["chapter_read_reward"])
-    if "daily_checkin_reward" in data:
-        settings.DAILY_LOGIN_COINS = int(data["daily_checkin_reward"])
-    if "welcome_bonus" in data:
-        settings.INITIAL_COINS = int(data["welcome_bonus"])
-    return {
-        "success": True,
-        "data": {
-            "chapter_read_reward": settings.CHAPTER_READ_COINS,
-            "daily_checkin_reward": settings.DAILY_LOGIN_COINS,
-            "welcome_bonus": settings.INITIAL_COINS,
-            "creator_chapter_reward": data.get("creator_chapter_reward", 25),
-            "comment_reward": data.get("comment_reward", 2),
-            "daily_max_limit": data.get("daily_max_limit", 100),
-            "reset_timezone": settings.TIMEZONE,
-            "reset_time": "00:00",
-            "anti_farming_cooldown_min": 3
-        },
-        "message": "Chaqmoq berilishi va iqtisodiyot sozlamalari muvaffaqiyatli saqlandi"
-    }
+@router.patch('/economy/settings')
+async def update_economy_settings(data: EconomyUpdate, _staff: StaffUser = Depends(require_permission('users:manage')), db=Depends(get_db)):
+    return {'success': True, 'data': await save_economy(db, data), 'message': 'Settings saved'}
 
-
+@router.post('/auth/logout')
+async def logout_staff(data: LogoutRequest | None = Body(None), credentials=Depends(security_bearer), db=Depends(get_db)):
+    await revoke_captured_session(db, 'staff', credentials, data)
+    return {'success': True, 'data': None}
 
 # 11. System Global Settings
 @router.get("/settings", status_code=status.HTTP_200_OK)

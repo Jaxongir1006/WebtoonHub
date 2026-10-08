@@ -1,164 +1,80 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { rewardsApi } from '../api/rewards';
 import { useAuth } from './AuthContext';
+import { useLanguage } from './LanguageContext';
 import { getTimeUntilTashkentMidnight, getTashkentDateString } from '../utils/date';
 import { getApiErrorMessage } from '../api/client';
 
 interface DailyBonusContextType {
-  isModalOpen: boolean;
-  openModal: () => void;
-  closeModal: () => void;
-  countdown: { hours: number; minutes: number; seconds: number; totalSeconds?: number };
+  isModalOpen: boolean; openModal: () => void; closeModal: () => void;
+  countdown: ReturnType<typeof getTimeUntilTashkentMidnight>;
   claimBonus: () => Promise<{ success: boolean; message: string; coinsEarned?: number }>;
-  isClaiming: boolean;
-  isClaimedToday: boolean;
+  isClaiming: boolean; isClaimedToday: boolean; rewardAmount: number | null;
 }
-
 const DailyBonusContext = createContext<DailyBonusContextType | undefined>(undefined);
-
 export const DailyBonusProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user, isAuthenticated, updateCoinsLocally, openAuthModal } = useAuth();
+  const { t } = useLanguage();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isClaiming, setIsClaiming] = useState(false);
+  const [isClaimedToday, setIsClaimedToday] = useState(false);
+  const [rewardAmount, setRewardAmount] = useState<number | null>(null);
   const [countdown, setCountdown] = useState(getTimeUntilTashkentMidnight());
-  const { user, isAuthenticated, updateCoinsLocally, openAuthModal } = useAuth();
-  
-  const [isClaimedToday, setIsClaimedToday] = useState<boolean>(() => {
-    const todayStr = getTashkentDateString();
-    const stored = localStorage.getItem('webtoonhub_daily_bonus_today');
-    return stored === todayStr;
-  });
-
-  // Sync claimed status when user profile changes
-  useEffect(() => {
-    if (!isAuthenticated || !user) {
-      setIsClaimedToday(false);
-      return;
-    }
-
-    const todayStr = getTashkentDateString();
-    const storedUserDate = localStorage.getItem(`webtoonhub_daily_bonus_${user.id}`);
-
-    if (storedUserDate === todayStr) {
-      setIsClaimedToday(true);
-      return;
-    }
-
-    if (user.daily_bonus_claimed) {
-      setIsClaimedToday(true);
-      localStorage.setItem(`webtoonhub_daily_bonus_${user.id}`, todayStr);
-      localStorage.setItem('webtoonhub_daily_bonus_today', todayStr);
-      return;
-    }
-
-    if (user.last_daily_login && getTashkentDateString(user.last_daily_login) === todayStr) {
-      setIsClaimedToday(true);
-      localStorage.setItem(`webtoonhub_daily_bonus_${user.id}`, todayStr);
-      localStorage.setItem('webtoonhub_daily_bonus_today', todayStr);
-      return;
-    }
-
-    // Double check with backend API
-    rewardsApi.getDailyStatus()
-      .then((res) => {
-        if (res.data?.claimed_today) {
-          setIsClaimedToday(true);
-          localStorage.setItem(`webtoonhub_daily_bonus_${user.id}`, todayStr);
-          localStorage.setItem('webtoonhub_daily_bonus_today', todayStr);
-        } else {
-          setIsClaimedToday(false);
-        }
-      })
-      .catch(() => {});
-  }, [user, isAuthenticated]);
-
-  // Tick countdown every second and handle midnight reset
-  useEffect(() => {
-    const timer = setInterval(() => {
-      const cd = getTimeUntilTashkentMidnight();
-      setCountdown(cd);
-      if (cd.totalSeconds === 0) {
-        setIsClaimedToday(false);
-        localStorage.removeItem('webtoonhub_daily_bonus_today');
-        if (user) {
-          localStorage.removeItem(`webtoonhub_daily_bonus_${user.id}`);
-        }
-      }
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [user]);
-
-  const openModal = () => {
-    if (!isAuthenticated) {
-      openAuthModal('login');
-      return;
-    }
-    setIsModalOpen(true);
-  };
-
-  const closeModal = () => {
-    setIsModalOpen(false);
-  };
-
-  const claimBonus = async () => {
-    if (!isAuthenticated || !user) {
-      openAuthModal('login');
-      return { success: false, message: "Iltimos, avval tizimga kiring" };
-    }
-
-    setIsClaiming(true);
-    const todayStr = getTashkentDateString();
-
+  const [day, setDay] = useState(getTashkentDateString());
+  const owner = useRef(user?.id); owner.current = user?.id;
+  const generation = useRef(0);
+  const claiming = useRef(false);
+  const refresh = useCallback(async () => {
+    if (!user?.id) return;
+    const id = user.id; const request = ++generation.current; const requestedDay = getTashkentDateString();
     try {
-      const res = await rewardsApi.claimDailyCheckin();
-      setIsClaimedToday(true);
-      localStorage.setItem(`webtoonhub_daily_bonus_${user.id}`, todayStr);
-      localStorage.setItem('webtoonhub_daily_bonus_today', todayStr);
-
-      if (res.data) {
-        const newBalance = res.data.total_lightning_coins ?? res.data.new_balance;
-        if (typeof newBalance === 'number') {
-          updateCoinsLocally(newBalance);
-        }
-      }
-      return {
-        success: true,
-        message: res.message || "+15 Chaqmoq hisobingizga qo'shildi!",
-        coinsEarned: res.data?.reward_amount || 15
-      };
-    } catch (err: any) {
-      const msg = getApiErrorMessage(err, "Bugun allaqachon kunlik bonus olindi");
-      if (err?.response?.status === 400 || msg.toLowerCase().includes('allaqachon')) {
-        setIsClaimedToday(true);
-        localStorage.setItem(`webtoonhub_daily_bonus_${user.id}`, todayStr);
-        localStorage.setItem('webtoonhub_daily_bonus_today', todayStr);
-      }
-      return { success: false, message: msg };
-    } finally {
-      setIsClaiming(false);
-    }
+      const result = await rewardsApi.getDailyStatus();
+      if (owner.current !== id || generation.current !== request || requestedDay !== getTashkentDateString()) return;
+      setIsClaimedToday(Boolean(result.data.claimed_today));
+      setRewardAmount(result.data.reward_amount);
+    } catch { /* Keep the last acknowledged status; claiming remains available for recovery. */ }
+  }, [user?.id]);
+  useEffect(() => {
+    generation.current++; setIsClaimedToday(false); setRewardAmount(null); setIsModalOpen(false);
+    void refresh();
+  }, [user?.id, day, refresh]);
+  useEffect(() => {
+    const update = () => { setCountdown(getTimeUntilTashkentMidnight()); setDay(getTashkentDateString()); };
+    const focus = () => { update(); void refresh(); };
+    const visible = () => { if (document.visibilityState === 'visible') focus(); };
+    const interval = setInterval(update, 1000);
+    window.addEventListener('focus', focus); document.addEventListener('visibilitychange', visible);
+    return () => { clearInterval(interval); window.removeEventListener('focus', focus); document.removeEventListener('visibilitychange', visible); };
+  }, [refresh]);
+  const openModal = () => {
+    if (!isAuthenticated) { openAuthModal('login'); return; }
+    void refresh(); setIsModalOpen(true);
   };
-
-  return (
-    <DailyBonusContext.Provider
-      value={{
-        isModalOpen,
-        openModal,
-        closeModal,
-        countdown,
-        claimBonus,
-        isClaiming,
-        isClaimedToday
-      }}
-    >
-      {children}
-    </DailyBonusContext.Provider>
-  );
+  const claimBonus = async () => {
+    if (!user || !isAuthenticated) { openAuthModal('login'); return { success: false, message: t('comments.loginToComment') }; }
+    if (claiming.current) return { success: false, message: t('dailyBonus.claiming') };
+    claiming.current = true; setIsClaiming(true); const id = user.id; const requestedDay = getTashkentDateString();
+    try {
+      const result = await rewardsApi.claimDailyCheckin();
+      if (owner.current === id) {
+        generation.current++; setRewardAmount(result.data.reward_amount);
+        const balance = result.data.total_lightning_coins ?? result.data.new_balance;
+        if (typeof balance === 'number') updateCoinsLocally(balance);
+        const currentDay = getTashkentDateString();
+        const acknowledgedDay = getTashkentDateString(result.data.claimed_at) || requestedDay;
+        if (requestedDay === currentDay && acknowledgedDay === currentDay) setIsClaimedToday(true);
+        else { setIsClaimedToday(false); void refresh(); }
+      }
+      return { success: true, message: t('ux.bonusSuccess', { amount: result.data.reward_amount }), coinsEarned: result.data.reward_amount };
+    } catch (error) {
+      void refresh();
+      return { success: false, message: getApiErrorMessage(error, t('common.error')) };
+    } finally { claiming.current = false; setIsClaiming(false); }
+  };
+  return <DailyBonusContext.Provider value={{ isModalOpen, openModal, closeModal: () => setIsModalOpen(false), countdown, claimBonus, isClaiming, isClaimedToday, rewardAmount }}>{children}</DailyBonusContext.Provider>;
 };
-
 export const useDailyBonus = () => {
-  const context = useContext(DailyBonusContext);
-  if (!context) {
-    throw new Error('useDailyBonus must be used within a DailyBonusProvider');
-  }
-  return context;
+  const value = useContext(DailyBonusContext);
+  if (!value) throw new Error('useDailyBonus must be used within a DailyBonusProvider');
+  return value;
 };

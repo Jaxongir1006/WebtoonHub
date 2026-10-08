@@ -3,27 +3,38 @@ import { Link } from 'react-router-dom';
 import { WebtoonSummary } from '../../types';
 import { SafeImage } from '../common/SafeImage';
 import { useLanguage } from '../../context/LanguageContext';
-import { Zap, BookOpen, Eye, ChevronRight, ChevronLeft } from 'lucide-react';
+import { Zap, BookOpen, Eye, ChevronRight, ChevronLeft, Pause, Play } from 'lucide-react';
 import { formatNumber, getStatusLabel } from '../../utils/format';
 import { localizeGenre } from '../../utils/genres';
 
 interface HeroBannerProps {
   webtoons: WebtoonSummary[];
+  label?: string;
 }
 
-export const HeroBanner: React.FC<HeroBannerProps> = ({ webtoons }) => {
+export const HeroBanner: React.FC<HeroBannerProps> = ({ webtoons, label }) => {
   const { t, language } = useLanguage();
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const [hovered, setHovered] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const [reducedMotion, setReducedMotion] = useState(false);
+  useEffect(() => {
+    const query = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const update = () => setReducedMotion(query.matches);
+    update(); query.addEventListener('change', update);
+    return () => query.removeEventListener('change', update);
+  }, []);
 
   // Auto rotate banner every 7 seconds
   useEffect(() => {
     if (webtoons.length <= 1) return;
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    if (paused || hovered || focused || reducedMotion) return;
     const interval = setInterval(() => {
       setCurrentIndex((prev) => (prev + 1) % webtoons.length);
     }, 7000);
     return () => clearInterval(interval);
-  }, [webtoons.length]);
+  }, [webtoons.length, paused, hovered, focused, reducedMotion]);
 
   if (!webtoons || webtoons.length === 0) return null;
 
@@ -39,7 +50,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ webtoons }) => {
   };
 
   return (
-    <div className="relative w-full rounded-3xl overflow-hidden bg-studio-900 border border-studio-800 shadow-2xl mb-12 select-none group">
+    <div onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} onFocusCapture={() => setFocused(true)} onBlurCapture={event => { if (!event.currentTarget.contains(event.relatedTarget as Node)) setFocused(false); }} className="relative w-full rounded-3xl overflow-hidden bg-studio-900 border border-studio-800 shadow-2xl mb-8 group">
       {/* Blurred atmospheric backdrop image */}
       <div className="absolute inset-0 overflow-hidden">
         <SafeImage
@@ -52,14 +63,14 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ webtoons }) => {
       </div>
 
       {/* Main Banner Content */}
-      <div className="relative z-10 p-6 sm:p-10 lg:p-14 flex flex-col-reverse md:flex-row items-center gap-8 justify-between min-h-[380px] lg:min-h-[440px]">
+      <div className="relative z-10 p-4 pb-20 sm:p-8 sm:pb-20 lg:p-12 flex flex-row items-start md:items-center gap-4 md:gap-8 justify-between lg:min-h-[400px]">
         {/* Left Column: Details */}
-        <div className="flex-1 max-w-2xl space-y-4">
+        <div className="flex-1 min-w-0 max-w-2xl space-y-3">
           {/* Badges */}
           <div className="flex flex-wrap items-center gap-2">
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-brand-500 text-studio-950 shadow-glow-brand">
               <Zap className="w-3.5 h-3.5 fill-studio-950" />
-              <span>{t('home.popularToday')} #{activeIndex + 1}</span>
+              <span>{label || t('home.popularToday')}</span>
             </span>
 
             <span
@@ -72,7 +83,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ webtoons }) => {
               {getStatusLabel(current.status, t)}
             </span>
 
-            <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-studio-800/80 backdrop-blur-md text-studio-300 border border-studio-700">
+            <span className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-studio-800/80 backdrop-blur-md text-studio-300 border border-studio-700">
               <Eye className="w-3.5 h-3.5 text-studio-400" />
               <span>{formatNumber(current.view_count)} {t('common.views').toLowerCase()}</span>
             </span>
@@ -91,7 +102,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ webtoons }) => {
               </span>
             )}
             {current.genres && current.genres.length > 0 && (
-              <div className="flex items-center gap-1.5">
+              <div className="hidden sm:flex flex-wrap items-center gap-1.5">
                 <span>•</span>
                 {current.genres.map((g, idx) => (
                   <span key={idx} className="text-brand-400 font-medium">
@@ -103,7 +114,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ webtoons }) => {
           </div>
 
           {/* Short description */}
-          <p className="text-sm sm:text-base text-studio-300 line-clamp-3 leading-relaxed max-w-xl">
+          <p className="text-sm sm:text-base text-studio-300 line-clamp-2 sm:line-clamp-3 leading-relaxed max-w-xl">
             {current.description || current.synopsis || t('home.whySubtitle')}
           </p>
           {language !== 'uz' && <p className="text-xs text-studio-400">{t('home.contentLanguageNotice')}</p>}
@@ -128,7 +139,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ webtoons }) => {
         </div>
 
         {/* Right Column: High-Res 3D Cover */}
-        <div className="relative shrink-0 w-44 sm:w-56 lg:w-64 aspect-[3/4] rounded-2xl overflow-hidden shadow-2xl border-2 border-studio-700/60 group-hover:border-brand-500/50 transition-all transform md:rotate-2 hover:rotate-0 duration-300">
+        <div className="relative shrink-0 w-20 sm:w-36 md:w-48 lg:w-60 aspect-[3/4] rounded-xl overflow-hidden shadow-2xl border border-studio-700/60">
           <SafeImage
             src={current.cover_image_url}
             alt={current.title}
@@ -136,7 +147,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ webtoons }) => {
             className="w-full h-full object-cover"
           />
           {current.latest_chapter && (
-            <div className="absolute bottom-3 left-3 right-3 bg-studio-950/80 backdrop-blur-md rounded-xl p-2 text-center border border-studio-800">
+            <div className="hidden sm:block absolute bottom-3 left-3 right-3 bg-studio-950/80 backdrop-blur-md rounded-xl p-2 text-center border border-studio-800">
               <span className="text-xs font-bold text-brand-400">
                 {t('details.chapterNum', { number: current.latest_chapter.chapter_number })}
               </span>
@@ -149,8 +160,9 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ webtoons }) => {
       {webtoons.length > 1 && (
         <div className="absolute bottom-4 right-4 z-20 flex items-center gap-2">
           <button
+            aria-label={t('readerFix.previousSlide')}
             onClick={handlePrev}
-            className="p-2 rounded-xl bg-studio-950/80 hover:bg-studio-800 text-studio-300 hover:text-white border border-studio-800 transition-colors"
+            className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl bg-studio-950/80 hover:bg-studio-800 text-studio-300 hover:text-white border border-studio-800 transition-colors"
           >
             <ChevronLeft className="w-4 h-4" />
           </button>
@@ -158,11 +170,13 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ webtoons }) => {
             {activeIndex + 1} / {webtoons.length}
           </div>
           <button
+            aria-label={t('readerFix.nextSlide')}
             onClick={handleNext}
-            className="p-2 rounded-xl bg-studio-950/80 hover:bg-studio-800 text-studio-300 hover:text-white border border-studio-800 transition-colors"
+            className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl bg-studio-950/80 hover:bg-studio-800 text-studio-300 hover:text-white border border-studio-800 transition-colors"
           >
             <ChevronRight className="w-4 h-4" />
           </button>
+          {!reducedMotion && <button aria-label={t(paused ? 'readerFix.play' : 'readerFix.pause')} aria-pressed={paused} onClick={() => setPaused(!paused)} className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl bg-studio-950 border border-studio-800 text-white">{paused ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}</button>}
         </div>
       )}
     </div>

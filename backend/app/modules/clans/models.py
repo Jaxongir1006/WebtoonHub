@@ -1,4 +1,4 @@
-from sqlalchemy import BigInteger, Boolean, Column, DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import BigInteger, Boolean, Column, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import relationship
 from app.core.database import Base, BigIntId
 from app.modules.users.models import User
@@ -60,6 +60,8 @@ class ClanMessage(Base):
     user_id = Column(BigInteger, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     message_type = Column(String(20), default="text", nullable=False)  # text, system
     content = Column(Text, nullable=False)
+    client_message_id = Column(String(64), nullable=True)
+    __table_args__ = (UniqueConstraint("user_id", "client_message_id", name="uq_clan_client_message"),)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     clan = relationship("Clan", back_populates="messages")

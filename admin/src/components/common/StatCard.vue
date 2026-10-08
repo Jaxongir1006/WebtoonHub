@@ -33,10 +33,10 @@
     <div v-if="subtext" class="mt-4 flex items-center gap-1.5 text-xs">
       <span
         v-if="trend"
-        :class="trend > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'"
+        :class="trend> 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'"
         class="font-semibold flex items-center gap-0.5"
       >
-        {{ trend > 0 ? '↑' : '↓' }} {{ Math.abs(trend) }}%
+        {{ trend> 0 ? '↑' : '↓' }} {{ Math.abs(trend) }}%
       </span>
       <span class="text-slate-500 dark:text-studio-400">{{ subtext }}</span>
     </div>
@@ -86,7 +86,7 @@ const iconContainerClass = computed(() => {
     case 'purple': return 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20'
     case 'emerald': return 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
     case 'rose': return 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20'
-    default: return 'bg-brand-500/10 text-brand-600 dark:text-brand-400 border-brand-500/20'
+    default: return 'bg-brand-500/10 text-brand-700 dark:text-brand-400 border-brand-500/20'
   }
 })
 </script>

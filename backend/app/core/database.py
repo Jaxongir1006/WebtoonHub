@@ -16,6 +16,7 @@ connect_args = {"check_same_thread": False} if is_sqlite else {}
 engine = create_async_engine(
     settings.DATABASE_URL,
     echo=settings.DEBUG,
+    hide_parameters=True,
     future=True,
     connect_args=connect_args,
     **({} if is_sqlite else {"pool_size": 10, "max_overflow": 20})
@@ -25,6 +26,7 @@ if is_sqlite:
     @event.listens_for(engine.sync_engine, "connect")
     def set_sqlite_pragma(dbapi_connection, connection_record):
         cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
         cursor.execute("PRAGMA journal_mode=WAL")
         cursor.execute("PRAGMA synchronous=NORMAL")
         cursor.execute("PRAGMA busy_timeout=5000")

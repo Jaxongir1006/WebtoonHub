@@ -153,11 +153,14 @@ async def seed_data():
 
         superadmin_role = None
         for rc in roles_config:
-            stmt = select(Role).options(selectinload(Role.permissions)).where(Role.name == rc["name"])
+            system_key = rc["name"] if rc["name"] in {'creator', 'superadmin'} else None
+            stmt = select(Role).options(selectinload(Role.permissions)).where(Role.system_key == system_key if system_key else Role.name == rc["name"])
             res = await db.execute(stmt)
             r_obj = res.scalar_one_or_none()
             if not r_obj:
-                r_obj = Role(name=rc["name"], description=rc["description"], permissions=rc["perms"])
+                r_obj = Role(name=rc["name"], system_key=system_key,
+                    scope='own_content' if system_key == 'creator' else 'global',
+                    description=rc["description"], permissions=rc["perms"])
                 db.add(r_obj)
                 await db.flush()
             if rc["name"] == "superadmin":

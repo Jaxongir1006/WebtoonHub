@@ -1,164 +1,118 @@
+import asyncio
 import io
-import json
-import os
+import logging
+import re
+import xml.etree.ElementTree as ET
 from pathlib import Path
-from typing import Optional
-from minio import Minio
-from PIL import Image, ImageOps
+from urllib.parse import urlsplit
+from fastapi import HTTPException
+from PIL import Image, ImageOps, UnidentifiedImageError
 from app.core.config import settings
+logger = logging.getLogger(__name__)
+CONTENT_ROOT = Path(__file__).resolve().parents[2] / 'public_content'
+MAX_MEDIA_BYTES = 20 * 1024 * 1024
+Image.MAX_IMAGE_PIXELS = 40_000_000
 
-# MinIO client
-minio_client = Minio(
-    endpoint=settings.MINIO_ENDPOINT,
-    access_key=settings.MINIO_ROOT_USER,
-    secret_key=settings.MINIO_ROOT_PASSWORD,
-    secure=settings.MINIO_SECURE
-)
+def init_storage():
+    CONTENT_ROOT.mkdir(parents=True, exist_ok=True)
 
+def safe_path(name):
+    path = (CONTENT_ROOT / name.lstrip('/')).resolve()
+    if not path.is_relative_to(CONTENT_ROOT.resolve()):
+        raise HTTPException(400, 'Invalid media path')
+    return path
 
-def ensure_bucket_exists(bucket_name: str, public: bool = True) -> None:
-    """Ensure bucket exists and optionally make it publicly readable for images"""
+def sanitize_svg(data):
+    if b'<!DOCTYPE' in data.upper() or b'<!ENTITY' in data.upper():
+        raise HTTPException(422, 'SVG external entities are not allowed')
     try:
-        if not minio_client.bucket_exists(bucket_name):
-            minio_client.make_bucket(bucket_name)
+        root = ET.fromstring(data)
+    except ET.ParseError:
+        raise HTTPException(422, 'Invalid SVG image')
+    if root.tag.split('}')[-1] != 'svg':
+        raise HTTPException(422, 'Invalid SVG root')
+    forbidden = {'script', 'foreignObject', 'iframe', 'object', 'embed', 'image', 'a', 'style', 'use'}
+    for parent in root.iter():
+        for child in list(parent):
+            if child.tag.split('}')[-1] in forbidden:
+                parent.remove(child)
+        for key, value in list(parent.attrib.items()):
+            local = key.split('}')[-1].lower()
+            if local.startswith('on') or local in {'href','src'} or 'javascript:' in value.lower() or 'expression(' in value.lower() or any(not token.strip().startswith('#') for token in re.findall(r'url\(([^)]*)\)', value, flags=re.I)):
+                del parent.attrib[key]
+    return ET.tostring(root, encoding='utf-8')
 
-        if public:
-            # Set public read policy so browser can display images without pre-signed URLs
-            policy = {
-                "Version": "2012-10-17",
-                "Statement": [
-                    {
-                        "Effect": "Allow",
-                        "Principal": {"AWS": ["*"]},
-                        "Action": ["s3:GetObject"],
-                        "Resource": [f"arn:aws:s3:::{bucket_name}/*"]
-                    }
-                ]
-            }
-            minio_client.set_bucket_policy(bucket_name, json.dumps(policy))
-    except Exception as e:
-        print(f"[Storage Warning] Could not ensure bucket '{bucket_name}': {e}")
-
-
-import socket
-
-def _is_minio_reachable() -> bool:
+def validated_media(data, object_name, bucket):
+    if not data or len(data) > MAX_MEDIA_BYTES:
+        raise HTTPException(413, 'Image must be nonempty and at most 20 MB')
+    if Path(object_name).suffix.lower() == '.svg':
+        if bucket in {settings.MINIO_BUCKET_CHAPTERS, settings.MINIO_BUCKET_COVERS}:
+            raise HTTPException(422, 'Chapter pages and covers must be raster images')
+        return sanitize_svg(data), object_name
     try:
-        endpoint = settings.MINIO_ENDPOINT.split("/")[0]
-        if ":" in endpoint:
-            host, port_str = endpoint.split(":", 1)
-            port = int(port_str)
-        else:
-            host = endpoint
-            port = 443 if settings.MINIO_SECURE else 80
-        with socket.create_connection((host, port), timeout=0.5):
-            return True
-    except Exception:
-        return False
-
-
-def init_storage() -> None:
-    """Initialize all application buckets on startup"""
-    try:
-        if not _is_minio_reachable():
-            print("[Storage Info] MinIO endpoint offline; local storage fallback active.")
-            return
-
-        buckets = [
-            settings.MINIO_BUCKET_COVERS,
-            settings.MINIO_BUCKET_CHAPTERS,
-            settings.MINIO_BUCKET_SHOP
-        ]
-        for b in buckets:
-            ensure_bucket_exists(b, public=True)
-    except Exception as e:
-        print(f"[Storage Warning] MinIO init skipped: {e}")
-
+        with Image.open(io.BytesIO(data)) as source:
+            source.load()
+            if source.format not in {'JPEG','PNG','WEBP','GIF'} or source.width * source.height > 40_000_000:
+                raise HTTPException(422, 'Unsupported image')
+            image = ImageOps.exif_transpose(source).convert('RGBA' if 'A' in source.getbands() else 'RGB')
+            if bucket == settings.MINIO_BUCKET_CHAPTERS and image.width > 1200:
+                image = image.resize((1200, round(image.height * 1200 / image.width)), Image.Resampling.LANCZOS)
+            output = io.BytesIO()
+            image.save(output, 'WEBP', quality=85, method=4)
+            return output.getvalue(), str(Path(object_name).with_suffix('.webp')).replace(chr(92), '/')
+    except (UnidentifiedImageError, OSError, ValueError, Image.DecompressionBombError):
+        raise HTTPException(422, 'Upload a valid PNG, JPEG, GIF or WebP image')
 
 class StorageService:
     @staticmethod
-    def optimized_image_url(url: str) -> str:
-        """Use a local WebP copy when one exists for a chapter page."""
-        if not url.startswith("/content/") or not url.lower().endswith((".jpg", ".jpeg", ".png")):
-            return url
-        root = Path(__file__).resolve().parents[2] / "public_content"
-        original = (root / url.removeprefix("/content/")).resolve()
-        if not original.is_relative_to(root.resolve()):
-            return url
-        optimized = original.with_suffix(".webp")
-        return f"/content/{optimized.relative_to(root).as_posix()}" if optimized.is_file() else url
+    def optimized_image_url(url):
+        if url.startswith('/content/') and url.lower().endswith(('.png','.jpg','.jpeg')):
+            path = safe_path(url.removeprefix('/content/')).with_suffix('.webp')
+            if path.is_file():
+                return '/content/' + path.relative_to(CONTENT_ROOT).as_posix()
+        return url
+    @staticmethod
+    def upload_file(bucket_name, object_name, data, content_type='image/webp'):
+        data, object_name = validated_media(data, object_name, bucket_name)
+        path = safe_path(object_name)
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(data)
+        except OSError:
+            logger.exception('Media write failed')
+            raise HTTPException(503, 'Image storage unavailable; upload was not saved')
+        return '/content/' + path.relative_to(CONTENT_ROOT).as_posix()
+    @staticmethod
+    async def upload_file_async(**kwargs):
+        return await asyncio.to_thread(StorageService.upload_file, **kwargs)
+    @staticmethod
+    def delete_file(bucket_name, object_name):
+        if object_name.startswith('/content/'):
+            object_name = urlsplit(object_name).path.removeprefix('/content/')
+        path = safe_path(object_name)
+        try:
+            path.unlink(missing_ok=True)
+            if path.suffix != '.webp':
+                path.with_suffix('.webp').unlink(missing_ok=True)
+        except OSError:
+            logger.warning('Unused media cleanup could not complete', exc_info=True)
+    @staticmethod
+    async def delete_url(url):
+        if url and url.startswith('/content/'):
+            await asyncio.to_thread(StorageService.delete_file, '', url)
+
 
     @staticmethod
-    def upload_file(
-        bucket_name: str,
-        object_name: str,
-        data: bytes,
-        content_type: str = "image/webp"
-    ) -> str:
-        """Upload raw bytes to local public_content storage and MinIO (if available) and return public URL"""
-        if bucket_name == settings.MINIO_BUCKET_CHAPTERS and content_type.startswith("image/"):
-            try:
-                with Image.open(io.BytesIO(data)) as source:
-                    image = ImageOps.exif_transpose(source)
-                    if image.width > 1200:
-                        image = image.resize((1200, round(image.height * 1200 / image.width)), Image.Resampling.LANCZOS)
-                    if image.mode not in ("RGB", "RGBA"):
-                        image = image.convert("RGB")
-                    optimized = io.BytesIO()
-                    image.save(optimized, format="WEBP", quality=80, method=6)
-                    if optimized.tell() < len(data):
-                        data = optimized.getvalue()
-                        object_name = str(Path(object_name).with_suffix(".webp")).replace("\\", "/")
-                        content_type = "image/webp"
-            except Exception as exc:
-                print(f"[Storage Warning] Image optimization skipped for {object_name}: {exc}")
-
-        clean_name = object_name.lstrip("/\\")
-
-        # 1. Always save locally to backend/public_content
+    def image_dimensions(url):
+        if not url or not url.startswith('/content/'):
+            return None
         try:
-            root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-            content_dir = os.path.join(root_dir, "public_content")
-            local_path = os.path.join(content_dir, clean_name)
-            os.makedirs(os.path.dirname(local_path), exist_ok=True)
-            with open(local_path, "wb") as f:
-                f.write(data)
-        except Exception as e:
-            print(f"[Storage Warning] Local save failed for {object_name}: {e}")
-
-        # 2. Upload to MinIO if running
-        if _is_minio_reachable():
-            try:
-                data_stream = io.BytesIO(data)
-                minio_client.put_object(
-                    bucket_name=bucket_name,
-                    object_name=object_name,
-                    data=data_stream,
-                    length=len(data),
-                    content_type=content_type
-                )
-            except Exception as e:
-                print(f"[Storage Error] MinIO upload failed: {e}")
-
-        clean_url = clean_name.replace("\\", "/")
-        return f"/content/{clean_url}"
-
+            path = safe_path(StorageService.optimized_image_url(url).removeprefix('/content/'))
+            with Image.open(path) as image:
+                if image.width * image.height <= 40_000_000:
+                    return image.width, image.height
+        except (OSError, ValueError, Image.DecompressionBombError):
+            return None
     @staticmethod
-    def delete_file(bucket_name: str, object_name: str) -> None:
-        """Delete an object from local storage and MinIO"""
-        try:
-            root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-            clean_name = object_name.lstrip("/\\")
-            local_path = os.path.join(root_dir, "public_content", clean_name)
-            if os.path.exists(local_path):
-                os.remove(local_path)
-        except Exception as e:
-            print(f"[Storage Warning] Local delete failed: {e}")
-
-        if not _is_minio_reachable():
-            return
-
-        try:
-            minio_client.remove_object(bucket_name, object_name)
-        except Exception as e:
-            print(f"[Storage Warning] Could not delete '{object_name}' from '{bucket_name}': {e}")
+    async def image_dimensions_async(url):
+        return await asyncio.to_thread(StorageService.image_dimensions, url)

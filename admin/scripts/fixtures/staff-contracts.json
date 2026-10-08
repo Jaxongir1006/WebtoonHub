@@ -1,0 +1,302 @@
+{
+  "ShopItemUpdateRequest": {
+    "additionalProperties": false,
+    "properties": {
+      "name": {
+        "anyOf": [
+          {
+            "maxLength": 100,
+            "minLength": 1,
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Name"
+      },
+      "price_coins": {
+        "anyOf": [
+          {
+            "minimum": 1,
+            "type": "integer"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Price Coins"
+      },
+      "asset_url": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Asset Url"
+      },
+      "is_available": {
+        "anyOf": [
+          {
+            "type": "boolean"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Is Available"
+      },
+      "rarity": {
+        "anyOf": [
+          {
+            "enum": [
+              "common",
+              "rare",
+              "epic",
+              "legendary"
+            ],
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Rarity"
+      },
+      "character_name": {
+        "anyOf": [
+          {
+            "maxLength": 100,
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Character Name"
+      },
+      "series_title": {
+        "anyOf": [
+          {
+            "maxLength": 255,
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Series Title"
+      },
+      "webtoon_id": {
+        "anyOf": [
+          {
+            "exclusiveMinimum": 0,
+            "type": "integer"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Webtoon Id"
+      }
+    },
+    "title": "ShopItemUpdateRequest",
+    "type": "object"
+  },
+  "ChapterUpdateRequest": {
+    "additionalProperties": false,
+    "properties": {
+      "chapter_number": {
+        "anyOf": [
+          {
+            "exclusiveMinimum": 0,
+            "type": "number"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Chapter Number"
+      },
+      "title": {
+        "anyOf": [
+          {
+            "maxLength": 255,
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Title"
+      },
+      "content_text": {
+        "anyOf": [
+          {
+            "maxLength": 2000000,
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Content Text"
+      },
+      "reward_coins": {
+        "anyOf": [
+          {
+            "maximum": 1000000,
+            "minimum": 0,
+            "type": "integer"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Reward Coins"
+      },
+      "image_ids": {
+        "anyOf": [
+          {
+            "items": {
+              "type": "integer"
+            },
+            "maxItems": 100,
+            "type": "array"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Image Ids"
+      },
+      "status": {
+        "anyOf": [
+          {
+            "pattern": "^(draft|pending|published|rejected)$",
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Status"
+      }
+    },
+    "title": "ChapterUpdateRequest",
+    "type": "object"
+  },
+  "ReaderUpdateRequest": {
+    "additionalProperties": false,
+    "properties": {
+      "is_active": {
+        "anyOf": [
+          {
+            "type": "boolean"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Is Active"
+      }
+    },
+    "title": "ReaderUpdateRequest",
+    "type": "object"
+  },
+  "EconomyUpdate": {
+    "additionalProperties": false,
+    "properties": {
+      "chapter_read_reward": {
+        "anyOf": [
+          {
+            "maximum": 100000,
+            "minimum": 0,
+            "type": "integer"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Chapter Read Reward"
+      },
+      "daily_checkin_reward": {
+        "anyOf": [
+          {
+            "maximum": 100000,
+            "minimum": 0,
+            "type": "integer"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Daily Checkin Reward"
+      },
+      "welcome_bonus": {
+        "anyOf": [
+          {
+            "maximum": 100000,
+            "minimum": 0,
+            "type": "integer"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Welcome Bonus"
+      },
+      "daily_max_limit": {
+        "anyOf": [
+          {
+            "maximum": 1000000,
+            "minimum": 0,
+            "type": "integer"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Daily Max Limit"
+      },
+      "anti_farming_cooldown_min": {
+        "anyOf": [
+          {
+            "maximum": 1440,
+            "minimum": 0,
+            "type": "integer"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Anti Farming Cooldown Min"
+      }
+    },
+    "title": "EconomyUpdate",
+    "type": "object"
+  }
+}

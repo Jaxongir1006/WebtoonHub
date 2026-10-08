@@ -1,3 +1,5 @@
+from app.core.transactions import serialize_user
+from app.core.idempotency import begin_operation, commit_operation
 import random
 import re
 from datetime import datetime, timezone
@@ -11,6 +13,8 @@ from sqlalchemy.orm import selectinload
 from app.core.config import settings
 from app.modules.rewards.service import RewardService
 from app.modules.shop.models import ShopItem, UserInventory
+from app.modules.shop.schemas import card_fields
+from app.modules.shop.locking import serialize_shop_catalog
 from app.modules.users.models import User
 from app.modules.wheel.models import Wheel, WheelItem, WheelSpin
 from app.modules.wheel.schemas import (
@@ -143,6 +147,7 @@ class WheelService:
                     item_type=item.shop_item.item_type,
                     price_coins=item.shop_item.price_coins,
                     asset_url=item.shop_item.asset_url,
+                    **card_fields(item.shop_item),
                 )
             items_resp.append(
                 WheelItemResponse(
@@ -179,12 +184,19 @@ class WheelService:
         )
 
     @staticmethod
-    async def spin_wheel(db: AsyncSession, user_id: int, wheel_id: int) -> SpinResultResponse:
+    @serialize_user
+    @serialize_shop_catalog
+    async def spin_wheel(db: AsyncSession, user_id: int, wheel_id: int, expected_mode: str, expected_cost: int, operation_key: Optional[str] = None) -> SpinResultResponse:
+        receipt, replay = await begin_operation(db, f'reader:{user_id}', 'wheel.spin', operation_key,
+            {'wheel_id': wheel_id, 'expected_mode': expected_mode, 'expected_cost': expected_cost})
+        if replay is not None:
+            return SpinResultResponse.model_validate(replay)
         # 1. Fetch wheel with items
         query = (
             select(Wheel)
             .options(selectinload(Wheel.items).selectinload(WheelItem.shop_item))
             .where(Wheel.id == wheel_id, Wheel.is_active.is_(True))
+            .with_for_update()
         )
         res = await db.execute(query)
         wheel = res.scalar_one_or_none()
@@ -198,7 +210,7 @@ class WheelService:
             )
 
         # 2. Fetch user
-        u_stmt = select(User).where(User.id == user_id)
+        u_stmt = select(User).where(User.id == user_id).with_for_update().execution_options(populate_existing=True)
         u_res = await db.execute(u_stmt)
         user = u_res.scalar_one_or_none()
         if not user:
@@ -222,6 +234,9 @@ class WheelService:
                 is_free = True
 
         cost = 0 if is_free else wheel.cost_coins
+        actual_mode = "free" if is_free else "paid"
+        if expected_mode != actual_mode or expected_cost != cost:
+            raise HTTPException(409, "Spin availability or cost changed. Refresh the wheel and confirm again.")
 
         # 4. Check user balance
         if not is_free and user.lightning_coins < cost:
@@ -264,6 +279,12 @@ class WheelService:
                 )
             message = f"Tabriklaymiz! Siz {winning_item.label} yutib oldingiz!"
         elif winning_item.reward_type == "shop_item":
+            if winning_item.shop_item_id:
+                locked_item = await db.scalar(select(ShopItem).where(ShopItem.id == winning_item.shop_item_id)
+                    .with_for_update().execution_options(populate_existing=True))
+                if locked_item is None:
+                    raise HTTPException(409, 'Wheel prize changed; retry the spin')
+                winning_item.shop_item = locked_item
             # Check duplicate in inventory
             inv_stmt = select(UserInventory).where(
                 UserInventory.user_id == user.id,
@@ -306,7 +327,7 @@ class WheelService:
         )
         db.add(spin_record)
 
-        await db.commit()
+        await db.flush()
         await db.refresh(spin_record)
         await db.refresh(user)
 
@@ -318,6 +339,7 @@ class WheelService:
                 item_type=winning_item.shop_item.item_type,
                 price_coins=winning_item.shop_item.price_coins,
                 asset_url=winning_item.shop_item.asset_url,
+                **card_fields(winning_item.shop_item),
             )
 
         winning_item_resp = WheelItemResponse(
@@ -337,14 +359,19 @@ class WheelService:
             order_index=winning_item.order_index,
         )
 
-        return SpinResultResponse(
+        response = SpinResultResponse(
             spin_id=spin_record.id,
             winning_item=winning_item_resp,
             winning_index=winning_index,
             new_balance=user.lightning_coins,
             is_free_spin=is_free,
             message=message,
+            outcome=("coins" if winning_item.reward_type == "coins" else "duplicate_item" if already_owned else "item"),
+            reward_coins=spin_record.reward_coins or 0,
+            reward_item_name=winning_item.shop_item.name if winning_item.shop_item else None,
         )
+        await commit_operation(db, receipt, response)
+        return response
 
     @staticmethod
     async def get_recent_spins(
@@ -415,6 +442,7 @@ class WheelService:
                         item_type=item.shop_item.item_type,
                         price_coins=item.shop_item.price_coins,
                         asset_url=item.shop_item.asset_url,
+                        **card_fields(item.shop_item),
                     )
                 items_resp.append(
                     WheelItemResponse(

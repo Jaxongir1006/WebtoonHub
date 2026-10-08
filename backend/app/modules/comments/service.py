@@ -1,6 +1,6 @@
 from typing import Dict, List, Optional
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -18,9 +18,9 @@ from app.modules.webtoons.models import Chapter
 
 class CommentsService:
     @staticmethod
-    async def list_comments(db: AsyncSession, chapter_id: int) -> List[CommentResponse]:
+    async def list_comments(db: AsyncSession, chapter_id: int, offset: int = 0, limit: int = 50) -> List[CommentResponse]:
         # Check chapter exists
-        ch_stmt = select(Chapter.id).where(Chapter.id == chapter_id)
+        ch_stmt = select(Chapter.id).where(Chapter.id == chapter_id, Chapter.status == "published")
         ch_res = await db.execute(ch_stmt)
         if not ch_res.scalar_one_or_none():
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Bob topilmadi")
@@ -30,7 +30,7 @@ class CommentsService:
             select(Comment)
             .options(selectinload(Comment.user))
             .where(Comment.chapter_id == chapter_id, Comment.parent_id.is_(None))
-            .order_by(Comment.created_at.desc())
+            .order_by(Comment.created_at.desc(), Comment.id.desc()).offset(offset).limit(limit)
         )
         result = await db.execute(stmt)
         top_comments = result.scalars().all()
@@ -39,8 +39,8 @@ class CommentsService:
         reply_stmt = (
             select(Comment)
             .options(selectinload(Comment.user))
-            .where(Comment.chapter_id == chapter_id, Comment.parent_id.isnot(None))
-            .order_by(Comment.created_at.asc())
+            .where(Comment.chapter_id == chapter_id, Comment.parent_id.in_([comment.id for comment in top_comments]))
+            .order_by(Comment.created_at.asc(), Comment.id.asc()).limit(500)
         )
         reply_result = await db.execute(reply_stmt)
         replies = reply_result.scalars().all()
@@ -86,6 +86,7 @@ class CommentsService:
             )
             replies_by_parent.setdefault(r.parent_id, []).append(reply_dto)
 
+        reply_counts = dict((await db.execute(select(Comment.parent_id, func.count(Comment.id)).where(Comment.parent_id.in_([comment.id for comment in top_comments])).group_by(Comment.parent_id))).all())
         # Build response
         response: List[CommentResponse] = []
         for c in top_comments:
@@ -100,7 +101,9 @@ class CommentsService:
                     user=author,
                     content=c.content,
                     created_at=c.created_at,
-                    replies=replies_by_parent.get(c.id, [])
+                    replies=replies_by_parent.get(c.id, []), reply_count=reply_counts.get(c.id, 0),
+                    has_more_replies=reply_counts.get(c.id, 0) > len(replies_by_parent.get(c.id, [])),
+                    next_reply_offset=len(replies_by_parent.get(c.id, []))
                 )
             )
 
@@ -257,3 +260,19 @@ class CommentsService:
         await db.refresh(comment)
         return comment
 
+
+
+    @staticmethod
+    async def list_replies(db, comment_id, offset=0, limit=50):
+        parent = await db.scalar(select(Comment).join(Chapter).where(Comment.id == comment_id, Comment.parent_id.is_(None), Chapter.status == 'published'))
+        if not parent:
+            raise HTTPException(404, 'Published comment not found')
+        rows = (await db.execute(select(Comment).options(selectinload(Comment.user)).where(Comment.parent_id == comment_id)
+                    .order_by(Comment.created_at.asc(), Comment.id.asc()).offset(offset).limit(limit))).scalars().all()
+        total = await db.scalar(select(func.count(Comment.id)).where(Comment.parent_id == comment_id))
+        ids = [row.user_id for row in rows if row.user_id]
+        frames = dict((await db.execute(select(UserInventory.user_id, ShopItem.asset_url).join(ShopItem)
+                    .where(UserInventory.user_id.in_(ids), UserInventory.is_active.is_(True), ShopItem.item_type == 'frame'))).all())
+        return {'items': [CommentReplyResponse(id=row.id, parent_id=comment_id, content=row.content, created_at=row.created_at,
+                        user=CommentAuthor(id=row.user_id or 0, username=row.user.username if row.user else 'Unknown', active_frame_url=frames.get(row.user_id))) for row in rows],
+                'total': total, 'offset': offset, 'limit': limit, 'has_more': offset+len(rows) < total}

@@ -1,23 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Modal } from '../common/Modal';
 import { useDailyBonus } from '../../context/DailyBonusContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { Zap, Clock, Sparkles, CheckCircle2, AlertCircle } from 'lucide-react';
 
 export const DailyBonusModal: React.FC = () => {
-  const { isModalOpen, closeModal, countdown, claimBonus, isClaiming, isClaimedToday } = useDailyBonus();
+  const { isModalOpen, closeModal, countdown, claimBonus, isClaiming, isClaimedToday, rewardAmount } = useDailyBonus();
   const { t } = useLanguage();
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  useEffect(() => { if (!isModalOpen) setFeedback(null); }, [isModalOpen]);
 
   const handleClaim = async () => {
     setFeedback(null);
     const res = await claimBonus();
     if (res.success) {
       setFeedback({ type: 'success', message: res.message });
-      setTimeout(() => {
-        closeModal();
-        setFeedback(null);
-      }, 1500);
     } else {
       setFeedback({ type: 'error', message: res.message });
     }
@@ -29,6 +26,7 @@ export const DailyBonusModal: React.FC = () => {
     <Modal
       isOpen={isModalOpen}
       onClose={closeModal}
+      dismissible={!isClaiming}
       maxWidth="md"
       title={
         <div className="flex items-center gap-2">
@@ -50,7 +48,7 @@ export const DailyBonusModal: React.FC = () => {
         </div>
 
         <h3 className="text-2xl font-black text-white mb-1">
-          {t('dailyBonus.amount')}
+          {rewardAmount === null ? t('dailyBonus.modalTitle') : t('ux.bonus', { amount: rewardAmount })}
         </h3>
         <p className="text-sm text-studio-300 max-w-xs mx-auto mb-6">
           {t('dailyBonus.modalSubtitle')}
@@ -89,6 +87,7 @@ export const DailyBonusModal: React.FC = () => {
         {/* Feedback message */}
         {feedback && (
           <div
+            role="status"
             className={`mb-4 p-3 rounded-xl text-sm flex items-center justify-center gap-2 ${
               feedback.type === 'success'
                 ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-400'
@@ -117,7 +116,7 @@ export const DailyBonusModal: React.FC = () => {
             className="w-full py-3.5 px-6 rounded-xl font-bold text-studio-950 bg-gradient-to-r from-brand-500 to-amber-400 hover:from-brand-400 hover:to-amber-300 active:scale-98 shadow-glow-brand transition-all flex items-center justify-center gap-2 disabled:opacity-50 text-base"
           >
             <Zap className="w-5 h-5 fill-studio-950" />
-            <span>{isClaiming ? t('dailyBonus.claiming') : t('dailyBonus.claimBtn')}</span>
+            <span>{isClaiming ? t('dailyBonus.claiming') : t('ux.claimBonus')}</span>
           </button>
         )}
       </div>

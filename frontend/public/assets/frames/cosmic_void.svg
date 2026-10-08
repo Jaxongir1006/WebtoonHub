@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <linearGradient id="cosmicGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38BDF8" />
+      <stop offset="35%" stop-color="#818CF8" />
+      <stop offset="70%" stop-color="#C084FC" />
+      <stop offset="100%" stop-color="#F472B6" />
+    </linearGradient>
+    <filter id="cosmicGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="7" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- Ambient Deep Violet Halo -->
+  <circle cx="256" cy="256" r="215" fill="none" stroke="#818CF8" stroke-width="2.5" opacity="0.4" filter="url(#cosmicGlow)" />
+
+  <!-- Elliptical Tilted Gyroscope Orbital Ring 1 -->
+  <ellipse cx="256" cy="256" rx="228" ry="120" fill="none" stroke="url(#cosmicGrad)" stroke-width="3.5" transform="rotate(-30, 256, 256)" filter="url(#cosmicGlow)" stroke-dasharray="120 18 40 18" />
+
+  <!-- Elliptical Tilted Gyroscope Orbital Ring 2 -->
+  <ellipse cx="256" cy="256" rx="228" ry="120" fill="none" stroke="url(#cosmicGrad)" stroke-width="3" transform="rotate(40, 256, 256)" opacity="0.75" filter="url(#cosmicGlow)" stroke-dasharray="80 25 15 25" />
+
+  <!-- Main Arcane Stellar Ring -->
+  <circle cx="256" cy="256" r="192" fill="none" stroke="url(#cosmicGrad)" stroke-width="6.5" filter="url(#cosmicGlow)" />
+
+  <!-- Inner Starlight Ring -->
+  <circle cx="256" cy="256" r="174" fill="none" stroke="#E0E7FF" stroke-width="2.5" opacity="0.9" />
+
+  <!-- Crescent Moon at Top Right (1:30 position) -->
+  <g transform="translate(378, 120) rotate(-25)" filter="url(#cosmicGlow)">
+    <path d="M 0,-18 A 18,18 0 1,1 -14,14 A 14,14 0 1,0 0,-18 Z" fill="#FDF4FF" stroke="#C084FC" stroke-width="1.5" />
+  </g>
+
+  <!-- 4 Point Diamond Stars & Constellation Nodes -->
+  <g fill="#FDF4FF" filter="url(#cosmicGlow)">
+    <!-- Top Star -->
+    <path d="M 256,42 Q 256,54 268,54 Q 256,54 256,66 Q 256,54 244,54 Q 256,54 256,42 Z" />
+    <!-- Bottom Star -->
+    <path d="M 256,446 Q 256,458 268,458 Q 256,458 256,470 Q 256,458 244,458 Q 256,458 256,446 Z" />
+    <!-- Left Star -->
+    <path d="M 44,256 Q 44,268 56,268 Q 44,268 44,280 Q 44,268 32,268 Q 44,268 44,256 Z" />
+    <!-- Right Star -->
+    <path d="M 468,256 Q 468,268 480,268 Q 468,268 468,280 Q 468,268 456,268 Q 468,268 468,256 Z" />
+  </g>
+
+  <!-- Glowing Stardust Beads around ring -->
+  <circle cx="150" cy="98" r="3.5" fill="#38BDF8" filter="url(#cosmicGlow)" />
+  <circle cx="360" cy="400" r="4" fill="#F472B6" filter="url(#cosmicGlow)" />
+  <circle cx="110" cy="370" r="3.5" fill="#C084FC" filter="url(#cosmicGlow)" />
+</svg>

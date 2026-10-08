@@ -11,7 +11,9 @@ COPY backend/app ./app
 COPY backend/migrations ./migrations
 COPY backend/alembic.ini ./alembic.ini
 COPY backend/scripts/bootstrap_admin.py ./scripts/bootstrap_admin.py
-RUN mkdir -p ./public_content
+COPY backend/scripts/prune_orphan_media.py ./scripts/prune_orphan_media.py
+COPY backend/scripts/prune_chapter_imports.py ./scripts/prune_chapter_imports.py
+RUN mkdir -p ./public_content ./private_chapter_imports
 
 EXPOSE 8000
 CMD ["sh", "-c", "python -m alembic upgrade head && python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips=*"]

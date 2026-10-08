@@ -67,11 +67,7 @@ async def refresh_token(
     new_access_token = await AuthService.refresh_access_token(db, data.refresh_token)
     return {
         "success": True,
-        "data": {
-            "access_token": new_access_token,
-            "token_type": "bearer",
-            "expires_in": 3600
-        },
+        "data": new_access_token,
         "message": "Token muvaffaqiyatli yangilandi"
     }
 

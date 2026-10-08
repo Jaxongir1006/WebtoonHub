@@ -1,4 +1,9 @@
 import axios from 'axios'
+import { ref } from 'vue'
+import i18n from '../i18n'
+import { isStaffLoginRequest, localizeApiError } from '../utils/apiErrors'
+
+export const apiConnectionStatus = ref('checking')
 
 // Axios instance
 const apiClient = axios.create({
@@ -6,8 +11,30 @@ const apiClient = axios.create({
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
-    'X-Device-Type': 'Desktop'
+    'X-Device-Type': /Mobi|Android/i.test(navigator.userAgent) ? 'Mobile' : 'Desktop'
   }
+})
+
+apiClient.interceptors.response.use((response) => {
+  apiConnectionStatus.value = 'online'
+  window.dispatchEvent(new CustomEvent('staff-connection', { detail: 'online' }))
+  return response
+}, (error) => {
+  apiConnectionStatus.value = error.response ? 'online' : 'offline'
+  window.dispatchEvent(new CustomEvent('staff-connection', { detail: error.response ? 'online' : 'offline' }))
+  const requestToken = String(error.config?.headers?.Authorization || '').replace(/^Bearer\s+/i, '')
+  const currentToken = localStorage.getItem('webtoonhub_staff_token') || ''
+  if (error.response?.status === 401 && !isStaffLoginRequest(error.config) && requestToken && requestToken === currentToken) {
+    window.dispatchEvent(new CustomEvent('staff-session-expired'))
+  }
+  const message = localizeApiError(error)
+  error.userMessage = message
+  error.message = message
+  if (error.response?.data) {
+    error.response.data.detail = message
+    if (error.response.data.error) error.response.data.error.message = message
+  }
+  return Promise.reject(error)
 })
 
 // Request interceptor: attach bearer token
@@ -16,6 +43,7 @@ apiClient.interceptors.request.use((config) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }
+  config.headers['Accept-Language'] = i18n.global.locale.value
   return config
 })
 

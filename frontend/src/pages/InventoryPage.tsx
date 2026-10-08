@@ -1,13 +1,15 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { shopApi } from '../api/shop';
-import { InventoryItem } from '../types';
+import { InventoryItem, ShopItemType } from '../types';
 import { AvatarFrame } from '../components/common/AvatarFrame';
 import { CoinBadge } from '../components/common/CoinBadge';
 import { formatDate } from '../utils/date';
 import { getApiErrorMessage } from '../api/client';
+import { CharacterCard } from '../components/cards/CharacterCard';
+import { CardCollectionPanel } from '../components/cards/CardCollectionPanel';
 import {
   Sparkles,
   ShoppingBag,
@@ -22,13 +24,30 @@ import {
 } from 'lucide-react';
 
 export const InventoryPage: React.FC = () => {
-  const { user, isAuthenticated, refreshProfile, openAuthModal } = useAuth();
+  const { user, isAuthenticated, isLoading: authLoading, refreshProfile, openAuthModal } = useAuth();
   const { t, language } = useLanguage();
   const navigate = useNavigate();
+  const actorIdentity = useRef(user?.id);
+  actorIdentity.current = user?.id;
 
   const [items, setItems] = useState<InventoryItem[]>([]);
-  const [filterType, setFilterType] = useState<'all' | 'frame' | 'background'>('all');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialType = searchParams.get('type');
+  const [filterType, setFilterType] = useState<'all' | ShopItemType>(initialType === 'card' || initialType === 'frame' || initialType === 'background' ? initialType : 'all');
+  const chooseType = (type: 'all' | ShopItemType) => {
+    setFilterType(type);
+    const next = new URLSearchParams(searchParams);
+    if (type === 'all') next.delete('type'); else next.set('type', type);
+    setSearchParams(next, { replace: true });
+  };
+  useEffect(() => {
+    const type = searchParams.get('type');
+    setFilterType(type === 'card' || type === 'frame' || type === 'background' ? type : 'all');
+  }, [searchParams]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const actionLock = useRef(false);
+  const requestId = useRef(0);
   const [actionLoadingId, setActionLoadingId] = useState<number | null>(null);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
@@ -39,29 +58,35 @@ export const InventoryPage: React.FC = () => {
 
   const fetchInventory = useCallback(async () => {
     if (!isAuthenticated) return;
+    const request = ++requestId.current;
     setLoading(true);
+    setLoadError(false);
     try {
       const data = await shopApi.getMyInventory();
-      setItems(data || []);
+      if (request === requestId.current) setItems(data || []);
     } catch (err) {
       console.error('Failed to load inventory', err);
-      showToast('error', getApiErrorMessage(err, t('common.error')));
+      if (request === requestId.current) { setLoadError(true); showToast('error', getApiErrorMessage(err, t('common.error'))); }
     } finally {
-      setLoading(false);
+      if (request === requestId.current) setLoading(false);
     }
-  }, [isAuthenticated, t]);
+  }, [isAuthenticated, user?.id, t]);
 
   useEffect(() => {
-    if (isAuthenticated) {
-      fetchInventory();
-    }
-  }, [isAuthenticated, fetchInventory]);
+    setItems([]);
+    if (isAuthenticated && !authLoading) fetchInventory();
+    return () => { requestId.current++; };
+  }, [isAuthenticated, authLoading, fetchInventory]);
 
   const handleEquip = async (item: InventoryItem) => {
+    const actor = actorIdentity.current;
+    if (actionLock.current || item.item_type === 'card') return;
+    actionLock.current = true;
     setActionLoadingId(item.id);
     try {
       const res = await shopApi.equipItem(item.id);
-      showToast('success', res.message || t('shop.equipSuccess'));
+      if (actor !== actorIdentity.current) return ;
+      if (actor === actorIdentity.current) showToast('success', t('shop.equipSuccess'));
       // Update local state: deactivate others of same type, activate this one
       setItems((prev) =>
         prev.map((i) => {
@@ -71,30 +96,39 @@ export const InventoryPage: React.FC = () => {
           return i;
         })
       );
-      await refreshProfile();
+      if (actor !== actorIdentity.current) return;
+      await refreshProfile().catch(() => undefined);
     } catch (err) {
-      showToast('error', getApiErrorMessage(err, t('common.error')));
+      if (actor === actorIdentity.current) showToast('error', getApiErrorMessage(err, t('common.error')));
     } finally {
+      actionLock.current = false;
       setActionLoadingId(null);
     }
   };
 
   const handleUnequip = async (item: InventoryItem) => {
+    const actor = actorIdentity.current;
+    if (actionLock.current || item.item_type === 'card') return;
+    actionLock.current = true;
     setActionLoadingId(item.id);
     try {
       const res = await shopApi.unequipItem(item.id);
-      showToast('success', res.message || t('shop.unequipSuccess'));
+      if (actor !== actorIdentity.current) return ;
+      if (actor === actorIdentity.current) showToast('success', t('shop.unequipSuccess'));
       setItems((prev) =>
         prev.map((i) => (i.id === item.id ? { ...i, is_active: false } : i))
       );
-      await refreshProfile();
+      if (actor !== actorIdentity.current) return;
+      await refreshProfile().catch(() => undefined);
     } catch (err) {
-      showToast('error', getApiErrorMessage(err, t('common.error')));
+      if (actor === actorIdentity.current) showToast('error', getApiErrorMessage(err, t('common.error')));
     } finally {
+      actionLock.current = false;
       setActionLoadingId(null);
     }
   };
 
+  if (authLoading) return <div role="status" className="py-24 text-center">{t('common.loading')}</div>;
   if (!isAuthenticated || !user) {
     return (
       <div className="min-h-screen py-24 flex flex-col items-center justify-center text-center px-4">
@@ -117,6 +151,7 @@ export const InventoryPage: React.FC = () => {
 
   const framesCount = items.filter((i) => i.item_type === 'frame').length;
   const backgroundsCount = items.filter((i) => i.item_type === 'background').length;
+  const cardsCount = items.filter((i) => i.item_type === 'card').length;
   const filteredItems = items.filter((i) => {
     if (filterType === 'all') return true;
     return i.item_type === filterType;
@@ -127,7 +162,7 @@ export const InventoryPage: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
         {/* Floating Toast Notification */}
         {toast && (
-          <div className="fixed bottom-6 right-6 z-50 animate-in slide-in-from-bottom duration-300">
+          <div role="status" className="fixed bottom-6 right-6 left-6 sm:left-auto z-50 animate-in slide-in-from-bottom duration-300">
             <div
               className={`p-4 rounded-2xl shadow-2xl flex items-center gap-3 border ${
                 toast.type === 'success'
@@ -164,6 +199,7 @@ export const InventoryPage: React.FC = () => {
             <div className="flex flex-col sm:flex-row items-center gap-5 text-center sm:text-left">
               <AvatarFrame
                 username={user.username}
+                avatarUrl={user.avatar_url}
                 frameUrl={user.active_frame?.asset_url}
                 size="xl"
               />
@@ -176,7 +212,7 @@ export const InventoryPage: React.FC = () => {
                   {user.username} {t('inventory.title')}
                 </h1>
                 <p className="text-xs text-studio-400 max-w-md">
-                  {t('inventory.subtitle')}
+                  {t('cards.inventorySubtitle')}
                 </p>
 
                 {/* Currently Equipped Badges */}
@@ -226,9 +262,9 @@ export const InventoryPage: React.FC = () => {
 
         {/* Filter Tabs */}
         <div className="flex flex-wrap items-center justify-between gap-4 border-b border-studio-800 pb-4">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button
-              onClick={() => setFilterType('all')}
+              aria-pressed={filterType === 'all'} onClick={() => chooseType('all')}
               className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
                 filterType === 'all'
                   ? 'bg-brand-500 text-studio-950 shadow-glow-brand'
@@ -241,9 +277,10 @@ export const InventoryPage: React.FC = () => {
                 {items.length}
               </span>
             </button>
+            <button type="button" aria-pressed={filterType === 'card'} onClick={() => chooseType('card')} className={`flex min-h-11 items-center gap-2 rounded-xl border px-4 text-xs font-bold ${filterType === 'card' ? 'border-brand-500 bg-brand-500 text-studio-950' : 'border-studio-800 bg-studio-900 text-studio-300'}`}><Layers className="h-4 w-4" aria-hidden="true" /><span>{t('cards.title')}</span><span>{cardsCount}</span></button>
 
             <button
-              onClick={() => setFilterType('frame')}
+              aria-pressed={filterType === 'frame'} onClick={() => chooseType('frame')}
               className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
                 filterType === 'frame'
                   ? 'bg-brand-500 text-studio-950 shadow-glow-brand'
@@ -258,7 +295,7 @@ export const InventoryPage: React.FC = () => {
             </button>
 
             <button
-              onClick={() => setFilterType('background')}
+              aria-pressed={filterType === 'background'} onClick={() => chooseType('background')}
               className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
                 filterType === 'background'
                   ? 'bg-brand-500 text-studio-950 shadow-glow-brand'
@@ -280,11 +317,13 @@ export const InventoryPage: React.FC = () => {
         </div>
 
         {/* Items Grid or Empty State */}
-        {loading ? (
+        {filterType === 'card' ? <CardCollectionPanel key={user.id} ownerId={user.id} summary={user.card_collection} onSaved={refreshProfile} /> : loading ? (
           <div className="py-24 flex flex-col items-center justify-center gap-3 text-studio-400">
             <Loader2 className="w-8 h-8 animate-spin text-brand-500" />
             <p className="text-xs">{t('common.loading')}</p>
           </div>
+        ) : loadError ? (
+          <div role="alert" className="py-16 text-center space-y-4"><p>{t('socialFix.loadFailed')}</p><button onClick={fetchInventory} className="px-5 py-3 bg-brand-500 text-studio-950 rounded-xl">{t('socialFix.retry')}</button></div>
         ) : filteredItems.length === 0 ? (
           <div className="py-20 px-4 text-center rounded-3xl bg-studio-900 border border-studio-800 space-y-4">
             <div className="w-16 h-16 mx-auto rounded-3xl bg-studio-800 border border-studio-700 flex items-center justify-center text-studio-400">
@@ -309,6 +348,7 @@ export const InventoryPage: React.FC = () => {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {filteredItems.map((item) => {
+              if (item.item_type === 'card') return <CharacterCard key={item.id} item={item} owned><p className="text-xs leading-relaxed text-studio-300">{t('cards.ownedNotice')}</p></CharacterCard>;
               const isActionLoading = actionLoadingId === item.id;
               const isEquipped = item.is_active;
 
@@ -341,6 +381,7 @@ export const InventoryPage: React.FC = () => {
                       <div className="relative">
                         <AvatarFrame
                           username={user.username}
+                          avatarUrl={user.avatar_url}
                           frameUrl={item.asset_url}
                           size="lg"
                         />
@@ -375,7 +416,7 @@ export const InventoryPage: React.FC = () => {
                     {isEquipped ? (
                       <button
                         onClick={() => handleUnequip(item)}
-                        disabled={isActionLoading}
+                        disabled={actionLoadingId !== null}
                         className="w-full py-2.5 rounded-xl font-bold text-xs bg-studio-800 hover:bg-rose-500/10 text-rose-400 border border-studio-700 hover:border-rose-500/30 transition-all flex items-center justify-center gap-1.5 disabled:opacity-40"
                       >
                         {isActionLoading ? (
@@ -386,7 +427,7 @@ export const InventoryPage: React.FC = () => {
                     ) : (
                       <button
                         onClick={() => handleEquip(item)}
-                        disabled={isActionLoading}
+                        disabled={actionLoadingId !== null}
                         className="w-full py-2.5 rounded-xl font-bold text-xs bg-brand-500 hover:bg-brand-400 text-studio-950 active:scale-95 shadow-glow-brand transition-all flex items-center justify-center gap-1.5 disabled:opacity-40"
                       >
                         {isActionLoading ? (

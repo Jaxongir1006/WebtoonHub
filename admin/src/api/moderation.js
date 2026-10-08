@@ -11,8 +11,8 @@ export const moderationApi = {
     return res.data
   },
 
-  async moderateChapter(id, status) {
-    const res = await apiClient.patch(`/chapters/${id}/status`, { status })
+  async moderateChapter(id, status, feedback = '') {
+    const res = await apiClient.patch(`/chapters/${id}/status`, { status, feedback })
     return res.data
   }
 }

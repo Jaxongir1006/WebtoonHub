@@ -1,7 +1,10 @@
 <template>
   <router-view />
+  <ToastContainer />
+  <ChapterImportQueue />
 </template>
 
 <script setup>
-// WebtoonHub Studio root component
+import ToastContainer from './components/common/ToastContainer.vue'
+import ChapterImportQueue from './components/webtoons/ChapterImportQueue.vue'
 </script>

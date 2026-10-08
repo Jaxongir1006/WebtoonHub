@@ -23,6 +23,9 @@ class CommentResponse(BaseModel):
     content: str
     created_at: datetime
     replies: List[CommentReplyResponse] = []
+    reply_count: int = 0
+    has_more_replies: bool = False
+    next_reply_offset: int = 0
 
 
 class CommentCreate(BaseModel):

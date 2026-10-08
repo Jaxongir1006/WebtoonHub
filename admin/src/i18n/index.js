@@ -2,6 +2,15 @@ import { createI18n } from 'vue-i18n'
 import uz from './locales/uz'
 import ru from './locales/ru'
 import en from './locales/en'
+import auditFixes from './auditFixes'
+import workflow from './workflow'
+import chapterImport from './chapterImport'
+import collectibleCards from './collectibleCards'
+import studioFixes from './studioFixes'
+function withFixes(base, language) {
+  const extra = workflow[language]
+  return { ...base, ...auditFixes[language], ...extra, ...chapterImport[language], ...collectibleCards[language], ...studioFixes[language], common: { ...base.common, ...extra.common }, nav: { ...base.nav, ...extra.nav } }
+}
 
 const savedLocale = localStorage.getItem('webtoonhub_lang') || 'uz'
 
@@ -10,9 +19,9 @@ const i18n = createI18n({
   locale: savedLocale,
   fallbackLocale: 'uz',
   messages: {
-    uz,
-    ru,
-    en
+    uz: withFixes(uz, 'uz'),
+    ru: withFixes(ru, 'ru'),
+    en: withFixes(en, 'en')
   }
 })
 

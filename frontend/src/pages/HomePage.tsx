@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { webtoonsApi } from '../api/webtoons';
 import { Genre, WebtoonSummary } from '../types';
 import { HeroBanner } from '../components/home/HeroBanner';
+import { ContinueReading } from '../components/home/ContinueReading';
 import { WebtoonCard } from '../components/webtoons/WebtoonCard';
 import { GenreFilter } from '../components/webtoons/GenreFilter';
 import { useDailyBonus } from '../context/DailyBonusContext';
@@ -20,11 +21,12 @@ import {
 } from 'lucide-react';
 
 export const HomePage: React.FC = () => {
-  const { openModal: openDailyBonusModal, isClaimedToday } = useDailyBonus();
+  const { openModal: openDailyBonusModal, isClaimedToday, rewardAmount } = useDailyBonus();
   const { t } = useLanguage();
   const [webtoons, setWebtoons] = useState<WebtoonSummary[]>([]);
   const [genres, setGenres] = useState<Genre[]>([]);
   const [selectedGenre, setSelectedGenre] = useState<string | undefined>();
+  const [sort, setSort] = useState<'popular' | 'updated' | 'newest'>('updated');
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
@@ -36,7 +38,7 @@ export const HomePage: React.FC = () => {
       setLoadError(false);
       try {
         const [webtoonResult, genreResult] = await Promise.allSettled([
-          webtoonsApi.listCatalog({ limit: 12, genre: selectedGenre }),
+          webtoonsApi.listCatalog({ limit: 12, genre: selectedGenre, sort }),
           genres.length === 0 ? webtoonsApi.listGenres() : Promise.resolve(genres)
         ]);
         if (webtoonResult.status === 'rejected') throw webtoonResult.reason;
@@ -55,20 +57,21 @@ export const HomePage: React.FC = () => {
     };
     fetchData();
     return () => { cancelled = true; };
-  }, [selectedGenre, retryCount]);
+  }, [selectedGenre, retryCount, sort]);
 
   const filteredWebtoons = webtoons;
 
   return (
     <div className="min-h-screen">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-16">
+        <ContinueReading />
         {/* Hero Banner for trending items */}
         {loading ? (
-          <div className="w-full h-96 rounded-3xl bg-studio-900 animate-pulse flex items-center justify-center text-studio-500 mb-12">
+          <div className="w-full h-60 sm:h-80 rounded-3xl bg-studio-900 animate-pulse flex items-center justify-center text-studio-500 mb-8">
             <Loader2 className="w-8 h-8 animate-spin text-brand-500" />
           </div>
         ) : loadError ? null : (
-          <HeroBanner webtoons={webtoons.slice(0, 3)} />
+          <HeroBanner label={t(sort === 'updated' ? 'ux.recent' : sort === 'newest' ? 'ux.newest' : 'home.popularToday')} webtoons={webtoons.slice(0, 3)} />
         )}
 
         {loadError && (
@@ -78,51 +81,24 @@ export const HomePage: React.FC = () => {
           </div>
         )}
 
-        {/* Daily Bonus Callout Strip (Faqat bugun olinmagan bo'lsa ko'rinadi) */}
-        {!isClaimedToday && (
-          <div className="mb-12 p-4 sm:p-6 rounded-2xl bg-gradient-to-r from-brand-600/20 via-amber-500/10 to-studio-900 border border-brand-500/30 shadow-glow-brand flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-4 text-center sm:text-left">
-              <div className="w-12 h-12 rounded-2xl bg-brand-500 flex items-center justify-center shrink-0 shadow-glow-brand">
-                <Zap className="w-6 h-6 text-studio-950 fill-studio-950" />
-              </div>
-              <div>
-                <h3 className="font-bold text-white text-base flex items-center gap-1.5 justify-center sm:justify-start">
-                  <span>{t('dailyBonus.modalTitle')} — {t('dailyBonus.amount')}</span>
-                  <Sparkles className="w-4 h-4 text-brand-400" />
-                </h3>
-                <p className="text-xs text-studio-300 mt-0.5">
-                  {t('dailyBonus.modalSubtitle')}
-                </p>
-              </div>
-            </div>
-
-            <button
-              onClick={openDailyBonusModal}
-              className="px-5 py-2.5 rounded-xl font-bold bg-brand-500 text-studio-950 hover:bg-brand-400 active:scale-95 shadow-glow-brand transition-all text-xs shrink-0 flex items-center gap-1.5"
-            >
-              <Gift className="w-4 h-4" />
-              <span>{t('dailyBonus.claimBtn')}</span>
-            </button>
-          </div>
-        )}
-
         {/* Trending Section */}
         <div className="mb-12">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-2">
               <TrendingUp className="w-5 h-5 text-brand-500" />
               <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
-                {t('home.popularToday')}
+                {t(sort === 'updated' ? 'ux.recent' : sort === 'newest' ? 'ux.newest' : 'home.popularToday')}
               </h2>
             </div>
             <Link
-              to="/catalog"
+              to={`/catalog?sort=${sort}`}
               className="text-xs font-bold text-brand-400 hover:text-brand-300 flex items-center gap-1 transition-colors"
             >
               <span>{t('home.viewAll')}</span>
               <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
+          <div className="flex flex-wrap gap-2 mb-4">{(['updated','newest','popular'] as const).map(value => <button key={value} aria-pressed={sort === value} onClick={() => setSort(value)} className={`min-h-[44px] px-4 rounded-xl text-sm font-semibold ${sort === value ? 'bg-brand-500 text-studio-950' : 'bg-studio-800 text-white'}`}>{t(value === 'updated' ? 'ux.recent' : value === 'newest' ? 'ux.newest' : 'readerFix.popular')}</button>)}</div>
 
           {/* Genre Filter Tabs */}
           {genres.length > 0 && (
@@ -155,6 +131,8 @@ export const HomePage: React.FC = () => {
           )}
         </div>
 
+        {!isClaimedToday && <div className="p-4 rounded-2xl bg-studio-900 border border-brand-500/30 flex flex-wrap items-center justify-between gap-3"><p className="font-semibold text-white">{t('dailyBonus.modalTitle')}{rewardAmount !== null && ` · ${t('ux.bonus', { amount: rewardAmount })}`}</p><button onClick={openDailyBonusModal} className="min-h-[44px] px-4 rounded-xl bg-brand-500 text-studio-950 font-bold text-sm">{t('ux.claimBonus')}</button></div>}
+
         {/* Features Showcase Section */}
         <div className="mt-20 pt-12 border-t border-studio-800">
           <div className="text-center max-w-xl mx-auto mb-10">
@@ -175,7 +153,7 @@ export const HomePage: React.FC = () => {
                 {t('home.featureCoinsTitle')}
               </h3>
               <p className="text-xs text-studio-400 leading-relaxed">
-                {t('home.featureCoinsDesc')}
+                {t('ux.coinsDesc')}
               </p>
             </div>
 

@@ -4,10 +4,13 @@ import { AvatarFrame } from '../common/AvatarFrame';
 import { Zap, Check, Sparkles, Loader2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
+import { Link } from 'react-router-dom';
+import { CharacterCard } from '../cards/CharacterCard';
 
 interface ShopItemCardProps {
   item: ShopItem;
   isEquipped: boolean;
+  actionBusy?: boolean;
   onBuy: (itemId: number) => Promise<boolean>;
   onEquip: (itemId: number) => Promise<boolean>;
   onUnequip: (itemId: number) => Promise<boolean>;
@@ -16,6 +19,7 @@ interface ShopItemCardProps {
 export const ShopItemCard: React.FC<ShopItemCardProps> = ({
   item,
   isEquipped,
+  actionBusy = false,
   onBuy,
   onEquip,
   onUnequip
@@ -32,6 +36,7 @@ export const ShopItemCard: React.FC<ShopItemCardProps> = ({
       return;
     }
 
+    if (loading || actionBusy || (item.item_type === 'card' && item.is_owned)) return;
     setLoading(true);
     try {
       if (!item.is_owned) {
@@ -45,6 +50,14 @@ export const ShopItemCard: React.FC<ShopItemCardProps> = ({
       setLoading(false);
     }
   };
+
+  if (item.item_type === 'card') return <CharacterCard item={item} owned={item.is_owned}>
+    {item.is_owned ? <Link to="/inventory?type=card" className="flex min-h-11 items-center justify-center rounded-xl border border-emerald-500/40 px-3 text-xs font-bold text-emerald-400">{t('cards.viewCollection')}</Link> : <>
+      <div className="mb-3 flex items-center gap-1 text-sm font-bold text-brand-400"><Zap className="h-4 w-4" aria-hidden="true" />{item.price_coins} {t('common.coins')}</div>
+      <button type="button" onClick={handleAction} disabled={loading || actionBusy || (isAuthenticated && !canAfford)} className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-brand-500 px-3 text-xs font-bold text-studio-950 disabled:opacity-50">{loading && <Loader2 className="h-4 w-4 animate-spin" />}{t(isAuthenticated ? 'cards.buy' : 'socialFix.signInToBuy')}</button>
+      {isAuthenticated && !canAfford && <p className="mt-2 text-xs text-studio-300">{t('socialFix.needCoins', { amount: item.price_coins - (user?.lightning_coins || 0) })}</p>}
+    </>}
+  </CharacterCard>;
 
   return (
     <div className="flex flex-col bg-studio-900 border border-studio-800 rounded-3xl p-5 hover:border-brand-500/40 transition-all duration-300 hover:-translate-y-1 shadow-xl relative overflow-hidden group">
@@ -76,6 +89,7 @@ export const ShopItemCard: React.FC<ShopItemCardProps> = ({
           <div className="relative">
             <AvatarFrame
               username={user?.username || "You"}
+              avatarUrl={user?.avatar_url}
               frameUrl={item.asset_url}
               size="lg"
             />
@@ -97,7 +111,7 @@ export const ShopItemCard: React.FC<ShopItemCardProps> = ({
       </h3>
 
       {/* Price or Ownership Status */}
-      <div className="flex items-center justify-between mt-auto pt-3">
+      <div className="flex flex-wrap gap-2 items-center justify-between mt-auto pt-3">
         {!item.is_owned ? (
           <div className="flex items-center gap-1 text-sm font-bold text-brand-400">
             <Zap className="w-4 h-4 fill-brand-400" />
@@ -112,7 +126,8 @@ export const ShopItemCard: React.FC<ShopItemCardProps> = ({
         {/* Action Button */}
         <button
           onClick={handleAction}
-          disabled={loading || (!item.is_owned && !canAfford)}
+          disabled={loading || actionBusy || (isAuthenticated && !item.is_owned && !canAfford)}
+          aria-label={!isAuthenticated ? t('socialFix.signInToBuy') : undefined}
           className={`py-2 px-4 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm active:scale-95 disabled:opacity-40 disabled:pointer-events-none ${
             !item.is_owned
               ? 'bg-brand-500 text-studio-950 hover:bg-brand-400 shadow-glow-brand'
@@ -126,7 +141,7 @@ export const ShopItemCard: React.FC<ShopItemCardProps> = ({
           ) : !item.is_owned ? (
             <>
               <Zap className="w-3.5 h-3.5 fill-current" />
-              <span>{t('shop.buy')}</span>
+              <span>{!isAuthenticated ? t('socialFix.signInToBuy') : t('shop.buy')}</span>
             </>
           ) : isEquipped ? (
             <span>{t('shop.unequip')}</span>
@@ -138,6 +153,9 @@ export const ShopItemCard: React.FC<ShopItemCardProps> = ({
           )}
         </button>
       </div>
+      {isAuthenticated && !item.is_owned && !canAfford && (
+        <p className="mt-3 text-xs text-studio-300">{t('socialFix.needCoins', { amount: item.price_coins - (user?.lightning_coins || 0) })}</p>
+      )}
     </div>
   );
 };

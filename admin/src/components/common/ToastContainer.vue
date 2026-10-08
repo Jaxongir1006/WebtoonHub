@@ -1,5 +1,5 @@
 <template>
-  <div class="fixed bottom-6 right-6 z-50 flex flex-col gap-2.5 max-w-sm w-full pointer-events-none">
+  <div class="fixed bottom-4 left-4 right-4 sm:left-auto sm:bottom-6 sm:right-6 z-50 flex flex-col gap-2.5 sm:max-w-sm pointer-events-none">
     <TransitionGroup
       enter-active-class="transition duration-300 ease-out"
       enter-from-class="transform translate-y-4 opacity-0 scale-95"
@@ -11,6 +11,8 @@
       <div
         v-for="toast in systemStore.toasts"
         :key="toast.id"
+        :role="toast.type === 'error' ? 'alert' : 'status'"
+        :aria-live="toast.type === 'error' ? 'assertive' : 'polite'"
         class="pointer-events-auto p-4 rounded-xl shadow-2xl border flex items-start gap-3 glass-panel"
         :class="getToastClasses(toast.type)"
       >
@@ -18,7 +20,7 @@
         <div class="mt-0.5 shrink-0">
           <svg
             v-if="toast.type === 'success'"
-            class="w-5 h-5 text-emerald-400"
+            class="w-5 h-5 text-emerald-700 dark:text-emerald-400"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -27,7 +29,7 @@
           </svg>
           <svg
             v-else-if="toast.type === 'error'"
-            class="w-5 h-5 text-rose-400"
+            class="w-5 h-5 text-rose-700 dark:text-rose-400"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -36,7 +38,7 @@
           </svg>
           <svg
             v-else
-            class="w-5 h-5 text-brand-400"
+            class="w-5 h-5 text-brand-700 dark:text-brand-400"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -47,17 +49,18 @@
 
         <!-- Text -->
         <div class="flex-1 min-w-0">
-          <h5 v-if="toast.title" class="text-sm font-semibold text-studio-100">
+          <h5 v-if="toast.title" class="text-sm font-semibold text-slate-900 dark:text-studio-100">
             {{ toast.title }}
           </h5>
-          <p class="text-xs text-studio-300 mt-0.5 leading-relaxed">
+          <p class="text-xs text-slate-600 dark:text-studio-300 mt-0.5 leading-relaxed">
             {{ toast.message }}
           </p>
         </div>
 
         <!-- Close -->
         <button
-          class="shrink-0 text-studio-400 hover:text-studio-200 transition-colors"
+          class="shrink-0 text-slate-500 dark:text-studio-400 hover:text-slate-900 dark:hover:text-studio-200 transition-colors"
+          :aria-label="$t('common.close')"
           @click="systemStore.removeToast(toast.id)"
         >
           <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -77,11 +80,11 @@ const systemStore = useSystemStore()
 function getToastClasses(type) {
   switch (type) {
     case 'success':
-      return 'border-emerald-500/30 bg-emerald-950/40 text-emerald-200'
+      return 'border-emerald-500/30 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-200'
     case 'error':
-      return 'border-rose-500/30 bg-rose-950/40 text-rose-200'
+      return 'border-rose-500/30 bg-rose-50 dark:bg-rose-950/40 text-rose-200'
     default:
-      return 'border-brand-500/30 bg-brand-950/40 text-brand-200'
+      return 'border-brand-500/30 bg-amber-50 dark:bg-brand-950/40 text-brand-200'
   }
 }
 </script>

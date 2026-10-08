@@ -1,6 +1,9 @@
+export const parseApiDate = (value: string): Date => new Date(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(value) && !/(Z|[+-]\d{2}:?\d{2})$/i.test(value) ? `${value}Z` : value);
+
 export const formatRelativeTime = (dateString?: string, locale: string = 'uz'): string => {
   if (!dateString) return '';
-  const date = new Date(dateString);
+  const date = parseApiDate(dateString);
+  if (!Number.isFinite(date.getTime())) return '';
   const now = new Date();
   const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
 
@@ -47,7 +50,8 @@ export const formatRelativeTimeUz = (dateString?: string, locale: string = 'uz')
 
 export const formatDate = (dateString?: string, locale: string = 'uz'): string => {
   if (!dateString) return '';
-  const date = new Date(dateString);
+  const date = parseApiDate(dateString);
+  if (!Number.isFinite(date.getTime())) return '';
   const loc = locale === 'ru' ? 'ru-RU' : locale === 'en' ? 'en-US' : 'uz-UZ';
   return date.toLocaleDateString(loc, {
     year: 'numeric',
@@ -62,18 +66,10 @@ export const formatDateUz = (dateString?: string, locale: string = 'uz'): string
 /**
  * Returns hours, minutes, seconds until next 00:00 midnight in Asia/Tashkent (UTC+5)
  */
-export const getTimeUntilTashkentMidnight = (): { hours: number; minutes: number; seconds: number; totalSeconds: number } => {
-  const now = new Date();
-  // Tashkent is UTC+5 (5 * 60 = 300 minutes)
-  const tashkentOffsetMs = 5 * 60 * 60 * 1000;
-  const utcMs = now.getTime() + now.getTimezoneOffset() * 60 * 1000;
-  const tashkentTime = new Date(utcMs + tashkentOffsetMs);
-
-  const nextMidnight = new Date(tashkentTime);
-  nextMidnight.setHours(24, 0, 0, 0);
-
-  const diffMs = nextMidnight.getTime() - tashkentTime.getTime();
-  const totalSeconds = Math.max(0, Math.floor(diffMs / 1000));
+export const getTimeUntilTashkentMidnight = (now = new Date()): { hours: number; minutes: number; seconds: number; totalSeconds: number } => {
+  const dayMs = 86400000;
+  const localDayMs = ((now.getTime() + 18000000) % dayMs + dayMs) % dayMs;
+  const totalSeconds = Math.max(0, Math.floor((dayMs - localDayMs) / 1000));
 
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
@@ -86,12 +82,6 @@ export const getTimeUntilTashkentMidnight = (): { hours: number; minutes: number
  * Returns YYYY-MM-DD string according to Asia/Tashkent (UTC+5)
  */
 export const getTashkentDateString = (dateInput?: string | Date): string => {
-  const d = dateInput ? new Date(dateInput) : new Date();
-  const tashkentOffsetMs = 5 * 60 * 60 * 1000;
-  const utcMs = d.getTime() + d.getTimezoneOffset() * 60 * 1000;
-  const tashkentTime = new Date(utcMs + tashkentOffsetMs);
-  const year = tashkentTime.getFullYear();
-  const month = String(tashkentTime.getMonth() + 1).padStart(2, '0');
-  const day = String(tashkentTime.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+  const d = typeof dateInput === 'string' ? parseApiDate(dateInput) : dateInput || new Date();
+  return Number.isFinite(d.getTime()) ? new Date(d.getTime() + 18000000).toISOString().slice(0, 10) : '';
 };

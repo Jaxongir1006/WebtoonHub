@@ -5,6 +5,7 @@ import { formatRelativeTime } from '../../utils/date';
 import { Reply, Trash2, Send, Loader2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
+import { COMMENT_MAX_LENGTH } from '../../utils/comments';
 
 interface CommentItemProps {
   id: number;
@@ -20,6 +21,7 @@ interface CommentItemProps {
   }>;
   onReply?: (parentId: number, text: string) => Promise<boolean>;
   onDelete?: (commentId: number) => Promise<boolean>;
+  disabled?: boolean;
 }
 
 export const CommentItem: React.FC<CommentItemProps> = ({
@@ -29,7 +31,8 @@ export const CommentItem: React.FC<CommentItemProps> = ({
   createdAt,
   replies = [],
   onReply,
-  onDelete
+  onDelete,
+  disabled = false
 }) => {
   const { user: currentUser, isAuthenticated, openAuthModal } = useAuth();
   const { t, language } = useLanguage();
@@ -46,7 +49,7 @@ export const CommentItem: React.FC<CommentItemProps> = ({
       openAuthModal('login');
       return;
     }
-    if (!replyText.trim() || !onReply) return;
+    if (!replyText.trim() || replyText.trim().length > COMMENT_MAX_LENGTH || !onReply) return;
 
     setIsSubmitting(true);
     const success = await onReply(id, replyText.trim());
@@ -90,9 +93,10 @@ export const CommentItem: React.FC<CommentItemProps> = ({
           {isAuthor && onDelete && (
             <button
               onClick={() => handleDelete(id)}
-              disabled={isDeleting}
+              disabled={disabled || isDeleting}
               className="text-studio-500 hover:text-rose-400 p-1 rounded transition-colors"
-              title="Delete"
+              title={t('ux.delete')}
+              aria-label={t('ux.delete')}
             >
               <Trash2 className="w-3.5 h-3.5" />
             </button>
@@ -107,6 +111,7 @@ export const CommentItem: React.FC<CommentItemProps> = ({
         {/* Reply Trigger */}
         <div className="mt-2 flex items-center gap-3">
           <button
+            disabled={disabled || isSubmitting}
             onClick={() => {
               if (!isAuthenticated) {
                 openAuthModal('login');
@@ -123,18 +128,22 @@ export const CommentItem: React.FC<CommentItemProps> = ({
 
         {/* Inline Reply Form */}
         {replyOpen && (
-          <form onSubmit={handleSendReply} className="mt-3 flex gap-2">
+          <form onSubmit={handleSendReply} className="mt-3 flex flex-wrap gap-2">
             <input
+              aria-label={t('comments.replyBtn')}
+              maxLength={COMMENT_MAX_LENGTH}
+              aria-describedby={`comment-reply-count-${id}`}
+              disabled={isSubmitting}
               type="text"
               required
               value={replyText}
               onChange={(e) => setReplyText(e.target.value)}
               placeholder={`@${user.username}...`}
-              className="flex-1 bg-studio-800 border border-studio-700 rounded-xl px-3 py-1.5 text-xs text-white placeholder-studio-500 focus:outline-none focus:border-brand-500"
+              className="flex-1 min-w-0 bg-studio-800 border border-studio-700 rounded-xl px-3 py-1.5 text-xs text-white placeholder-studio-500 focus:outline-none focus:border-brand-500"
             />
             <button
               type="submit"
-              disabled={isSubmitting || !replyText.trim()}
+              disabled={disabled || isSubmitting || !replyText.trim()}
               className="px-3 py-1.5 rounded-xl bg-brand-500 text-studio-950 font-bold text-xs hover:bg-brand-400 disabled:opacity-40 transition-all flex items-center gap-1 shadow-glow-brand"
             >
               {isSubmitting ? (
@@ -144,6 +153,7 @@ export const CommentItem: React.FC<CommentItemProps> = ({
               )}
               <span>{t('comments.sendBtn')}</span>
             </button>
+            <p id={`comment-reply-count-${id}`} className="w-full text-xs text-studio-400">{t('comments.characterCount', { count: replyText.length, limit: COMMENT_MAX_LENGTH })}</p>
           </form>
         )}
 
@@ -174,7 +184,9 @@ export const CommentItem: React.FC<CommentItemProps> = ({
                         <button
                           onClick={() => handleDelete(reply.id)}
                           className="text-studio-500 hover:text-rose-400 p-1 rounded transition-colors"
-                          title="Delete"
+                          title={t('ux.delete')}
+                          disabled={disabled || isDeleting}
+                          aria-label={t('ux.delete')}
                         >
                           <Trash2 className="w-3 h-3" />
                         </button>

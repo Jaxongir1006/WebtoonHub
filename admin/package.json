@@ -6,11 +6,13 @@
   "scripts": {
     "dev": "vite --port 5174",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "node scripts/regression.mjs && node scripts/chapter-import-regression.mjs && node scripts/card-regression.mjs"
   },
   "dependencies": {
     "@lucide/vue": "^1.48.0",
     "axios": "^1.20.0",
+    "fflate": "^0.8.3",
     "lucide-vue-next": "^1.0.0",
     "pinia": "^2.3.1",
     "vue": "^3.5.43",

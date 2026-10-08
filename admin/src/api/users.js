@@ -1,4 +1,5 @@
 import apiClient from './client'
+import { coinRequestConfig } from '../utils/operationIntents'
 
 export const usersApi = {
   async getUsers(params = {}) {
@@ -11,12 +12,12 @@ export const usersApi = {
     return res.data
   },
 
-  async adjustCoins(userId, amount, reason = 'Admin balansi tuzatishi') {
+  async adjustCoins(userId, amount, reason = 'Admin balansi tuzatishi', operationKey) {
     const res = await apiClient.post(`/readers/${userId}/coins`, {
       amount: Number(amount),
       amount_delta: Number(amount),
       reason
-    })
+    }, coinRequestConfig(operationKey))
     return res.data
   },
 

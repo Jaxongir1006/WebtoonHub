@@ -1,5 +1,5 @@
 import { apiClient } from './client';
-import { ApiResponse, ShopItem, InventoryItem } from '../types';
+import { ApiResponse, ShopItem, InventoryItem, ShopItemType, CardCollection, CardCollectionSummary } from '../types';
 
 export interface BuyResponseData {
   item_id: number;
@@ -15,22 +15,22 @@ export interface EquipResponseData {
 }
 
 export const shopApi = {
-  async listItems(itemType?: 'frame' | 'background') {
+  async listItems(itemType?: ShopItemType) {
     const res = await apiClient.get<ApiResponse<ShopItem[]>>('/shop/items', {
       params: itemType ? { item_type: itemType } : undefined
     });
     return res.data.data;
   },
 
-  async getMyInventory(itemType?: 'frame' | 'background') {
+  async getMyInventory(itemType?: ShopItemType) {
     const res = await apiClient.get<ApiResponse<InventoryItem[]>>('/shop/inventory', {
       params: itemType ? { item_type: itemType } : undefined
     });
     return res.data.data;
   },
 
-  async buyItem(itemId: number) {
-    const res = await apiClient.post<ApiResponse<BuyResponseData>>(`/shop/buy/${itemId}`);
+  async buyItem(itemId: number, expectedPrice: number) {
+    const res = await apiClient.post<ApiResponse<BuyResponseData>>(`/shop/buy/${itemId}`, { expected_price: expectedPrice });
     return res.data;
   },
 
@@ -42,5 +42,15 @@ export const shopApi = {
   async unequipItem(itemId: number) {
     const res = await apiClient.post<ApiResponse<null>>(`/shop/unequip/${itemId}`);
     return res.data;
+  },
+
+  async getMyCollection(signal?: AbortSignal) {
+    const res = await apiClient.get<ApiResponse<CardCollection>>('/shop/collection', { signal });
+    return res.data.data;
+  },
+
+  async updateFeaturedCards(itemIds: number[], signal?: AbortSignal) {
+    const res = await apiClient.put<ApiResponse<CardCollectionSummary>>('/shop/collection/featured', { item_ids: itemIds }, { signal });
+    return res.data.data;
   }
 };

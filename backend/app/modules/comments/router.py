@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime, timezone
 from typing import List, Optional, Tuple
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -11,7 +12,7 @@ from app.core.security import decode_token
 from app.modules.auth.dependencies import get_current_user
 from app.modules.comments.schemas import CommentCreate, CommentStaffUpdateRequest
 from app.modules.comments.service import CommentsService
-from app.modules.staff.dependencies import require_permission
+from app.modules.staff.dependencies import require_permission, is_superadmin
 from app.modules.staff.models import Role, StaffSession, StaffUser
 from app.modules.users.models import User, UserSession
 
@@ -55,67 +56,22 @@ async def get_current_actor(
     except (ValueError, TypeError):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token identifikatorlari xato")
 
-    if role == "user":
-        # Validate user session
-        s_stmt = select(UserSession).where(
-            UserSession.id == session_id,
-            UserSession.user_id == actor_id,
-            UserSession.is_active.is_(True)
-        )
-        s_res = await db.execute(s_stmt)
-        if not s_res.scalar_one_or_none():
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Ushbu seans bekor qilingan yoki muddati tugagan"
-            )
-
-        u_stmt = select(User).where(User.id == actor_id, User.is_active.is_(True))
-        u_res = await db.execute(u_stmt)
-        if not u_res.scalar_one_or_none():
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Foydalanuvchi topilmadi yoki bloklangan")
-
-        return "user", actor_id, []
-
-    elif role == "staff":
-        # Validate staff session
-        s_stmt = select(StaffSession).where(
-            StaffSession.id == session_id,
-            StaffSession.staff_id == actor_id,
-            StaffSession.is_active.is_(True)
-        )
-        s_res = await db.execute(s_stmt)
-        if not s_res.scalar_one_or_none():
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Ushbu xodim seansi bekor qilingan yoki muddati tugagan"
-            )
-
-        st_stmt = (
-            select(StaffUser)
-            .options(selectinload(StaffUser.role).selectinload(Role.permissions))
-            .where(StaffUser.id == actor_id, StaffUser.is_active.is_(True))
-        )
-        st_res = await db.execute(st_stmt)
-        staff = st_res.scalar_one_or_none()
-        if not staff:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Xodim topilmadi yoki bloklangan")
-
-        perms = [p.code for p in staff.role.permissions] if staff.role else []
-        if staff.role and staff.role.name == "superadmin":
-            perms.append("superadmin")
-
-        return "staff", actor_id, perms
-
-    else:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Noma'lum rol turi"
-        )
+    if role == 'user':
+        from app.modules.auth.dependencies import get_current_user_and_session
+        user, _ = await get_current_user_and_session(credentials, db)
+        return 'user', user.id, []
+    if role == 'staff':
+        from app.modules.staff.dependencies import get_current_staff_and_session
+        staff, _ = await get_current_staff_and_session(credentials, db)
+        permissions = [permission.code for permission in staff.role.permissions]
+        if is_superadmin(staff): permissions.append('superadmin')
+        return 'staff', staff.id, permissions
+    raise HTTPException(401, 'Actor token role is invalid')
 
 
 @router.get("/chapters/{id}/comments")
-async def list_comments(id: int, db: AsyncSession = Depends(get_db)):
-    comments = await CommentsService.list_comments(db, chapter_id=id)
+async def list_comments(id: int, offset: int = Query(0, ge=0), limit: int = Query(50, ge=1, le=100), db: AsyncSession = Depends(get_db)):
+    comments = await CommentsService.list_comments(db, chapter_id=id, offset=offset, limit=limit)
     return {
         "success": True,
         "data": comments
@@ -215,3 +171,8 @@ async def delete_staff_comment(
         "message": "Sharh muvaffaqiyatli o'chirildi"
     }
 
+
+
+@router.get('/comments/{id}/replies')
+async def list_comment_replies(id: int, offset: int = Query(0, ge=0), limit: int = Query(50, ge=1, le=100), db=Depends(get_db)):
+    return {'success': True, 'data': await CommentsService.list_replies(db, id, offset, limit)}

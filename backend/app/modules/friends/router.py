@@ -1,10 +1,11 @@
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import or_, select
+from sqlalchemy import or_, select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
+from app.core.transactions import entity_lock
 from app.modules.auth.dependencies import get_current_user
 from app.modules.clans.models import ClanMember
 from app.modules.friends.models import Friendship
@@ -21,6 +22,8 @@ router = APIRouter(prefix="/friends", tags=["Friends"])
 
 
 async def _get_user_assets(db: AsyncSession, user_id: int):
+    if "public_assets" in db.info:
+        return db.info["public_assets"].get(user_id, (None, None))
     inv_stmt = (
         select(UserInventory)
         .options(selectinload(UserInventory.item))
@@ -38,6 +41,8 @@ async def _get_user_assets(db: AsyncSession, user_id: int):
 
 
 async def _get_user_clan(db: AsyncSession, user_id: int):
+    if "public_clans" in db.info:
+        return db.info["public_clans"].get(user_id)
     clan_stmt = (
         select(ClanMember)
         .options(selectinload(ClanMember.clan))
@@ -58,6 +63,8 @@ async def _get_user_clan(db: AsyncSession, user_id: int):
 
 @router.get("", status_code=status.HTTP_200_OK)
 async def list_friends(
+    offset: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -69,10 +76,12 @@ async def list_friends(
             or_(Friendship.user_id == current_user.id, Friendship.friend_id == current_user.id),
             Friendship.status == "accepted",
         )
-        .order_by(Friendship.updated_at.desc())
+        .order_by(Friendship.updated_at.desc(), Friendship.id.desc()).offset(offset).limit(limit)
     )
+    total = await db.scalar(select(func.count(Friendship.id)).where(or_(Friendship.user_id == current_user.id, Friendship.friend_id == current_user.id), Friendship.status == "accepted"))
     rows = (await db.execute(stmt)).scalars().all()
 
+    await _batch_public_data(db, [f.friend_id if f.user_id == current_user.id else f.user_id for f in rows])
     friends_data = []
     for f in rows:
         target = f.friend if f.user_id == current_user.id else f.user
@@ -93,6 +102,7 @@ async def list_friends(
     return {
         "success": True,
         "data": friends_data,
+        "pagination": {"offset": offset, "limit": limit, "total": total, "has_more": offset+len(friends_data) < total},
         "message": "Do'stlar ro'yxati muvaffaqiyatli yuklandi",
     }
 
@@ -120,6 +130,7 @@ async def list_friend_requests(
     )
     out_rows = (await db.execute(out_stmt)).scalars().all()
 
+    await _batch_public_data(db, [r.user_id for r in in_rows] + [r.friend_id for r in out_rows])
     incoming = []
     for r in in_rows:
         frame, _ = await _get_user_assets(db, r.user.id)
@@ -184,7 +195,15 @@ async def send_friend_request(
             detail="O'zingizga do'stlik so'rovi yubora olmaysiz",
         )
 
-    # Check existing friendship
+    # All directions of a pair take the same lock, then database rows in ID order.
+    pair = tuple(sorted((current_user.id, target_user.id)))
+    async with entity_lock('friend_pair', pair):
+        await db.execute(select(User.id).where(User.id.in_(pair)).order_by(User.id).with_for_update())
+        return await _persist_friend_request(db, current_user, target_user)
+
+
+async def _persist_friend_request(db, current_user, target_user):
+    # Check existing friendship after serializing both directions.
     f_stmt = select(Friendship).where(
         or_(
             (Friendship.user_id == current_user.id) & (Friendship.friend_id == target_user.id),
@@ -305,22 +324,10 @@ async def remove_friend(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    # Try finding by friendship ID first
-    f_stmt = select(Friendship).where(
-        Friendship.id == target_user_or_friendship_id,
-        or_(Friendship.user_id == current_user.id, Friendship.friend_id == current_user.id),
-    )
+    f_stmt = select(Friendship).where(or_(
+        (Friendship.user_id == current_user.id) & (Friendship.friend_id == target_user_or_friendship_id),
+        (Friendship.user_id == target_user_or_friendship_id) & (Friendship.friend_id == current_user.id)))
     f_row = (await db.execute(f_stmt)).scalar_one_or_none()
-
-    # If not found by friendship ID, try by target user ID
-    if not f_row:
-        f_stmt = select(Friendship).where(
-            or_(
-                (Friendship.user_id == current_user.id) & (Friendship.friend_id == target_user_or_friendship_id),
-                (Friendship.user_id == target_user_or_friendship_id) & (Friendship.friend_id == current_user.id),
-            )
-        )
-        f_row = (await db.execute(f_stmt)).scalar_one_or_none()
 
     if not f_row:
         raise HTTPException(
@@ -393,3 +400,20 @@ async def search_users(
         "success": True,
         "data": results,
     }
+
+
+async def _batch_public_data(db, user_ids):
+    assets = (await db.execute(select(UserInventory).options(selectinload(UserInventory.item)).where(UserInventory.user_id.in_(user_ids), UserInventory.is_active.is_(True)))).scalars().all()
+    result = {}
+    for inventory in assets:
+        if inventory.item is None: continue
+        frame, background = result.get(inventory.user_id, (None, None))
+        item = inventory.item
+        value = {'id': item.id, 'name': item.name, 'asset_url': item.asset_url}
+        if item.item_type == 'frame': frame = value
+        if item.item_type == 'background': background = value
+        result[inventory.user_id] = frame, background
+    db.info['public_assets'] = result
+    members = (await db.execute(select(ClanMember).options(selectinload(ClanMember.clan)).where(ClanMember.user_id.in_(user_ids)))).scalars().all()
+    db.info['public_clans'] = {member.user_id: {'id': member.clan.id, 'name': member.clan.name, 'tag': member.clan.tag,
+             'avatar_url': member.clan.avatar_url, 'level': member.clan.level, 'role': member.role} for member in members if member.clan}

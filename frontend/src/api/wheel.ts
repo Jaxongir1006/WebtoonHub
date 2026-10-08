@@ -50,6 +50,9 @@ export interface SpinResult {
   new_balance: number;
   is_free_spin: boolean;
   message: string;
+  outcome?: 'coins' | 'item' | 'duplicate_item';
+  reward_coins?: number;
+  reward_item_name?: string | null;
 }
 
 export interface SpinHistoryItem {
@@ -78,8 +81,8 @@ export const wheelApi = {
     return res.data.data;
   },
 
-  async spinWheel(wheelId: number): Promise<SpinResult> {
-    const res = await apiClient.post<ApiResponse<SpinResult>>(`/wheels/${wheelId}/spin`);
+  async spinWheel(wheelId: number, intent: { expected_mode: 'free' | 'paid'; expected_cost: number; operation_key: string }): Promise<SpinResult> {
+    const res = await apiClient.post<ApiResponse<SpinResult>>(`/wheels/${wheelId}/spin`, intent);
     return res.data.data;
   },
 

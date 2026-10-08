@@ -1,7 +1,7 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 
 class UserRegisterRequest(BaseModel):
@@ -57,6 +57,7 @@ class UserProfileResponse(BaseModel):
     clan: Optional[Dict[str, Any]] = None
     active_frame: Optional[ActiveAsset] = None
     active_background: Optional[ActiveAsset] = None
+    card_collection: Optional[Dict[str, Any]] = None
     daily_bonus_claimed: bool = False
     last_daily_login: Optional[datetime] = None
     created_at: datetime
@@ -70,6 +71,11 @@ class UserSessionItem(BaseModel):
     is_current: bool = False
     last_active_at: datetime
     created_at: datetime
+
+    @field_validator('last_active_at', 'created_at')
+    @classmethod
+    def explicit_utc(cls, value):
+        return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value
 
     class Config:
         from_attributes = True

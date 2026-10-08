@@ -1,5 +1,11 @@
 # 📄 API: Buyum Xarid Qilish (Buy Item)
 
+## Price consent (October 2026)
+
+Send JSON `{"expected_price": 100}` with the price shown to the reader. The server
+locks the current offer and returns 409 if its price changed; no balance or inventory
+change is committed. A successful receipt reports the actual `price_paid`.
+
 ## Umumiy Ma'lumot
 * **Metod:** `POST`
 * **Yo'l:** `/api/v1/shop/buy/{item_id}`

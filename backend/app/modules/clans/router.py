@@ -1,4 +1,6 @@
 import json
+import asyncio
+import uuid
 import os
 import time
 from datetime import datetime, timezone
@@ -12,6 +14,9 @@ from sqlalchemy.orm import selectinload
 from app.core.database import AsyncSessionLocal, get_db
 from app.core.security import decode_token
 from app.core.storage import StorageService
+from app.core.media_cleanup import delete_unreferenced_media
+from app.core.transactions import serialize_user, serialize_clan, lock_user, entity_lock
+from app.modules.clans.connection_manager import valid_chat_session
 from app.modules.auth.dependencies import get_current_user, get_optional_user
 from app.modules.clans.connection_manager import clan_ws_manager
 from app.modules.clans.models import Clan, ClanLevelConfig, ClanMember, ClanMessage
@@ -24,7 +29,7 @@ from app.modules.clans.schemas import (
     ClanUpdatePayload,
 )
 from app.modules.rewards.models import CoinTransaction
-from app.modules.shop.models import UserInventory
+from app.modules.shop.models import UserInventory, ShopItem
 from app.modules.staff.models import SystemSetting
 from app.modules.users.models import User
 
@@ -32,8 +37,12 @@ router = APIRouter(prefix="/clans", tags=["Clans"])
 
 
 class ChatMessageSendPayload(BaseModel):
+    client_message_id: Optional[str] = Field(None, min_length=1, max_length=64)
     content: str = Field(..., min_length=1, max_length=500)
 
+
+class UpgradeIntent(BaseModel):
+    expected_cost: int = Field(ge=0)
 
 class RoleChangePayload(BaseModel):
     role: str = Field(..., pattern=r"^(leader|co_leader|elder|member)$")
@@ -55,23 +64,28 @@ async def _get_user_frame_svg(db: AsyncSession, user_id: int) -> Optional[str]:
 @router.get("", status_code=status.HTTP_200_OK)
 async def list_clans(
     q: Optional[str] = Query(None),
+    offset: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
     sort: str = Query("level", pattern=r"^(level|members|created_at)$"),
     db: AsyncSession = Depends(get_db),
 ):
-    stmt = select(Clan).options(selectinload(Clan.leader), selectinload(Clan.members))
+    stmt = select(Clan).options(selectinload(Clan.leader))
 
     if q and q.strip():
         search = f"%{q.strip()}%"
         stmt = stmt.where(or_(Clan.name.ilike(search), Clan.tag.ilike(search)))
 
+    member_count = select(func.count(ClanMember.id)).where(ClanMember.clan_id == Clan.id).correlate(Clan).scalar_subquery()
     if sort == "level":
-        stmt = stmt.order_by(Clan.level.desc(), Clan.xp.desc())
+        stmt = stmt.order_by(Clan.level.desc(), Clan.xp.desc(), Clan.id.desc())
     elif sort == "created_at":
-        stmt = stmt.order_by(Clan.created_at.desc())
+        stmt = stmt.order_by(Clan.created_at.desc(), Clan.id.desc())
     else:
-        stmt = stmt.order_by(Clan.level.desc())
+        stmt = stmt.order_by(member_count.desc(), Clan.id.desc())
 
-    clans = (await db.execute(stmt)).scalars().all()
+    total = await db.scalar(select(func.count()).select_from(stmt.order_by(None).subquery()))
+    clans = (await db.execute(stmt.offset(offset).limit(limit))).scalars().all()
+    counts = dict((await db.execute(select(ClanMember.clan_id, func.count(ClanMember.id)).where(ClanMember.clan_id.in_([clan.id for clan in clans])).group_by(ClanMember.clan_id))).all())
 
     items = []
     for c in clans:
@@ -85,7 +99,7 @@ async def list_clans(
             "banner_url": c.banner_url,
             "level": c.level,
             "xp": c.xp,
-            "member_count": len(c.members),
+            "member_count": counts.get(c.id, 0),
             "max_members": c.max_members,
             "is_recruiting": c.is_recruiting,
             "leader_id": c.leader_id,
@@ -96,6 +110,7 @@ async def list_clans(
     return {
         "success": True,
         "data": items,
+        "pagination": {"offset": offset, "limit": limit, "total": total, "has_more": offset+len(items) < total},
         "message": "Klanlar ro'yxati muvaffaqiyatli yuklandi",
     }
 
@@ -139,9 +154,9 @@ async def get_my_clan(
             "leader_username": clan.leader.username if clan.leader else "Boshliq",
             "level": clan.level,
             "xp": clan.xp,
-            "required_xp": req_xp,
+            "required_xp": req_xp, "has_next_level": bool(next_lvl_cfg),
             "upgrade_cost_coins": up_cost,
-            "can_upgrade": clan.xp >= req_xp,
+            "can_upgrade": bool(lvl_cfg and next_lvl_cfg and clan.xp >= req_xp and cm.role in {"leader", "co_leader"} and current_user.lightning_coins >= up_cost),
             "next_level_max_members": next_lvl_cfg.max_members if next_lvl_cfg else clan.max_members,
             "next_level_perks": next_lvl_cfg.perks_description if next_lvl_cfg else "Maksimal daraja",
             "max_members": clan.max_members,
@@ -153,7 +168,7 @@ async def get_my_clan(
     }
 
 
-@router.get("/{clan_id}", status_code=status.HTTP_200_OK)
+@router.get("/{clan_id:int}", status_code=status.HTTP_200_OK)
 async def get_clan_detail(
     clan_id: int,
     current_user: Optional[User] = Depends(get_optional_user),
@@ -197,9 +212,9 @@ async def get_clan_detail(
             "leader_username": clan.leader.username if clan.leader else "Boshliq",
             "level": clan.level,
             "xp": clan.xp,
-            "required_xp": req_xp,
+            "required_xp": req_xp, "has_next_level": bool(next_lvl_cfg),
             "upgrade_cost_coins": up_cost,
-            "can_upgrade": clan.xp >= req_xp,
+            "can_upgrade": bool(lvl_cfg and next_lvl_cfg and clan.xp >= req_xp and my_role in {"leader", "co_leader"} and current_user and current_user.lightning_coins >= up_cost),
             "next_level_max_members": next_lvl_cfg.max_members if next_lvl_cfg else clan.max_members,
             "next_level_perks": next_lvl_cfg.perks_description if next_lvl_cfg else "Maksimal daraja",
             "max_members": clan.max_members,
@@ -212,11 +227,13 @@ async def get_clan_detail(
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
+@serialize_user
 async def create_clan(
     payload: ClanCreatePayload,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    current_user = await lock_user(db, current_user.id)
     # 1. Enforce rule: 1 user can only belong to 1 clan
     existing_membership = (
         await db.execute(select(ClanMember).where(ClanMember.user_id == current_user.id))
@@ -247,6 +264,8 @@ async def create_clan(
     cost_setting = await db.get(SystemSetting, "clan_creation_cost")
     creation_cost = int(cost_setting.value) if cost_setting and cost_setting.value.isdigit() else 300
 
+    if payload.expected_cost != creation_cost:
+        raise HTTPException(409, "Clan creation cost changed. Refresh settings and confirm again.")
     # 4. Check user balance
     if current_user.lightning_coins < creation_cost:
         raise HTTPException(
@@ -310,7 +329,7 @@ async def create_clan(
         "data": {
             "id": new_clan.id,
             "name": new_clan.name,
-            "tag": new_clan.tag,
+            "tag": new_clan.tag, "remaining_coins": current_user.lightning_coins,
         },
         "message": f"'{new_clan.name}' klani muvaffaqiyatli tashkil etildi!",
     }
@@ -335,6 +354,7 @@ async def update_clan(
     if not cm or cm.role not in ["leader", "co_leader"]:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Faqat klan yetakchilari tahrirlashi mumkin")
 
+    old_assets = [clan.avatar_url, clan.frame_url, clan.banner_url]
     if payload.description is not None:
         clan.description = payload.description
     if payload.avatar_url is not None:
@@ -347,6 +367,8 @@ async def update_clan(
         clan.is_recruiting = payload.is_recruiting
 
     await db.commit()
+    for url in old_assets:
+        await delete_unreferenced_media(db, url)
     return {"success": True, "message": "Klan ma'lumotlari yangilandi"}
 
 
@@ -371,20 +393,22 @@ async def upload_clan_avatar(
     if ext not in [".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg"]:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Rasm fayli formati noto'g'ri (.png, .jpg, .webp, .svg)")
 
-    content = await file.read()
+    content = await file.read(10*1024*1024+1)
     if len(content) > 5 * 1024 * 1024:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Fayl hajmi 5MB dan oshmasligi kerak")
 
     filename = f"clan_avatar_{clan_id}_{int(time.time())}{ext}"
-    avatar_url = StorageService.upload_file(
+    avatar_url = await StorageService.upload_file_async(
         bucket_name="clans",
         object_name=f"avatars/{filename}",
         data=content,
         content_type=file.content_type or "image/png"
     )
 
+    old_asset = clan.avatar_url
     clan.avatar_url = avatar_url
     await db.commit()
+    await delete_unreferenced_media(db, old_asset)
     return {"success": True, "avatar_url": avatar_url, "message": "Klan logosi muvaffaqiyatli yangilandi"}
 
 
@@ -409,20 +433,22 @@ async def upload_clan_banner(
     if ext not in [".png", ".jpg", ".jpeg", ".webp", ".svg"]:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Rasm fayli formati noto'g'ri (.png, .jpg, .webp, .svg)")
 
-    content = await file.read()
+    content = await file.read(10*1024*1024+1)
     if len(content) > 10 * 1024 * 1024:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Fayl hajmi 10MB dan oshmasligi kerak")
 
     filename = f"clan_banner_{clan_id}_{int(time.time())}{ext}"
-    banner_url = StorageService.upload_file(
+    banner_url = await StorageService.upload_file_async(
         bucket_name="clans",
         object_name=f"backgrounds/{filename}",
         data=content,
         content_type=file.content_type or "image/jpeg"
     )
 
+    old_asset = clan.banner_url
     clan.banner_url = banner_url
     await db.commit()
+    await delete_unreferenced_media(db, old_asset)
     return {"success": True, "banner_url": banner_url, "message": "Klan foni muvaffaqiyatli yangilandi"}
 
 
@@ -447,29 +473,34 @@ async def upload_clan_frame(
     if ext not in [".png", ".svg", ".webp"]:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Ramka formati SVG yoki PNG bo'lishi kerak")
 
-    content = await file.read()
+    content = await file.read(10*1024*1024+1)
     if len(content) > 5 * 1024 * 1024:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Fayl hajmi 5MB dan oshmasligi kerak")
 
     filename = f"clan_frame_{clan_id}_{int(time.time())}{ext}"
-    frame_url = StorageService.upload_file(
+    frame_url = await StorageService.upload_file_async(
         bucket_name="clans",
         object_name=f"frames/{filename}",
         data=content,
         content_type="image/svg+xml" if ext == ".svg" else (file.content_type or "image/png")
     )
 
+    old_asset = clan.frame_url
     clan.frame_url = frame_url
     await db.commit()
+    await delete_unreferenced_media(db, old_asset)
     return {"success": True, "frame_url": frame_url, "message": "Klan ramkasi muvaffaqiyatli yangilandi"}
 
 
 @router.post("/{clan_id}/join", status_code=status.HTTP_200_OK)
+@serialize_user
+@serialize_clan
 async def join_clan(
     clan_id: int,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    current_user = await lock_user(db, current_user.id)
     # Rule: 1 user, 1 clan
     existing = (await db.execute(
         select(ClanMember).where(ClanMember.user_id == current_user.id)
@@ -481,7 +512,7 @@ async def join_clan(
         )
 
     clan = (await db.execute(
-        select(Clan).options(selectinload(Clan.members)).where(Clan.id == clan_id)
+        select(Clan).options(selectinload(Clan.members)).where(Clan.id == clan_id).with_for_update().execution_options(populate_existing=True)
     )).scalar_one_or_none()
     if not clan:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Klan topilmadi")
@@ -554,11 +585,16 @@ async def leave_clan(
         else:
             # Last member, delete whole clan
             clan = await db.get(Clan, clan_id)
+            old_assets = [clan.avatar_url, clan.frame_url, clan.banner_url] if clan else []
             if clan:
                 await db.delete(clan)
             await db.commit()
+            await clan_ws_manager.close_member(clan_id, current_user.id)
+            for url in old_assets:
+                await delete_unreferenced_media(db, url)
             return {"success": True, "message": "Klan tarqatib yuborildi"}
 
+    await clan_ws_manager.close_member(clan_id, current_user.id)
     await db.delete(cm)
 
     # System message
@@ -614,6 +650,7 @@ async def kick_clan_member(
     if my_cm.role == "co_leader" and target_cm.role in ["leader", "co_leader"]:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="O'rinbosar boshqa yetakchilarni hayday olmaydi")
 
+    await clan_ws_manager.close_member(clan_id, target_user_id)
     target_username = target_cm.user.username if target_cm.user else f"Foydalanuvchi #{target_user_id}"
     await db.delete(target_cm)
 
@@ -643,8 +680,11 @@ async def kick_clan_member(
 
 
 @router.post("/{clan_id}/upgrade-level", status_code=status.HTTP_200_OK)
+@serialize_user
+@serialize_clan
 async def upgrade_clan_level(
     clan_id: int,
+    payload: UpgradeIntent,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -669,9 +709,11 @@ async def upgrade_clan_level(
     if not clan:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Klan topilmadi")
 
+    current_user = await lock_user(db, current_user.id)
+    clan = await db.scalar(select(Clan).where(Clan.id == clan_id).with_for_update().execution_options(populate_existing=True))
     # Fetch configuration for current clan level
     lvl_cfg = await db.get(ClanLevelConfig, clan.level)
-    if not lvl_cfg:
+    if not lvl_cfg or not await db.get(ClanLevelConfig, clan.level + 1):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Klan maksimal darajaga yetgan yoki daraja sozlamalari mavjud emas",
@@ -689,6 +731,8 @@ async def upgrade_clan_level(
 
     # 2. Check Chaqmoq coins requirement
     upgrade_fee = lvl_cfg.upgrade_cost_coins
+    if payload.expected_cost != upgrade_fee:
+        raise HTTPException(409, "Clan upgrade cost changed. Refresh the clan and confirm again.")
     if current_user.lightning_coins < upgrade_fee:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -750,7 +794,7 @@ async def upgrade_clan_level(
         "data": {
             "level": clan.level,
             "xp": clan.xp,
-            "max_members": clan.max_members,
+            "max_members": clan.max_members, "remaining_coins": current_user.lightning_coins,
         },
         "message": f"Tabriklaymiz! '{clan.name}' klani {clan.level}-darajaga ko'tarildi!",
     }
@@ -775,10 +819,11 @@ async def list_clan_members(
     )
     members = (await db.execute(stmt)).scalars().all()
 
+    frames = await _batch_frames(db, [member.user_id for member in members])
     items = []
     for m in members:
         user = m.user
-        frame_svg = await _get_user_frame_svg(db, user.id) if user else None
+        frame_svg = frames.get(user.id) if user else None
         items.append({
             "id": m.id,
             "user_id": user.id if user else 0,
@@ -797,9 +842,13 @@ async def list_clan_members(
 async def get_clan_messages(
     clan_id: int,
     limit: int = Query(50, ge=1, le=100),
+    before_id: Optional[int] = Query(None, gt=0),
+    after_id: Optional[int] = Query(None, ge=0),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    if before_id is not None and after_id is not None:
+        raise HTTPException(422, 'Use either before_id or after_id')
     # Verify user is in clan
     cm = (await db.execute(
         select(ClanMember).where(ClanMember.clan_id == clan_id, ClanMember.user_id == current_user.id)
@@ -811,20 +860,25 @@ async def get_clan_messages(
         select(ClanMessage)
         .options(selectinload(ClanMessage.user))
         .where(ClanMessage.clan_id == clan_id)
-        .order_by(ClanMessage.created_at.desc())
-        .limit(limit)
+        .where(ClanMessage.id < before_id if before_id else True)
+        .where(ClanMessage.id > after_id if after_id is not None else True)
+        .order_by(ClanMessage.id.asc() if after_id is not None else ClanMessage.id.desc())
+        .limit(limit + 1)
     )
-    messages = list(reversed((await db.execute(stmt)).scalars().all()))
+    fetched = (await db.execute(stmt)).scalars().all()
+    has_more = len(fetched) > limit
+    messages = fetched[:limit] if after_id is not None else list(reversed(fetched[:limit]))
 
     # Build cache of roles and frames for user_ids in this clan
     members_stmt = select(ClanMember).where(ClanMember.clan_id == clan_id)
     clan_members_map = {m.user_id: m.role for m in (await db.execute(members_stmt)).scalars().all()}
 
+    frames = await _batch_frames(db, [msg.user_id for msg in messages if msg.user_id])
     items = []
     for msg in messages:
         user = msg.user
         role = clan_members_map.get(msg.user_id, "member") if msg.user_id else "system"
-        frame_svg = await _get_user_frame_svg(db, msg.user_id) if msg.user_id else None
+        frame_svg = frames.get(msg.user_id) if msg.user_id else None
 
         items.append({
             "id": msg.id,
@@ -839,16 +893,24 @@ async def get_clan_messages(
             "created_at": msg.created_at,
         })
 
-    return {"success": True, "data": items}
+    return {"success": True, "data": items, "has_more": has_more,
+            "pagination": {"has_more": has_more, "limit": limit},
+            "next_after_id": messages[-1].id if messages else after_id}
 
 
 @router.post("/{clan_id}/chat/send", status_code=status.HTTP_200_OK)
+@serialize_user
 async def send_clan_message(
     clan_id: int,
     payload: ChatMessageSendPayload,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    # A process-local lock cannot deduplicate retries handled by another worker.
+    # Lock the author in the transaction before checking the message identity.
+    current_user = await lock_user(db, current_user.id)
+    if current_user is None or not current_user.is_active:
+        raise HTTPException(403, "Chat account is unavailable")
     # Verify membership
     cm = (await db.execute(
         select(ClanMember).where(ClanMember.clan_id == clan_id, ClanMember.user_id == current_user.id)
@@ -856,15 +918,21 @@ async def send_clan_message(
     if not cm:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Siz bu klan a'zosi emassiz")
 
-    msg = ClanMessage(
-        clan_id=clan_id,
-        user_id=current_user.id,
-        message_type="text",
-        content=payload.content.strip(),
-    )
-    db.add(msg)
-    await db.commit()
-    await db.refresh(msg)
+    if not payload.content.strip():
+        raise HTTPException(422, "Message cannot be blank")
+    msg = None
+    if payload.client_message_id:
+        msg = await db.scalar(select(ClanMessage).where(ClanMessage.user_id == current_user.id, ClanMessage.client_message_id == payload.client_message_id))
+        if msg and (msg.clan_id != clan_id or msg.content != payload.content.strip()):
+            raise HTTPException(409, "Message identifier was already used")
+    if msg is None:
+        msg = ClanMessage(clan_id=clan_id, user_id=current_user.id, message_type="text", content=payload.content.strip(), client_message_id=payload.client_message_id)
+        db.add(msg)
+        await db.commit()
+        await db.refresh(msg)
+    else:
+        # Release the author lock before network delivery, including on replay.
+        await db.commit()
 
     frame_svg = await _get_user_frame_svg(db, current_user.id)
     msg_dict = {
@@ -886,88 +954,73 @@ async def send_clan_message(
     return {"success": True, "data": msg_dict}
 
 
-# WebSocket Real-Time Clan Chat Endpoint
-@router.websocket("/{clan_id}/chat/ws")
-async def clan_chat_websocket(
-    websocket: WebSocket,
-    clan_id: int,
-    token: Optional[str] = Query(None),
-):
-    if not token:
-        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
-        return
-
-    payload = decode_token(token)
-    if not payload or not payload.get("sub"):
-        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
-        return
-
+# Read-only live transport; messages persist through REST acknowledgements.
+@router.websocket('/{clan_id}/chat/ws')
+async def clan_chat_websocket(websocket: WebSocket, clan_id: int, token: Optional[str] = Query(None)):
+    claims = decode_token(token) if token else None
     try:
-        user_id = int(payload.get("sub"))
-    except Exception:
-        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        if not claims or claims.get('type') != 'access' or claims.get('role') != 'user':
+            raise ValueError()
+        user_id, session_id = int(claims['sub']), uuid.UUID(claims['session_id'])
+        async with AsyncSessionLocal() as db:
+            if not await valid_chat_session(db, clan_id, user_id, session_id):
+                raise ValueError()
+    except (ValueError, KeyError, TypeError):
+        await websocket.close(code=1008)
         return
-
-    # Verify user belongs to clan
-    async with AsyncSessionLocal() as db:
-        user = await db.get(User, user_id)
-        if not user or not user.is_active:
-            await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
-            return
-
-        cm = (await db.execute(
-            select(ClanMember).where(ClanMember.clan_id == clan_id, ClanMember.user_id == user_id)
-        )).scalar_one_or_none()
-        if not cm:
-            await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
-            return
-        user_role = cm.role
-        username = user.username
-        avatar_url = user.avatar_url
-
-    await clan_ws_manager.connect(clan_id, websocket)
-
+    await clan_ws_manager.connect(clan_id, websocket, user_id, session_id)
     try:
         while True:
-            data = await websocket.receive_text()
             try:
-                parsed = json.loads(data)
-                content = parsed.get("content", "").strip()
-            except Exception:
-                content = data.strip()
-
-            if not content:
-                continue
-
-            # Save message in DB
+                await asyncio.wait_for(websocket.receive_text(), timeout=30)
+            except asyncio.TimeoutError:
+                pass
             async with AsyncSessionLocal() as db:
-                msg = ClanMessage(
-                    clan_id=clan_id,
-                    user_id=user_id,
-                    message_type="text",
-                    content=content[:500],
-                )
-                db.add(msg)
-                await db.commit()
-                await db.refresh(msg)
-                msg_id = msg.id
-                created_at_iso = msg.created_at.isoformat()
-                frame_svg = await _get_user_frame_svg(db, user_id)
-
-            # Broadcast to all connected members of this clan
-            await clan_ws_manager.broadcast(clan_id, {
-                "id": msg_id,
-                "clan_id": clan_id,
-                "user_id": user_id,
-                "username": username,
-                "avatar_url": avatar_url,
-                "active_frame_svg": frame_svg,
-                "role": user_role,
-                "message_type": "text",
-                "content": content[:500],
-                "created_at": created_at_iso,
-            })
+                if not await valid_chat_session(db, clan_id, user_id, session_id) or claims.get('exp', 0) <= time.time():
+                    await clan_ws_manager.close(clan_id, websocket)
+                    return
     except WebSocketDisconnect:
+        pass
+    finally:
         clan_ws_manager.disconnect(clan_id, websocket)
-    except Exception:
-        clan_ws_manager.disconnect(clan_id, websocket)
+
+@router.get('/settings')
+async def clan_settings(db=Depends(get_db)):
+    setting = await db.get(SystemSetting, 'clan_creation_cost')
+    cost = int(setting.value) if setting and setting.value.isdigit() else 300
+    levels = (await db.execute(select(ClanLevelConfig).order_by(ClanLevelConfig.level))).scalars().all()
+    return {'success': True, 'data': {'clan_creation_cost': cost,
+        'levels': [{key: getattr(level, key) for key in ['level','required_xp','upgrade_cost_coins','max_members','perks_description']} for level in levels]}}
+
+@router.post('/uploads/{kind}')
+async def draft_clan_upload(kind: str, file: UploadFile = File(...), current_user: User = Depends(get_current_user)):
+    if kind not in {'avatar','banner','frame'}:
+        raise HTTPException(404, 'Unknown clan image kind')
+    extension = 'svg' if (file.filename or '').lower().endswith('.svg') and kind == 'frame' else 'webp'
+    content = await file.read(5*1024*1024+1)
+    if len(content) > 5*1024*1024:
+        raise HTTPException(413, 'Clan appearance image must be at most 5 MB')
+    url = await StorageService.upload_file_async(bucket_name='clans', object_name=f'clans/drafts/{current_user.id}/{kind}_{uuid.uuid4().hex}.{extension}',
+                                               data=content, content_type=file.content_type)
+    return {'success': True, 'data': {'url': url, f'{kind}_url': url}}
+
+@router.patch('/{clan_id}/members/{user_id}/role')
+async def change_member_role(clan_id: int, user_id: int, payload: RoleChangePayload, current_user: User = Depends(get_current_user), db=Depends(get_db)):
+    async with entity_lock('clan', clan_id):
+        clan = await db.scalar(select(Clan).where(Clan.id == clan_id).with_for_update())
+        actor = await db.scalar(select(ClanMember).where(ClanMember.clan_id == clan_id, ClanMember.user_id == current_user.id))
+        member = await db.scalar(select(ClanMember).where(ClanMember.clan_id == clan_id, ClanMember.user_id == user_id))
+        if not clan or not member:
+            raise HTTPException(404, 'Clan member not found')
+        if not actor or actor.role != 'leader' or actor.user_id == user_id:
+            raise HTTPException(403, 'Only the leader may change another member role')
+        if payload.role == 'leader':
+            actor.role = 'co_leader'
+            clan.leader_id = user_id
+        member.role = payload.role
+        await db.commit()
+    return {'success': True, 'data': {'user_id': user_id, 'role': member.role, 'leader_id': clan.leader_id}}
+
+
+async def _batch_frames(db, ids):
+    return dict((await db.execute(select(UserInventory.user_id, ShopItem.asset_url).join(ShopItem).where(UserInventory.user_id.in_(ids), UserInventory.is_active.is_(True), ShopItem.item_type == 'frame'))).all())

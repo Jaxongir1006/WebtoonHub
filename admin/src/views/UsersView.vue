@@ -1,10 +1,11 @@
 <template>
   <div class="space-y-6">
+    <LoadState :error="loadError" @retry="loadUsers" />
     <!-- Header -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
       <div>
         <h2 class="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
-          <svg class="w-6 h-6 text-brand-500 dark:text-brand-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg class="w-6 h-6 text-brand-700 dark:text-brand-500 dark:text-brand-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
           </svg>
           {{ $t('users.title') }}
@@ -17,9 +18,9 @@
       <div class="flex items-center gap-3">
         <router-link
           to="/economy"
-          class="px-4 py-2 rounded-xl text-xs font-bold bg-brand-500/15 hover:bg-brand-500/25 text-brand-600 dark:text-brand-400 border border-brand-500/30 transition-all flex items-center gap-2 shadow-sm"
+          class="px-4 py-2 rounded-xl text-xs font-bold bg-brand-500/15 hover:bg-brand-500/25 text-brand-700 dark:text-brand-400 border border-brand-500/30 transition-all flex items-center gap-2 shadow-sm"
         >
-          <svg class="w-4 h-4 text-brand-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg class="w-4 h-4 text-brand-700 dark:text-brand-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
           </svg>
           <span>⚡ {{ $t('nav.economy') }}</span>
@@ -30,32 +31,29 @@
     <!-- Search & Filters -->
     <div class="glass-card rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4 border border-slate-200 dark:border-white/5">
       <div class="w-full sm:w-80">
-        <SearchInput v-model="searchQuery" :placeholder="$t('common.search')" @input="debouncedSearch" />
+        <SearchInput v-model="searchQuery" :placeholder="$t('common.search')"  />
       </div>
 
-      <div class="text-xs text-slate-500 dark:text-studio-400 font-mono">
-        Jami: <strong>{{ totalReaders }}</strong> {{ $t('users.total_readers') }}
+      <div class="text-xs text-slate-500 dark:text-studio-400 font-mono"> {{ $t('staff.s201') }} <strong>{{ totalReaders }}</strong> {{ $t('users.total_readers') }}
       </div>
     </div>
 
     <!-- Loading State -->
     <div v-if="loading" class="flex flex-col items-center justify-center p-16 space-y-4">
       <div class="w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full animate-spin"></div>
-      <p class="text-xs text-studio-400 font-medium">O'quvchilar ro'yxati yuklanmoqda...</p>
+      <p class="text-xs text-slate-500 dark:text-studio-400 font-medium"> {{ $t('staff.s483') }} </p>
     </div>
 
     <!-- Empty State -->
     <div
-      v-else-if="users.length === 0"
+      v-else-if="!loadError && users.length === 0"
       class="glass-card rounded-2xl p-12 text-center border border-slate-200 dark:border-white/5 space-y-3"
     >
-      <div class="w-12 h-12 rounded-2xl bg-brand-500/10 text-brand-400 mx-auto flex items-center justify-center font-bold text-lg">
+      <div class="w-12 h-12 rounded-2xl bg-brand-500/10 text-brand-700 dark:text-brand-400 mx-auto flex items-center justify-center font-bold text-lg">
         👥
       </div>
-      <h3 class="font-bold text-white text-base">Foydalanuvchilar topilmadi</h3>
-      <p class="text-xs text-studio-400 max-w-sm mx-auto">
-        Qidiruv so'rovi bo'yicha hech qanday o'quvchi qaytmadi.
-      </p>
+      <h3 class="font-bold text-slate-900 dark:text-white text-base"> {{ $t('staff.s484') }} </h3>
+      <p class="text-xs text-slate-500 dark:text-studio-400 max-w-sm mx-auto"> {{ $t('staff.s485') }} </p>
     </div>
 
     <!-- Users Table -->
@@ -66,8 +64,8 @@
             <tr>
               <th class="px-6 py-3.5">{{ $t('users.th_user') }}</th>
               <th class="px-6 py-3.5">{{ $t('users.th_coins') }}</th>
-              <th class="px-6 py-3.5">{{ $t('users.th_equipped') }}</th>
-              <th class="px-6 py-3.5">Ro'yxatdan o'tgan</th>
+
+              <th class="px-6 py-3.5"> {{ $t('staff.s486') }} </th>
               <th class="px-6 py-3.5">{{ $t('users.th_status') }}</th>
               <th class="px-6 py-3.5 text-right">{{ $t('users.th_actions') }}</th>
             </tr>
@@ -80,33 +78,20 @@
             >
               <!-- Username & Email -->
               <td class="px-6 py-4 flex items-center gap-3">
-                <div class="w-9 h-9 rounded-full bg-slate-200 dark:bg-studio-800 border border-slate-300 dark:border-white/10 flex items-center justify-center font-bold text-xs text-brand-600 dark:text-brand-400 shrink-0">
+                <div class="w-9 h-9 rounded-full bg-slate-200 dark:bg-studio-800 border border-slate-300 dark:border-white/10 flex items-center justify-center font-bold text-xs text-brand-700 dark:text-brand-400 shrink-0">
                   {{ (user.username || 'U').charAt(0).toUpperCase() }}
                 </div>
                 <div>
                   <span class="font-bold text-slate-900 dark:text-white block">{{ user.username }}</span>
-                  <span class="text-xs text-slate-400 dark:text-studio-400 font-mono">{{ user.email }}</span>
+                  <span class="text-xs text-slate-600 dark:text-studio-400 font-mono">{{ user.email }}</span>
                 </div>
               </td>
 
               <!-- Lightning Coins Balance -->
               <td class="px-6 py-4">
-                <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-brand-500/10 border border-brand-500/30 text-brand-600 dark:text-brand-300 font-bold font-mono text-sm">
+                <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-brand-500/10 border border-brand-500/30 text-brand-700 dark:text-brand-300 font-bold font-mono text-sm">
                   ⚡ {{ user.lightning_coins }}
                 </div>
-              </td>
-
-              <!-- Equipped Cosmetics -->
-              <td class="px-6 py-4 text-xs space-y-0.5">
-                <div v-if="user.equipped_frame" class="text-amber-500 dark:text-amber-300 flex items-center gap-1 font-medium">
-                  <span>👑</span> {{ user.equipped_frame }}
-                </div>
-                <div v-if="user.equipped_background" class="text-purple-600 dark:text-purple-300 flex items-center gap-1 font-medium">
-                  <span>🌌</span> {{ user.equipped_background }}
-                </div>
-                <span v-if="!user.equipped_frame && !user.equipped_background" class="text-slate-400 dark:text-studio-500 italic">
-                  Standart
-                </span>
               </td>
 
               <!-- Registration Date -->
@@ -128,7 +113,7 @@
                   <Button
                     variant="ghost"
                     size="xs"
-                    class="text-brand-600 dark:text-brand-400 hover:bg-brand-500/10 border border-brand-500/30"
+                    class="text-brand-700 dark:text-brand-400 hover:bg-brand-500/10 border border-brand-500/30"
                     @click="openEditModal(user)"
                   >
                     ✏️ {{ $t('common.edit') }}
@@ -138,7 +123,7 @@
                   <Button
                     variant="secondary"
                     size="xs"
-                    @click="openCoinsModal(user)"
+                    v-if="authStore.hasPermission('coins:adjust')" @click="openCoinsModal(user)"
                   >
                     ⚡ {{ $t('users.btn_adjust') }}
                   </Button>
@@ -160,11 +145,9 @@
                   <!-- TERMINATE SESSIONS BUTTON -->
                   <button
                     class="p-1.5 rounded-lg text-xs transition-colors font-medium text-slate-500 dark:text-studio-400 hover:text-amber-500 dark:hover:text-amber-400 hover:bg-amber-500/10"
-                    title="Barcha seanslarni to'xtatish"
+                    :title="$t('staff.s488')" :aria-label="$t('staff.s488')"
                     @click="terminateUserSessions(user)"
-                  >
-                    🔒 Seanslar
-                  </button>
+                  > {{ $t('staff.s489') }} </button>
                 </div>
               </td>
             </tr>
@@ -177,20 +160,28 @@
     <UserEditModal
       v-model="showEditModal"
       :user="selectedUser"
-      @save="onUserUpdated"
+      :on-save="onUserUpdated"
     />
 
     <!-- Coins Adjustment Modal -->
     <CoinsModal
       v-model="showCoinsModal"
       :user="selectedUser"
-      @save="onCoinsAdjusted"
+      :on-save="onCoinsAdjusted"
     />
+    <Pagination v-model:page="page" :limit="limit" :total="totalReaders" :loading="loading" />
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import i18n from '../i18n/index.js'
+const tr = (...args) => i18n.global.t(...args)
+
+import { ref, onMounted, watch, onUnmounted } from 'vue'
+import Pagination from '../components/common/Pagination.vue'
+import LoadState from '../components/common/LoadState.vue'
+import { getErrorMessage, pageCount } from '../utils/forms'
+import { useAuthStore } from '../stores/auth'
 import { useSystemStore } from '../stores/system'
 import { usersApi } from '../api/users'
 import Badge from '../components/common/Badge.vue'
@@ -199,6 +190,7 @@ import SearchInput from '../components/common/SearchInput.vue'
 import CoinsModal from '../components/users/CoinsModal.vue'
 import UserEditModal from '../components/users/UserEditModal.vue'
 
+const authStore = useAuthStore()
 const systemStore = useSystemStore()
 const searchQuery = ref('')
 const showCoinsModal = ref(false)
@@ -208,38 +200,39 @@ const loading = ref(false)
 const users = ref([])
 const totalReaders = ref(0)
 
-let searchTimeout = null
-
-function debouncedSearch() {
-  if (searchTimeout) clearTimeout(searchTimeout)
-  searchTimeout = setTimeout(() => {
-    loadUsers()
-  }, 300)
-}
-
+const page = ref(1)
+const limit = 25
+const loadError = ref('')
+let loadSequence = 0
 async function loadUsers() {
+  const sequence = ++loadSequence
+  loadError.value = ''
   loading.value = true
   try {
     const res = await usersApi.getUsers({
       search: searchQuery.value || undefined,
-      limit: 100
+      page: page.value, limit
     })
+    if (sequence !== loadSequence) return
     users.value = res.data?.items || []
-    totalReaders.value = res.data?.total || users.value.length
+    totalReaders.value = res.data?.total ?? users.value.length
+    if (page.value> pageCount(totalReaders.value, limit)) { page.value = pageCount(totalReaders.value, limit); return }
   } catch (err) {
+    if (sequence !== loadSequence) return
+    loadError.value = getErrorMessage(err)
     systemStore.addToast({
-      type: 'danger',
-      title: 'Xatolik',
-      message: 'Foydalanuvchilar ro\'yxatini yuklashda xatolik yuz berdi'
+      type: 'error',
+      title: tr('staff.s024'),
+      message: tr('staff.s490')
     })
   } finally {
-    loading.value = false
+    if (sequence === loadSequence) loading.value = false
   }
 }
 
 function formatDate(iso) {
   if (!iso) return ''
-  return new Date(iso).toLocaleDateString('uz-UZ', {
+  return new Date(iso).toLocaleDateString(i18n.global.locale.value, {
     year: 'numeric',
     month: 'short',
     day: 'numeric'
@@ -259,39 +252,41 @@ function openCoinsModal(user) {
 async function onUserUpdated(formData) {
   try {
     await usersApi.updateUser(formData.id, {
-      lightning_coins: formData.lightning_coins,
       is_active: formData.is_active
     })
     systemStore.addToast({
       type: 'success',
-      title: 'Tahrirlandi',
-      message: `"${formData.username}" ma'lumotlari muvaffaqiyatli yangilandi`
+      title: tr('staff.s478'),
+      message: tr('staff.s491', { value0: formData.username })
     })
     await loadUsers()
   } catch (err) {
     systemStore.addToast({
       type: 'error',
-      title: 'Xatolik',
-      message: err.response?.data?.detail || err.message || 'Foydalanuvchini yangilashda xatolik'
+      title: tr('staff.s024'),
+      message: err.response?.data?.detail || err.message || tr('staff.s492')
     })
+    throw err
   }
 }
 
-async function onCoinsAdjusted({ userId, amount, reason }) {
+async function onCoinsAdjusted({ userId, amount, reason, operationKey }) {
   try {
-    await usersApi.adjustCoins(userId, amount, reason)
+    const result = await usersApi.adjustCoins(userId, amount, reason, operationKey)
+    const appliedAmount = result.data?.amount_delta ?? amount
     systemStore.addToast({
       type: 'success',
-      title: 'Balans yangilandi',
-      message: `Balans muvaffaqiyatli o'zgartirildi (${amount > 0 ? '+' : ''}${amount} ⚡)`
+      title: tr('staff.s493'),
+      message: tr('staff.s494', { value0: appliedAmount> 0 ? '+' : '', value1: appliedAmount })
     })
     await loadUsers()
   } catch (err) {
     systemStore.addToast({
       type: 'error',
-      title: 'Xatolik',
-      message: err.response?.data?.detail || err.message || 'Balansni o\'zgartirishda xatolik'
+      title: tr('staff.s024'),
+      message: err.response?.data?.detail || err.message || tr('staff.s495')
     })
+    throw err
   }
 }
 
@@ -301,34 +296,34 @@ async function toggleUserActive(user) {
     user.is_active = !user.is_active
     systemStore.addToast({
       type: user.is_active ? 'success' : 'info',
-      title: 'Holat yangilandi',
-      message: `${user.username} hisobi ${user.is_active ? 'faollashtirildi' : 'bloklandi'}`
+      title: tr('staff.s471'),
+      message: tr('staff.s496', { value0: user.username, value1: tr(user.is_active ? 'common.activated' : 'common.blocked') })
     })
   } catch (err) {
     systemStore.addToast({
-      type: 'danger',
-      title: 'Xatolik',
-      message: err.response?.data?.detail || 'Holatni o\'zgartirishda xatolik'
+      type: 'error',
+      title: tr('staff.s024'),
+      message: err.response?.data?.detail || tr('staff.s473')
     })
   }
 }
 
 async function terminateUserSessions(user) {
-  if (!confirm(`"${user.username}" foydalanuvchisining barcha qurilmalardagi seanslarini to'xtatmoqchimisiz?`)) {
+  if (!confirm(tr('staff.s497', { value0: user.username }))) {
     return
   }
   try {
     await usersApi.terminateReaderSessions(user.id)
     systemStore.addToast({
       type: 'success',
-      title: 'Seanslar bekor qilindi',
-      message: `${user.username} seanslari muvaffaqiyatli to'xtatildi`
+      title: tr('staff.s498'),
+      message: tr('staff.s499', { value0: user.username })
     })
   } catch (err) {
     systemStore.addToast({
       type: 'error',
-      title: 'Xatolik',
-      message: err.response?.data?.detail || 'Seanslarni to\'xtatishda xatolik'
+      title: tr('staff.s024'),
+      message: err.response?.data?.detail || tr('staff.s500')
     })
   }
 }
@@ -336,4 +331,8 @@ async function terminateUserSessions(user) {
 onMounted(() => {
   loadUsers()
 })
+watch(page, loadUsers)
+onUnmounted(() => { loadSequence++; clearTimeout(searchTimer) })
+let searchTimer = null
+watch(searchQuery, () => { clearTimeout(searchTimer); searchTimer = setTimeout(() => { if (page.value !== 1) page.value = 1; else loadUsers() }, 300) })
 </script>

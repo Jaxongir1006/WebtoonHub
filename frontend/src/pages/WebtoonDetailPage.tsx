@@ -1,10 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { webtoonsApi } from '../api/webtoons';
 import { libraryApi } from '../api/library';
+import { progressApi } from '../api/progress';
+import { API_BASE_URL, getApiErrorMessage } from '../api/client';
+import { readPosition } from '../utils/readingStorage';
+import { readerUrl } from '../utils/reading';
+import { usePageMetadata } from '../hooks/usePageMetadata';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
-import { WebtoonDetail, BookmarkStatus, BookmarkItem } from '../types';
+import { WebtoonDetail, BookmarkStatus, ReadingProgress } from '../types';
 import { SafeImage } from '../components/common/SafeImage';
 import { BookmarkButton } from '../components/webtoons/BookmarkButton';
 import { formatNumber, getStatusLabel } from '../utils/format';
@@ -24,46 +29,57 @@ import {
 
 export const WebtoonDetailPage: React.FC = () => {
   const { idOrSlug } = useParams<{ idOrSlug: string }>();
-  const { isAuthenticated } = useAuth();
+  const { user, isAuthenticated, isLoading: checkingAccount } = useAuth();
   const { t, language } = useLanguage();
   const navigate = useNavigate();
 
   const [webtoon, setWebtoon] = useState<WebtoonDetail | null>(null);
   const [bookmarkStatus, setBookmarkStatus] = useState<BookmarkStatus | null>(null);
+  const bookmarkVersion = useRef(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sortAsc, setSortAsc] = useState(true);
+  const [retry, setRetry] = useState(0);
+  const [personalRetry, setPersonalRetry] = useState(0);
+  const [personalError, setPersonalError] = useState(false);
+  const [savedPosition, setSavedPosition] = useState<ReadingProgress | null>(null);
+  const [shareFeedback, setShareFeedback] = useState('');
+  usePageMetadata(webtoon?.title, webtoon?.description, webtoon?.cover_image_url);
 
   useEffect(() => {
     if (!idOrSlug) return;
+    const controller = new AbortController();
     const fetchDetail = async () => {
       setLoading(true);
       setError(null);
       try {
-        const data = await webtoonsApi.getWebtoon(idOrSlug);
+        const data = await webtoonsApi.getWebtoon(idOrSlug, controller.signal);
+        if (controller.signal.aborted) return;
         setWebtoon(data);
-
-        // If authenticated, check if in library
-        if (isAuthenticated && data) {
-          try {
-            const library = await libraryApi.getLibrary();
-            const found = library?.find((b: BookmarkItem) => b.webtoon.id === data.id);
-            if (found) {
-              setBookmarkStatus(found.reading_status);
-            }
-          } catch {
-            // ignore
-          }
-        }
       } catch (err) {
-        setError(t('common.error'));
-        console.error(err);
+        if (!controller.signal.aborted) setError(getApiErrorMessage(err, t('common.error')));
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       }
     };
     fetchDetail();
-  }, [idOrSlug, isAuthenticated, t]);
+    return () => controller.abort();
+  }, [idOrSlug, retry, user?.id, checkingAccount]);
+
+  useEffect(() => {
+    let alive = true;
+    const version = ++bookmarkVersion.current;
+    setBookmarkStatus(null); setPersonalError(false); setSavedPosition(webtoon ? readPosition(webtoon.id, user?.id) || null : null);
+    if (!webtoon || !isAuthenticated || checkingAccount) return;
+    Promise.allSettled([libraryApi.getLibrary(), progressApi.list()]).then(([library, progress]) => {
+      if (!alive) return;
+      if (library.status === 'fulfilled') { if (bookmarkVersion.current === version) setBookmarkStatus(library.value.find(item => item.webtoon.id === webtoon.id)?.reading_status || null); }
+      else setPersonalError(true);
+      if (progress.status === 'fulfilled') { const remote = progress.value.find(item => item.webtoon_id === webtoon.id); const local = readPosition(webtoon.id, user?.id); setSavedPosition(local && (!remote || Date.parse(local.updated_at || '') > Date.parse(remote.updated_at || '')) ? local : remote || null); }
+      else setPersonalError(true);
+    });
+    return () => { alive = false; };
+  }, [webtoon?.id, user?.id, isAuthenticated, checkingAccount, personalRetry]);
 
   if (loading) {
     return (
@@ -82,6 +98,7 @@ export const WebtoonDetailPage: React.FC = () => {
         </div>
         <h2 className="text-xl font-bold text-white mb-2">{error || t('common.notFound')}</h2>
         <p className="text-xs text-studio-400 mb-6">{t('catalog.emptyDesc')}</p>
+        <button onClick={() => setRetry(retry + 1)} className="min-h-[44px] px-5 mb-4 rounded-xl bg-brand-500 text-studio-950 font-bold">{t('common.retry')}</button>
         <Link
           to="/catalog"
           className="px-5 py-2.5 rounded-xl bg-brand-500 text-studio-950 font-bold text-xs hover:bg-brand-400 shadow-glow-brand"
@@ -98,10 +115,11 @@ export const WebtoonDetailPage: React.FC = () => {
       : b.chapter_number - a.chapter_number;
   });
 
-  const firstChapter = webtoon.chapters.length > 0 ? webtoon.chapters[0] : null;
+  const ordered = [...webtoon.chapters].sort((a,b) => a.chapter_number - b.chapter_number);
+  const firstChapter = ordered[0] || null;
   const lastChapter =
     webtoon.chapters.length > 0
-      ? webtoon.chapters[webtoon.chapters.length - 1]
+      ? ordered[ordered.length - 1]
       : null;
 
   return (
@@ -211,13 +229,14 @@ export const WebtoonDetailPage: React.FC = () => {
 
               {/* Action Buttons */}
               <div className="pt-4 flex flex-wrap items-center justify-center md:justify-start gap-3">
+                {savedPosition && <Link to={readerUrl(savedPosition.chapter_id)} className="min-h-[44px] flex items-center px-5 rounded-xl bg-brand-500 text-studio-950 font-bold">{t('readerFix.continue')} · {t('details.chapterNum', { number: savedPosition.chapter_number || 1 })}</Link>}
                 {firstChapter && (
                   <button
-                    onClick={() => navigate(`/chapters/${firstChapter.id}`)}
+                    onClick={() => navigate(readerUrl(firstChapter.id, Boolean(savedPosition)))}
                     className="px-6 py-3 rounded-xl font-bold bg-brand-500 text-studio-950 hover:bg-brand-400 active:scale-95 shadow-glow-brand transition-all flex items-center gap-2 text-sm"
                   >
                     <BookOpen className="w-4 h-4 fill-studio-950" />
-                    <span>{t('details.firstChapter')}</span>
+                    <span>{t(savedPosition ? 'readerFix.startOver' : 'details.startReading')}</span>
                   </button>
                 )}
 
@@ -232,11 +251,15 @@ export const WebtoonDetailPage: React.FC = () => {
 
                 {/* Bookmark dropdown */}
                 <BookmarkButton
+                  key={`${webtoon.id}:${user?.id || 'guest'}`}
                   webtoonId={webtoon.id}
                   currentStatus={bookmarkStatus}
-                  onStatusChange={setBookmarkStatus}
+                  onStatusChange={value => { bookmarkVersion.current++; setBookmarkStatus(value); }}
                 />
+                <button className="min-h-[44px] px-4 rounded-xl border border-studio-600 text-white font-semibold" onClick={async () => { const base = new URL(API_BASE_URL.replace(/\/$/, '') + '/', window.location.origin); const url = new URL(`share/webtoons/${encodeURIComponent(webtoon.slug || String(webtoon.id))}`, base).href; try { await navigator.clipboard.writeText(url); setShareFeedback(t('ux.copied')); } catch { setShareFeedback(`${t('ux.copyFailed')} ${url}`); } }}>{t('ux.share')}</button>
               </div>
+              {personalError && <p role="alert" className="text-sm text-rose-200">{t('readerFix.loadError')} <button onClick={() => setPersonalRetry(personalRetry + 1)} className="min-h-[44px] px-3 underline">{t('common.retry')}</button></p>}
+              {shareFeedback && <p role="status" className="text-sm text-studio-200 break-all">{shareFeedback}</p>}
             </div>
           </div>
         </div>
@@ -285,7 +308,7 @@ export const WebtoonDetailPage: React.FC = () => {
                     </div>
                     <div className="flex items-center gap-2 text-[11px] text-studio-500 mt-0.5">
                       <Calendar className="w-3 h-3" />
-                      <span>{formatDate(ch.created_at, language)}</span>
+                      <span>{formatDate(ch.published_at ?? ch.created_at, language)}</span>
                     </div>
                   </div>
                 </div>

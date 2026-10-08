@@ -1,581 +1,216 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ChapterReaderData, ChapterSummary } from '../../types';
+import { ChapterReaderData, ChapterSummary, ReadingProgress } from '../../types';
+import { PositionChange } from '../../hooks/useReadingProgress';
+import { useNovelPageSwipe } from '../../hooks/useNovelPageSwipe';
+import { useNovelPageMotion } from '../../hooks/useNovelPageMotion';
 import { RewardClaimCard } from './RewardClaimCard';
 import { ChapterComments } from '../comments/ChapterComments';
 import { useLanguage } from '../../context/LanguageContext';
-import {
-  ChevronLeft,
-  ChevronRight,
-  BookOpen,
-  ArrowLeft,
-  Settings,
-  Type,
-  Sun,
-  Moon,
-  Coffee,
-  CheckCircle2,
-  Sparkles
-} from 'lucide-react';
+import { ReaderImage } from './ReaderImage';
+import { clampPage, isInteractiveTarget, pageForWord, paginateNovel } from '../../utils/reading';
+import { ArrowLeft, BookOpen, ChevronLeft, ChevronRight, Settings } from 'lucide-react';
 
 interface NovelReaderProps {
   data: ChapterReaderData;
   allChapters: ChapterSummary[];
   onClaimSuccess: () => void;
+  initialPosition?: ReadingProgress;
+  onProgress: (position: PositionChange) => void;
+  rewardReady: boolean;
 }
-
 type NovelTheme = 'dark' | 'sepia' | 'light';
 type FontSize = 'sm' | 'base' | 'lg' | 'xl';
 type FontFamily = 'serif' | 'sans';
+const wordLimits: Record<FontSize, number> = { sm: 240, base: 190, lg: 140, xl: 100 };
+function preference<T extends string>(key: string, values: T[], fallback: T): T {
+  try { const value = localStorage.getItem(key) as T; return values.includes(value) ? value : fallback; }
+  catch { return fallback; }
+}
+function storePreference(key: string, value: string) { try { localStorage.setItem(key, value); } catch { /* Optional preference. */ } }
 
-export const NovelReader: React.FC<NovelReaderProps> = ({
-  data,
-  allChapters,
-  onClaimSuccess
-}) => {
+export const NovelReader: React.FC<NovelReaderProps> = ({ data, allChapters, onClaimSuccess, initialPosition, onProgress, rewardReady }) => {
   const { t } = useLanguage();
   const navigate = useNavigate();
-
-  // Reader Customizer Settings
-  const [theme, setTheme] = useState<NovelTheme>(() => {
-    return (localStorage.getItem('webtoonhub_novel_theme') as NovelTheme) || 'sepia';
+  const [theme, setTheme] = useState(() => preference<NovelTheme>('webtoonhub_novel_theme', ['dark', 'sepia', 'light'], 'sepia'));
+  const [fontSize, setFontSize] = useState(() => preference<FontSize>('webtoonhub_novel_font_size', ['sm', 'base', 'lg', 'xl'], 'base'));
+  const [fontFamily, setFontFamily] = useState(() => preference<FontFamily>('webtoonhub_novel_font_family', ['serif', 'sans'], 'serif'));
+  const [showSettings, setShowSettings] = useState(false);
+  const settingsRef = useRef<HTMLElement>(null);
+  const settingsButtonRef = useRef<HTMLButtonElement>(null);
+  const headerRef = useRef<HTMLElement>(null);
+  const illustrations = useMemo(() => [...(data.images || [])].sort((a, b) => a.order_index - b.order_index), [data.images]);
+  const [loadedIllustrations, setLoadedIllustrations] = useState<Set<number>>(() => new Set());
+  const pages = useMemo(() => paginateNovel(data.content_text || '', wordLimits[fontSize]), [data.content_text, fontSize]);
+  const [pageIndex, setPageIndex] = useState(() => {
+    const word = initialPosition?.anchor?.match(/^word:(\d+)$/);
+    return word ? pageForWord(pages, Number(word[1])) : clampPage(initialPosition?.page_index || 0, pages.length);
   });
-  const [fontSize, setFontSize] = useState<FontSize>(() => {
-    return (localStorage.getItem('webtoonhub_novel_font_size') as FontSize) || 'base';
+  const page = clampPage(pageIndex, pages.length);
+  const isLastPage = page === pages.length - 1;
+  const articleRef = useRef<HTMLElement>(null);
+  const pageFrameRef = useRef<HTMLDivElement>(null);
+  const endRef = useRef<HTMLDivElement>(null);
+  const completeRef = useRef(Boolean(initialPosition?.completed));
+  const activePage = pages[page];
+
+  const { motion, isSettling, dragPage, cancelDrag, turnPage, finishMotion } = useNovelPageMotion({
+    page, pageCount: pages.length, onCommit: setPageIndex,
+    contextKey: data.id + ':' + fontSize + ':' + fontFamily + ':' + theme,
+    stageRef: pageFrameRef, disabled: showSettings
   });
-  const [fontFamily, setFontFamily] = useState<FontFamily>(() => {
-    return (localStorage.getItem('webtoonhub_novel_font_family') as FontFamily) || 'serif';
+  const motionActive = useRef(false);
+  motionActive.current = Boolean(motion);
+  const swipeHandlers = useNovelPageSwipe({
+    onTurnPage: turnPage,
+    onDrag: dragPage,
+    onCancel: cancelDrag,
+    pageKey: data.id + ':' + activePage.startWord + ':' + fontSize,
+    enabled: pages.length > 1 && !showSettings && !isSettling
   });
-  const [showSettings, setShowSettings] = useState<boolean>(false);
 
-  // Flip Animation State
-  const [pageIndex, setPageIndex] = useState<number>(0);
-  const [flipDirection, setFlipDirection] = useState<'next' | 'prev' | null>(null);
-  const [isFlipping, setIsFlipping] = useState<boolean>(false);
-
-  const rawText = data.content_text || '';
-
-  // Intelligent text pagination into book pages
-  const pages = useMemo(() => {
-    if (!rawText.trim()) return [''];
-
-    // Split text into meaningful paragraph blocks
-    const paragraphs = rawText.split(/\n\s*\n/);
-    const pagesList: string[] = [];
-    let currentPageContent: string[] = [];
-    let currentWordCount = 0;
-
-    // Approximate words per page based on font size
-    const targetWordsPerPage =
-      fontSize === 'sm' ? 240 : fontSize === 'base' ? 190 : fontSize === 'lg' ? 140 : 100;
-
-    for (const para of paragraphs) {
-      const trimmed = para.trim();
-      if (!trimmed) continue;
-
-      const words = trimmed.split(/\s+/).length;
-
-      // If adding this paragraph exceeds limit and page already has content, create new page
-      if (currentWordCount + words > targetWordsPerPage && currentPageContent.length > 0) {
-        pagesList.push(currentPageContent.join('\n\n'));
-        currentPageContent = [trimmed];
-        currentWordCount = words;
-      } else {
-        currentPageContent.push(trimmed);
-        currentWordCount += words;
+  useLayoutEffect(() => {
+    if (showSettings) {
+      const panel = settingsRef.current;
+      if (panel) {
+        window.scrollTo({ top: Math.max(0, panel.getBoundingClientRect().top + window.scrollY - (headerRef.current?.offsetHeight || 80)), behavior: 'auto' });
+        panel.focus({ preventScroll: true });
       }
+      return;
     }
+    const article = articleRef.current;
+    if (article) window.scrollTo({ top: Math.max(0, article.getBoundingClientRect().top + window.scrollY - 80), behavior: 'auto' });
+  }, [page, showSettings]);
 
-    if (currentPageContent.length > 0) {
-      pagesList.push(currentPageContent.join('\n\n'));
-    }
-
-    return pagesList.length > 0 ? pagesList : [''];
-  }, [rawText, fontSize]);
-
-  const totalPages = pages.length;
-  const isLastPage = pageIndex === totalPages - 1;
-
-  // Reset page when chapter changes
   useEffect(() => {
-    setPageIndex(0);
-    setFlipDirection(null);
-    window.scrollTo(0, 0);
-  }, [data.id]);
+    onProgress({ page_index: page, anchor: 'word:' + activePage.startWord, progress_percent: (page + 1) / pages.length * 100, completed: completeRef.current });
+  }, [page, activePage.startWord, pages.length, onProgress]);
 
-  // Turn to Next Page with 3D Flip
-  const handleNextPage = useCallback(() => {
-    if (isFlipping || pageIndex >= totalPages - 1) return;
-    setIsFlipping(true);
-    setFlipDirection('next');
-    setTimeout(() => {
-      setPageIndex((prev) => Math.min(prev + 1, totalPages - 1));
-      setFlipDirection(null);
-      setIsFlipping(false);
-    }, 450);
-  }, [isFlipping, pageIndex, totalPages]);
-
-  // Turn to Prev Page with 3D Flip
-  const handlePrevPage = useCallback(() => {
-    if (isFlipping || pageIndex <= 0) return;
-    setIsFlipping(true);
-    setFlipDirection('prev');
-    setTimeout(() => {
-      setPageIndex((prev) => Math.max(prev - 1, 0));
-      setFlipDirection(null);
-      setIsFlipping(false);
-    }, 450);
-  }, [isFlipping, pageIndex]);
-
-  // Keyboard navigation
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName)) {
-        return;
-      }
-      if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') {
-        e.preventDefault();
-        handleNextPage();
-      } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
-        e.preventDefault();
-        handlePrevPage();
+    if (!isLastPage || !endRef.current || !data.content_text?.trim()) return;
+    const checkEnd = () => {
+      if (!motionActive.current && !completeRef.current && loadedIllustrations.size === illustrations.length && endRef.current && endRef.current.getBoundingClientRect().bottom <= window.innerHeight) {
+        completeRef.current = true;
+        onProgress({ page_index: page, anchor: 'word:' + activePage.startWord, progress_percent: 100, completed: true });
       }
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleNextPage, handlePrevPage]);
+    const observer = new IntersectionObserver(checkEnd, { threshold: 1 });
+    observer.observe(endRef.current);
+    const frame = requestAnimationFrame(checkEnd);
+    window.addEventListener('scroll', checkEnd, { passive: true });
+    window.addEventListener('resize', checkEnd);
+    return () => { observer.disconnect(); cancelAnimationFrame(frame); window.removeEventListener('scroll', checkEnd); window.removeEventListener('resize', checkEnd); };
+  }, [isLastPage, page, activePage.startWord, onProgress, data.content_text, illustrations.length, loadedIllustrations]);
 
-  const updateTheme = (newTheme: NovelTheme) => {
-    setTheme(newTheme);
-    localStorage.setItem('webtoonhub_novel_theme', newTheme);
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && showSettings) { event.preventDefault(); setShowSettings(false); settingsButtonRef.current?.focus({ preventScroll: true }); return; }
+      if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey || isInteractiveTarget(event.target)) return;
+      if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
+        event.preventDefault(); turnPage(event.key === 'ArrowRight' ? 1 : -1);
+      } else if (event.key === 'Escape') setShowSettings(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [turnPage, showSettings]);
+
+  const changeSize = (size: FontSize) => {
+    // Keep the same text anchor rather than the old page number.
+    const repaginated = paginateNovel(data.content_text || '', wordLimits[size]);
+    setPageIndex(pageForWord(repaginated, activePage.startWord));
+    setFontSize(size); storePreference('webtoonhub_novel_font_size', size);
+  };
+  const themeClass = theme === 'dark' ? 'bg-studio-950 text-slate-200' : theme === 'sepia' ? 'bg-[#efe0c8] text-[#332415]' : 'bg-slate-100 text-slate-800';
+  const paperClass = theme === 'dark' ? 'bg-studio-900 border-studio-700' : theme === 'sepia' ? 'bg-[#fbf0d9] border-[#d4bd96]' : 'bg-white border-slate-200';
+  const textClass = { sm: 'text-sm', base: 'text-base', lg: 'text-lg', xl: 'text-xl' }[fontSize];
+  const pageClass = 'novel-page-paper rounded-3xl border p-6 sm:p-12 min-h-[60vh] ' + paperClass + ' ' + textClass + (fontFamily === 'serif' ? ' font-serif' : ' font-sans');
+  const motionClass = motion ? ' novel-page-moving novel-page-' + motion.phase : '';
+  const turnAmount = motion ? Math.min(1, Math.abs(motion.offset) / motion.width) : 0;
+  const outgoingStyle: React.CSSProperties = {
+    touchAction: 'pan-y pinch-zoom',
+    transform: motion ? `translate3d(${motion.offset}px, 0, 0) rotateY(${-motion.direction * turnAmount * 8}deg)` : undefined,
+    transformOrigin: motion?.direction === -1 ? 'right center' : 'left center',
+    '--novel-page-shade': turnAmount
+  } as React.CSSProperties;
+
+  const inlineText = (text: string) => text.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g).map((part, index) => part.startsWith('**') && part.endsWith('**') ? <strong key={index}>{part.slice(2,-2)}</strong> : part.startsWith('*') && part.endsWith('*') ? <em key={index}>{part.slice(1,-1)}</em> : <React.Fragment key={index}>{part}</React.Fragment>);
+  const renderParagraph = (text: string, index: number) => {
+    const heading = text.match(/^(#{1,6})\s+(.+)$/);
+    if (heading) return heading[1].length <= 2 ? <h2 key={index} className="text-2xl sm:text-3xl font-black mb-6">{inlineText(heading[2])}</h2> : <h3 key={index} className="text-xl font-bold mb-4 mt-6">{inlineText(heading[2])}</h3>;
+    if (text.startsWith('> ')) return <blockquote key={index} className="my-5 pl-4 border-l-4 border-brand-500 italic">{inlineText(text.slice(2))}</blockquote>;
+    if (text === '---') return <hr key={index} className="my-6 border-current opacity-30" />;
+    return <p key={index} className="mb-5 leading-[1.85] break-words">{inlineText(text)}</p>;
   };
 
-  const updateFontSize = (newSize: FontSize) => {
-    setFontSize(newSize);
-    localStorage.setItem('webtoonhub_novel_font_size', newSize);
-  };
-
-  const updateFontFamily = (newFont: FontFamily) => {
-    setFontFamily(newFont);
-    localStorage.setItem('webtoonhub_novel_font_family', newFont);
-  };
-
-  // Theme style configurations
-  const themeClasses = useMemo(() => {
-    switch (theme) {
-      case 'dark':
-        return {
-          wrapper: 'bg-studio-950 text-slate-200',
-          book: 'bg-studio-900 border-studio-800 text-slate-200 shadow-2xl',
-          pageBg: 'bg-studio-900 text-slate-200',
-          accent: 'text-brand-400',
-          muted: 'text-studio-400',
-          border: 'border-studio-800'
-        };
-      case 'sepia':
-        return {
-          wrapper: 'bg-[#18130d] text-[#332415]',
-          book: 'bg-[#fbf0d9] border-[#e2d2b5] text-[#2c1f13] shadow-2xl',
-          pageBg: 'bg-[#fbf0d9] text-[#2c1f13]',
-          accent: 'text-amber-800',
-          muted: 'text-[#7a644f]',
-          border: 'border-[#e4d4b9]'
-        };
-      case 'light':
-      default:
-        return {
-          wrapper: 'bg-slate-100 text-slate-800',
-          book: 'bg-white border-slate-200 text-slate-900 shadow-2xl',
-          pageBg: 'bg-white text-slate-900',
-          accent: 'text-amber-600',
-          muted: 'text-slate-500',
-          border: 'border-slate-200'
-        };
-    }
-  }, [theme]);
-
-  // Font size classes
-  const fontClasses = useMemo(() => {
-    switch (fontSize) {
-      case 'sm':
-        return 'text-sm leading-relaxed';
-      case 'lg':
-        return 'text-lg leading-relaxed';
-      case 'xl':
-        return 'text-xl leading-loose';
-      case 'base':
-      default:
-        return 'text-base leading-relaxed';
-    }
-  }, [fontSize]);
-
-  // Simple Markdown Parser to render beautiful book text
-  const renderParagraph = (text: string, idx: number) => {
-    const trimmed = text.trim();
-
-    // H1 Heading
-    if (trimmed.startsWith('# ')) {
-      return (
-        <h1
-          key={idx}
-          className="text-2xl sm:text-3xl font-black mb-6 mt-2 tracking-tight text-center border-b pb-4 border-current/15"
-        >
-          {trimmed.slice(2)}
-        </h1>
-      );
-    }
-
-    // H2 Heading
-    if (trimmed.startsWith('## ')) {
-      return (
-        <h2 key={idx} className="text-xl sm:text-2xl font-bold mb-4 mt-6 tracking-tight">
-          {trimmed.slice(3)}
-        </h2>
-      );
-    }
-
-    // Blockquote
-    if (trimmed.startsWith('> ')) {
-      return (
-        <blockquote
-          key={idx}
-          className="my-5 pl-4 border-l-4 border-brand-500/80 italic opacity-90 text-sm sm:text-base font-serif bg-current/5 py-2.5 pr-3 rounded-r-xl"
-        >
-          {trimmed.slice(2).replace(/\*/g, '')}
-        </blockquote>
-      );
-    }
-
-    // Divider
-    if (trimmed === '---') {
-      return (
-        <div key={idx} className="my-6 flex items-center justify-center gap-2 opacity-30">
-          <span className="w-8 h-px bg-current" />
-          <span className="text-xs">✦</span>
-          <span className="w-8 h-px bg-current" />
+  return <div style={{ overflowAnchor: 'none' }} className={'novel-reader min-h-screen ' + themeClass}>
+    <header ref={headerRef} className={'sticky top-0 z-40 border-b backdrop-blur-md px-3 sm:px-6 py-3 ' + paperClass}>
+      <div className="max-w-4xl mx-auto flex flex-wrap items-center gap-2">
+        <Link to={'/webtoons/' + data.webtoon_id} aria-label={t('reader.backToManhwa')} className="min-h-11 min-w-11 flex items-center justify-center rounded-xl reader-surface"><ArrowLeft className="w-5 h-5" /></Link>
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-bold truncate">{data.webtoon_title}</div>
+          <div className="text-xs opacity-80 truncate">{t('details.chapterNum', { number: data.chapter_number })}{data.title ? ' · ' + data.title : ''}</div>
         </div>
-      );
-    }
-
-    // Dialogue (starts with — or -)
-    if (trimmed.startsWith('—') || trimmed.startsWith('- ')) {
-      return (
-        <p key={idx} className="mb-4 pl-3 border-l-2 border-current/20 italic font-medium">
-          {trimmed}
-        </p>
-      );
-    }
-
-    // Standard body paragraph
-    return (
-      <p key={idx} className="mb-4 indent-6 text-justify tracking-normal">
-        {trimmed}
-      </p>
-    );
-  };
-
-  return (
-    <div className={`min-h-screen ${themeClasses.wrapper} transition-colors duration-300 flex flex-col relative select-none`}>
-      {/* Top Novel Reader Navigation Bar */}
-      <header className="sticky top-0 inset-x-0 z-40 bg-current/5 backdrop-blur-md border-b border-current/10 px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Link
-            to={`/webtoons/${data.webtoon_id}`}
-            className="p-2 rounded-xl bg-current/10 hover:bg-current/20 transition-colors"
-            title={t('reader.backToManhwa')}
-          >
-            <ArrowLeft className="w-4 h-4" />
-          </Link>
-          <div>
-            <div className="text-xs font-bold line-clamp-1">{data.webtoon_title}</div>
-            <div className="text-[11px] opacity-75 font-medium flex items-center gap-1.5">
-              <span>{t('details.chapterNum', { number: data.chapter_number })}</span>
-              {data.title && <span>• {data.title}</span>}
-            </div>
-          </div>
+        <button ref={settingsButtonRef} aria-label={t('readerFix.settings')} aria-expanded={showSettings} aria-controls="novel-settings" onClick={() => setShowSettings(value => !value)} className="min-h-11 min-w-11 flex items-center justify-center rounded-xl reader-surface"><Settings className="w-5 h-5" /></button>
+        {allChapters.length > 0 && <select aria-label={t('readerFix.selectChapter')} value={data.id} onChange={e => navigate('/chapters/' + e.target.value)} className="min-h-11 max-w-[45%] sm:max-w-[180px] text-sm border border-current/30 rounded-xl px-2 reader-surface">
+          {allChapters.map(chapter => <option key={chapter.id} value={chapter.id} className="bg-white text-slate-900">{t('details.chapterNum', { number: chapter.chapter_number })}</option>)}
+        </select>}
+      </div>
+    </header>
+    {showSettings && <section ref={settingsRef} tabIndex={-1} id="novel-settings" aria-label={t('readerFix.settings')} className="max-w-4xl mx-auto p-4 space-y-4">
+      <fieldset className="flex flex-wrap gap-2"><legend className="text-sm font-bold mb-2">{t('readerFix.theme')}</legend>
+        {(['sepia', 'dark', 'light'] as NovelTheme[]).map(value => <button key={value} aria-pressed={theme === value} onClick={() => { setTheme(value); storePreference('webtoonhub_novel_theme', value); }} className={'px-4 min-h-11 rounded-xl border ' + (theme === value ? 'bg-brand-500 text-studio-950 border-brand-500 font-bold' : 'border-current/30 reader-surface')}>{t('readerFix.' + value)}</button>)}
+      </fieldset>
+      <fieldset className="flex flex-wrap gap-2"><legend className="text-sm font-bold mb-2">{t('readerFix.size')}</legend>
+        {(['sm', 'base', 'lg', 'xl'] as FontSize[]).map((value, index) => <button key={value} aria-pressed={fontSize === value} onClick={() => changeSize(value)} className={'min-w-11 min-h-11 rounded-xl border ' + (fontSize === value ? 'bg-brand-500 text-studio-950 border-brand-500 font-bold' : 'border-current/30 reader-surface')}>{['A-', 'A', 'A+', 'A++'][index]}</button>)}
+      </fieldset>
+      <fieldset className="flex flex-wrap gap-2"><legend className="text-sm font-bold mb-2">{t('readerFix.font')}</legend>
+        {(['serif', 'sans'] as FontFamily[]).map(value => <button key={value} aria-pressed={fontFamily === value} onClick={() => { setFontFamily(value); storePreference('webtoonhub_novel_font_family', value); }} className={'px-4 min-h-11 rounded-xl border ' + (fontFamily === value ? 'bg-brand-500 text-studio-950 border-brand-500 font-bold' : 'border-current/30 reader-surface')}>{t('readerFix.' + value)}</button>)}
+      </fieldset>
+    </section>}
+    <div className="max-w-4xl mx-auto px-3 sm:px-6 py-6">
+      <div ref={pageFrameRef} className={'novel-page-frame rounded-3xl shadow-xl ' + paperClass} style={{ minHeight: motion?.height }}>
+      {motion && <div aria-hidden="true" className={pageClass + motionClass + ' novel-page-preview'} style={{
+        top: motion.top, minHeight: Math.max(0, motion.height - motion.top),
+        transform: `translate3d(${motion.offset + motion.direction * motion.width}px, 0, 0) rotateY(${motion.direction * (1 - turnAmount) * 8}deg)`,
+        transformOrigin: motion.direction === 1 ? 'left center' : 'right center',
+        '--novel-page-shade': 1 - turnAmount
+      } as React.CSSProperties}>
+        <div className="text-xs opacity-80 mb-6">
+          <span>{t('readerFix.page', { page: motion.to + 1, total: pages.length })}</span>
+          {pages.length > 1 && <p className="mt-2 sm:hidden">{t('readerFix.swipePages')}</p>}
         </div>
-
-        {/* Reader Customization & Chapters Switcher */}
-        <div className="flex items-center gap-2">
-          {/* Customizer Settings Button */}
-          <button
-            onClick={() => setShowSettings((prev) => !prev)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-current/10 hover:bg-current/20 text-xs font-bold transition-all"
-            title="Kitob sozlamalari"
-          >
-            <Settings className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Sozlamalar</span>
-          </button>
-
-          {/* Chapter Selector Dropdown */}
-          {allChapters.length > 0 && (
-            <select
-              value={data.id}
-              onChange={(e) => navigate(`/chapters/${e.target.value}`)}
-              className="bg-current/10 border border-current/20 rounded-xl px-2.5 py-1.5 text-xs font-bold focus:outline-none"
-            >
-              {allChapters.map((ch) => (
-                <option key={ch.id} value={ch.id} className="text-slate-900 bg-white">
-                  {t('details.chapterNum', { number: ch.chapter_number })}
-                </option>
-              ))}
-            </select>
-          )}
+        {pages[motion.to]?.text ? pages[motion.to].text.split(/\n\s*\n/).map(renderParagraph) : <p>{t('readerFix.emptyText')}</p>}
+      </div>}
+      <article ref={articleRef} {...swipeHandlers} style={outgoingStyle} className={pageClass + motionClass} onTransitionEnd={event => {
+        if (event.target === event.currentTarget && event.propertyName === 'transform') finishMotion();
+      }}>
+        <div className="text-xs opacity-80 mb-6">
+          <span role="status" aria-live="polite" aria-atomic="true">{t('readerFix.page', { page: page + 1, total: pages.length })}</span>
+          {pages.length > 1 && <p className="mt-2 sm:hidden">{t('readerFix.swipePages')}</p>}
         </div>
-      </header>
-
-      {/* Floating Settings Drawer / Panel */}
-      {showSettings && (
-        <div className="max-w-2xl mx-auto w-full px-4 pt-3 z-30 animate-in slide-in-from-top-2 duration-200">
-          <div className="p-4 rounded-2xl bg-current/10 backdrop-blur-md border border-current/15 flex flex-wrap items-center justify-between gap-4 text-xs font-bold">
-            {/* Theme Selector */}
-            <div className="flex items-center gap-2">
-              <span className="opacity-70">Mavzu:</span>
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => updateTheme('sepia')}
-                  className={`px-3 py-1 rounded-xl flex items-center gap-1.5 transition-all ${
-                    theme === 'sepia' ? 'bg-[#fbf0d9] text-[#2c1f13] shadow-md' : 'opacity-60 hover:opacity-100'
-                  }`}
-                >
-                  <Coffee className="w-3.5 h-3.5" />
-                  <span>Sepiya</span>
-                </button>
-                <button
-                  onClick={() => updateTheme('dark')}
-                  className={`px-3 py-1 rounded-xl flex items-center gap-1.5 transition-all ${
-                    theme === 'dark' ? 'bg-studio-900 text-white shadow-md' : 'opacity-60 hover:opacity-100'
-                  }`}
-                >
-                  <Moon className="w-3.5 h-3.5" />
-                  <span>Tungi</span>
-                </button>
-                <button
-                  onClick={() => updateTheme('light')}
-                  className={`px-3 py-1 rounded-xl flex items-center gap-1.5 transition-all ${
-                    theme === 'light' ? 'bg-white text-slate-900 shadow-md' : 'opacity-60 hover:opacity-100'
-                  }`}
-                >
-                  <Sun className="w-3.5 h-3.5" />
-                  <span>Kunduzgi</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Font Size Selector */}
-            <div className="flex items-center gap-2">
-              <span className="opacity-70">Hajm:</span>
-              <div className="flex items-center gap-1">
-                {(['sm', 'base', 'lg', 'xl'] as FontSize[]).map((sz) => (
-                  <button
-                    key={sz}
-                    onClick={() => updateFontSize(sz)}
-                    className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs transition-all ${
-                      fontSize === sz ? 'bg-brand-500 text-studio-950 shadow-sm' : 'opacity-60 hover:opacity-100'
-                    }`}
-                  >
-                    {sz === 'sm' ? 'A-' : sz === 'base' ? 'A' : sz === 'lg' ? 'A+' : 'A++'}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Font Family Selector */}
-            <div className="flex items-center gap-2">
-              <span className="opacity-70">Shrift:</span>
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => updateFontFamily('serif')}
-                  className={`px-2.5 py-1 rounded-lg font-serif transition-all ${
-                    fontFamily === 'serif' ? 'bg-brand-500 text-studio-950 font-bold' : 'opacity-60'
-                  }`}
-                >
-                  Kitobiy
-                </button>
-                <button
-                  onClick={() => updateFontFamily('sans')}
-                  className={`px-2.5 py-1 rounded-lg font-sans transition-all ${
-                    fontFamily === 'sans' ? 'bg-brand-500 text-studio-950 font-bold' : 'opacity-60'
-                  }`}
-                >
-                  Zamonaviy
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Main 3D Book Container */}
-      <main className="flex-1 max-w-4xl w-full mx-auto px-4 py-8 sm:py-12 flex flex-col justify-center perspective-1500">
-        <div className="relative w-full rounded-3xl border book-page-shadow overflow-hidden transition-all duration-300">
-          {/* Authentic Book Spine Shadow Effect on Left */}
-          <div className="absolute top-0 bottom-0 left-0 w-8 pointer-events-none book-spine-shadow z-20 opacity-60" />
-
-          {/* Click Zones for Navigation: Left 40% (Prev), Right 40% (Next) */}
-          <div
-            onClick={handlePrevPage}
-            className={`absolute top-0 bottom-0 left-0 w-1/3 z-20 cursor-w-resize group flex items-center justify-start pl-4 ${
-              pageIndex === 0 ? 'pointer-events-none' : ''
-            }`}
-            title="Oldingi sahifa"
-          >
-            {pageIndex > 0 && (
-              <div className="p-2.5 rounded-full bg-current/15 opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm">
-                <ChevronLeft className="w-5 h-5" />
-              </div>
-            )}
-          </div>
-
-          <div
-            onClick={handleNextPage}
-            className={`absolute top-0 bottom-0 right-0 w-1/3 z-20 cursor-e-resize group flex items-center justify-end pr-4 ${
-              isLastPage ? 'pointer-events-none' : ''
-            }`}
-            title="Keyingi sahifa"
-          >
-            {!isLastPage && (
-              <div className="p-2.5 rounded-full bg-current/15 opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm">
-                <ChevronRight className="w-5 h-5" />
-              </div>
-            )}
-          </div>
-
-          {/* Book Page Content with 3D Flip transition */}
-          <article
-            className={`p-6 sm:p-12 md:p-16 min-h-[68vh] flex flex-col justify-between ${
-              themeClasses.book
-            } ${fontClasses} ${
-              fontFamily === 'serif' ? 'font-serif' : 'font-sans'
-            } transition-all duration-400 transform-style-3d origin-left ${
-              flipDirection === 'next'
-                ? '-rotate-y-12 scale-[0.98] opacity-80'
-                : flipDirection === 'prev'
-                ? 'rotate-y-12 scale-[0.98] opacity-80'
-                : 'rotate-y-0 scale-100 opacity-100'
-            }`}
-          >
-            {/* Page Header Header info */}
-            <div className="flex items-center justify-between text-[11px] opacity-50 pb-4 mb-4 border-b border-current/10">
-              <span className="tracking-widest uppercase">{data.webtoon_title}</span>
-              <span>{t('details.chapterNum', { number: data.chapter_number })}</span>
-            </div>
-
-            {/* Paragraphs of Current Page */}
-            <div className="flex-1 py-2">
-              {pages[pageIndex] ? (
-                pages[pageIndex]
-                  .split(/\n\s*\n/)
-                  .map((p, idx) => renderParagraph(p, idx))
-              ) : (
-                <div className="py-20 text-center opacity-60">
-                  <BookOpen className="w-12 h-12 mx-auto mb-3 opacity-40" />
-                  <p>Hozircha matn kiritilmagan</p>
-                </div>
-              )}
-            </div>
-
-            {/* Page Footer & Pagination Counter */}
-            <div className="pt-6 mt-6 border-t border-current/10 flex items-center justify-between text-xs opacity-60">
-              <div className="flex items-center gap-1.5">
-                <BookOpen className="w-3.5 h-3.5" />
-                <span>Kitobiy mutolaa</span>
-              </div>
-              <span className="font-bold tabular-nums">
-                {pageIndex + 1} / {totalPages}
-              </span>
-            </div>
-          </article>
-        </div>
-
-        {/* Bottom Page Flipping Controls & Progress */}
-        <div className="mt-6 flex items-center justify-between px-2">
-          <button
-            onClick={handlePrevPage}
-            disabled={pageIndex === 0 || isFlipping}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-2xl bg-current/10 hover:bg-current/20 disabled:opacity-30 disabled:pointer-events-none text-xs font-bold transition-all shadow-sm"
-          >
-            <ChevronLeft className="w-4 h-4" />
-            <span>Oldingi bet</span>
-          </button>
-
-          {/* Visual Progress bar */}
-          <div className="flex items-center gap-3">
-            <div className="w-28 sm:w-48 h-1.5 bg-current/15 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-brand-500 rounded-full transition-all duration-300"
-                style={{ width: `${((pageIndex + 1) / totalPages) * 100}%` }}
-              />
-            </div>
-            <span className="text-xs font-bold opacity-80 tabular-nums">
-              {Math.round(((pageIndex + 1) / totalPages) * 100)}%
-            </span>
-          </div>
-
-          <button
-            onClick={handleNextPage}
-            disabled={isLastPage || isFlipping}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-2xl bg-brand-500 text-studio-950 hover:bg-brand-400 disabled:opacity-30 disabled:pointer-events-none text-xs font-bold transition-all shadow-glow-brand"
-          >
-            <span>Keyingi bet</span>
-            <ChevronRight className="w-4 h-4" />
-          </button>
-        </div>
-      </main>
-
-      {/* Completion & Rewards Section on Last Page */}
-      {isLastPage && (
-        <section className="bg-current/5 border-t border-current/15 px-4 py-12 mt-8">
-          <div className="max-w-2xl mx-auto text-center space-y-6">
-            <div className="inline-flex items-center gap-2 p-1.5 px-5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 text-xs font-bold">
-              <CheckCircle2 className="w-4 h-4" />
-              <span>{t('reader.chapterCompleted', { webtoon: data.webtoon_title, chapter: data.chapter_number })}</span>
-            </div>
-
-            {/* Chapter Navigation Buttons */}
-            <div className="flex items-center justify-center gap-3">
-              {data.prev_chapter_id && (
-                <Link
-                  to={`/chapters/${data.prev_chapter_id}`}
-                  className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-current/10 text-xs font-bold hover:bg-current/20 transition-colors"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                  <span>{t('reader.prevChapter')}</span>
-                </Link>
-              )}
-
-              <Link
-                to={`/webtoons/${data.webtoon_id}`}
-                className="px-4 py-2.5 rounded-xl bg-current/10 text-xs font-bold hover:bg-current/20 transition-colors"
-              >
-                {t('reader.chaptersList')}
-              </Link>
-
-              {data.next_chapter_id && (
-                <Link
-                  to={`/chapters/${data.next_chapter_id}`}
-                  className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-brand-500 text-studio-950 text-xs font-bold hover:bg-brand-400 shadow-glow-brand transition-all"
-                >
-                  <span>{t('reader.nextChapter')}</span>
-                  <ChevronRight className="w-4 h-4" />
-                </Link>
-              )}
-            </div>
-
-            {/* Reward Claim Card (+5 Chaqmoq) */}
-            <RewardClaimCard
-              key={data.id}
-              chapterId={data.id}
-              initialClaimed={data.is_reward_claimed}
-              rewardAmount={data.reward_coins || 5}
-              onClaimSuccess={onClaimSuccess}
-            />
-          </div>
-
-          {/* Interactive Comments */}
-          <ChapterComments key={data.id} chapterId={data.id} />
-        </section>
-      )}
+        {activePage.text ? activePage.text.split(/\n\s*\n/).map(renderParagraph) : <p>{t('readerFix.emptyText')}</p>}
+        {illustrations.length === 0 && <div ref={endRef} className="h-1" />}
+      </article>
+      </div>
+      <nav aria-label={t('readerFix.page', { page: page + 1, total: pages.length })} className="flex items-center justify-between gap-2 mt-5">
+        <button aria-label={t('reader.prevPage')} disabled={page === 0 || isSettling} onClick={() => turnPage(-1)} className="min-h-11 min-w-11 px-3 rounded-xl reader-surface flex items-center gap-1 disabled:opacity-40"><ChevronLeft className="w-5 h-5" /><span className="hidden sm:inline">{t('reader.prevPage')}</span></button>
+        <span className="text-sm tabular-nums">{page + 1} / {pages.length} · {Math.round((page + 1) / pages.length * 100)}%</span>
+        <button aria-label={t('reader.nextPage')} disabled={isLastPage || isSettling} onClick={() => turnPage(1)} className="min-h-11 min-w-11 px-3 rounded-xl bg-brand-500 text-studio-950 flex items-center gap-1 disabled:opacity-40"><span className="hidden sm:inline">{t('reader.nextPage')}</span><ChevronRight className="w-5 h-5" /></button>
+      </nav>
     </div>
-  );
+    {isLastPage && illustrations.length > 0 && <section aria-label={t('reader.illustrations')} className="max-w-4xl mx-auto px-3 sm:px-6 pb-8 space-y-4">
+      <h2 className="text-xl font-bold">{t('reader.illustrations')}</h2>
+      {illustrations.map((image, index) => <ReaderImage key={image.id} image={image} index={index} onLoaded={id => setLoadedIllustrations(previous => previous.has(id) ? previous : new Set([...previous, id]))} />)}
+      <div ref={endRef} className="h-1" />
+    </section>}
+    {isLastPage && <section className="px-3 sm:px-6 py-8">
+      <nav className="flex flex-wrap items-center justify-center gap-3">
+        {data.prev_chapter_id && <Link to={'/chapters/' + data.prev_chapter_id} className="px-4 py-3 rounded-xl reader-surface">{t('reader.prevChapter')}</Link>}
+        <Link to={'/webtoons/' + data.webtoon_id} className="px-4 py-3 rounded-xl reader-surface">{t('reader.chaptersList')}</Link>
+        {data.next_chapter_id && <Link to={'/chapters/' + data.next_chapter_id} className="px-4 py-3 rounded-xl bg-brand-500 text-studio-950 font-bold">{t('reader.nextChapter')}</Link>}
+      </nav>
+      <RewardClaimCard chapterId={data.id} initialClaimed={data.is_reward_claimed} rewardAmount={data.reward_coins ?? 5} ready={rewardReady} onClaimSuccess={onClaimSuccess} />
+      <ChapterComments chapterId={data.id} />
+    </section>}
+  </div>;
 };

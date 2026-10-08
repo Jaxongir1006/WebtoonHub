@@ -1,4 +1,6 @@
 from typing import Optional
+from pydantic import BaseModel, Field
+from typing import Literal
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -14,6 +16,11 @@ from app.modules.wheel.schemas import (
     WheelUpdateRequest,
 )
 from app.modules.wheel.service import WheelService
+
+class SpinIntent(BaseModel):
+    expected_mode: Literal["free", "paid"]
+    expected_cost: int = Field(ge=0)
+    operation_key: str = Field(min_length=8, max_length=128, pattern=r'^[A-Za-z0-9_-]+$')
 
 client_router = APIRouter(prefix="/wheels", tags=["Lucky Wheel (User)"])
 staff_router = APIRouter(prefix="/staff/wheels", tags=["Lucky Wheel Management (Staff)"])
@@ -55,11 +62,12 @@ async def get_wheel_details(
 @client_router.post("/{wheel_id}/spin", status_code=status.HTTP_200_OK)
 async def spin_wheel(
     wheel_id: int,
+    intent: SpinIntent,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     """Spin the wheel: awards guaranteed prize, deducts coins or consumes free daily spin"""
-    result = await WheelService.spin_wheel(db, user_id=user.id, wheel_id=wheel_id)
+    result = await WheelService.spin_wheel(db, user_id=user.id, wheel_id=wheel_id, expected_mode=intent.expected_mode, expected_cost=intent.expected_cost, operation_key=intent.operation_key)
     return {
         "success": True,
         "data": result,
@@ -67,7 +75,7 @@ async def spin_wheel(
     }
 
 
-@client_router.get("/{wheel_id}/history", status_code=status.HTTP_200_OK)
+@client_router.get("/{wheel_id:int}/history", status_code=status.HTTP_200_OK)
 async def get_wheel_history(
     wheel_id: int,
     limit: int = Query(20, ge=1, le=50),

@@ -1,6 +1,9 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
+import { watch } from 'vue'
+import i18n from '../i18n'
 import { useSystemStore } from '../stores/system'
+import { WHEEL_PERMISSIONS } from '../utils/permissions'
 
 import AppLayout from '../components/layout/AppLayout.vue'
 import LoginView from '../views/LoginView.vue'
@@ -23,7 +26,7 @@ const routes = [
     path: '/login',
     name: 'login',
     component: LoginView,
-    meta: { guest: true, title: 'Kirish' }
+    meta: { titleKey: 'login.title', guest: true, title: 'Kirish' }
   },
   {
     path: '/',
@@ -35,79 +38,79 @@ const routes = [
         path: 'dashboard',
         name: 'dashboard',
         component: DashboardView,
-        meta: { title: 'Boshqaruv Paneli' }
+        meta: { titleKey: 'nav.dashboard', title: 'Boshqaruv Paneli' }
       },
       {
         path: 'webtoons',
         name: 'webtoons',
         component: WebtoonsView,
-        meta: { title: 'Manhvalar & Boblar', permission: 'webtoons:create' }
+        meta: { titleKey: 'nav.webtoons', title: 'Manhvalar & Boblar', permissions: ['webtoons:create','webtoons:edit','webtoons:delete','chapters:create','chapters:edit','chapters:delete','chapters:approve'] }
       },
       {
         path: 'webtoons/:id',
         name: 'webtoon-detail',
         component: WebtoonDetailView,
-        meta: { title: 'Manhwa Tafsilotlari' }
+        meta: { titleKey: 'nav.webtoons', title: 'Manhwa Tafsilotlari', permissions: ['webtoons:create','webtoons:edit','webtoons:delete','chapters:create','chapters:edit','chapters:delete','chapters:approve'] }
       },
       {
         path: 'moderation',
         name: 'moderation',
         component: ModerationView,
-        meta: { title: 'Boblar Moderatsiyasi', permission: 'chapters:approve' }
+        meta: { titleKey: 'nav.moderation', title: 'Boblar Moderatsiyasi', permission: 'chapters:approve' }
       },
       {
         path: 'shop',
         name: 'shop',
         component: ShopView,
-        meta: { title: 'Do\'kon & Bezaklar', permission: 'shop:manage' }
+        meta: { titleKey: 'nav.shop', title: 'Do\'kon & Bezaklar', permission: 'shop:manage' }
       },
       {
         path: 'wheels',
         name: 'wheels',
         component: WheelManagementView,
-        meta: { title: 'Omad Charxi (Ruletka)', permission: 'wheel:manage' }
+        meta: { titleKey: 'nav.wheels', title: 'Omad Charxi (Ruletka)', permissions: WHEEL_PERMISSIONS }
       },
       {
         path: 'rbac',
         name: 'rbac',
         component: RbacView,
-        meta: { title: 'Dinamik RBAC', permission: 'roles:manage' }
+        meta: { titleKey: 'nav.rbac', title: 'Dinamik RBAC', permissions: ['roles:manage','staff:manage'] }
       },
       {
         path: 'creator-requests',
         name: 'creator-requests',
         component: CreatorRequestsView,
-        meta: { title: 'Creatorlik Arizalari', permission: 'roles:manage' }
+        meta: { titleKey: 'nav.creator_requests', title: 'Creatorlik Arizalari', permission: 'users:manage' }
       },
       {
         path: 'users',
         name: 'users',
         component: UsersView,
-        meta: { title: 'O\'quvchilar & Chaqmoq', permission: 'users:manage' }
+        meta: { titleKey: 'nav.users', title: 'O\'quvchilar & Chaqmoq', permission: 'users:manage' }
       },
       {
         path: 'economy',
         name: 'economy',
         component: EconomyView,
-        meta: { title: '⚡ Chaqmoq Iqtisodiyoti', permission: 'users:manage' }
+        meta: { titleKey: 'nav.economy', title: '⚡ Chaqmoq Iqtisodiyoti', permissions: ['users:manage','coins:view','coins:distribute'] }
       },
       {
         path: 'clans',
         name: 'clans',
         component: ClanManagementView,
-        meta: { title: 'Klanlar & Darajalar', permission: 'users:manage' }
+        meta: { titleKey: 'nav.clans', title: 'Klanlar & Darajalar', permissions: ['users:manage','settings:manage','roles:manage'] }
       },
       {
         path: 'comments',
         name: 'comments',
         component: CommentsView,
-        meta: { title: 'Sharhlar', permission: 'comments:moderate' }
+        meta: { titleKey: 'nav.comments', title: 'Sharhlar', permission: 'comments:moderate' }
       },
       {
         path: 'sessions',
         name: 'sessions',
         component: SessionsView,
-        meta: { title: 'Faol Seanslar' }
+        meta: { titleKey: 'nav.sessions', title: 'Faol Seanslar' }
       }
     ]
   },
@@ -122,12 +125,13 @@ const router = createRouter({
   routes
 })
 
-router.beforeEach((to, from, next) => {
+router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore()
   const systemStore = useSystemStore()
 
+  await authStore.ensureAuth()
   // Set document title
-  document.title = to.meta.title ? `${to.meta.title} — WebtoonHub Studio` : 'WebtoonHub Studio'
+  document.title = `${to.meta.titleKey ? i18n.global.t(to.meta.titleKey) : 'WebtoonHub Studio'} — WebtoonHub Studio`
 
   // Guest route check
   if (to.meta.guest && authStore.isAuthenticated) {
@@ -137,15 +141,15 @@ router.beforeEach((to, from, next) => {
   // Auth requirement check
   if (to.matched.some((record) => record.meta.requiresAuth)) {
     if (!authStore.isAuthenticated) {
-      return next('/login')
+      return next({ path: '/login', query: { redirect: to.fullPath } })
     }
 
     // Permission check
-    if (to.meta.permission && !authStore.hasPermission(to.meta.permission)) {
+    if ((to.meta.permission && !authStore.hasPermission(to.meta.permission)) || (to.meta.permissions && !to.meta.permissions.some(code => authStore.hasPermission(code)))) {
       systemStore.addToast({
         type: 'error',
-        title: 'Kirish taqiqlandi (403)',
-        message: `Sizning rolingizda ushbu sahifaga kirish uchun '${to.meta.permission}' huquqi mavjud emas`
+        title: i18n.global.t('common.access_denied'),
+        message: i18n.global.t('common.no_permission')
       })
       return next('/dashboard')
     }
@@ -154,4 +158,8 @@ router.beforeEach((to, from, next) => {
   next()
 })
 
+window.addEventListener('staff-session-expired', () => {
+  if (router.currentRoute.value.path !== '/login') router.replace({ path: '/login', query: { redirect: router.currentRoute.value.fullPath } })
+})
+watch(i18n.global.locale, () => { const meta = router.currentRoute.value.meta; document.title = `${meta.titleKey ? i18n.global.t(meta.titleKey) : 'WebtoonHub Studio'} — WebtoonHub Studio` })
 export default router

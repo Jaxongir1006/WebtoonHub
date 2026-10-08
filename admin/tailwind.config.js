@@ -28,6 +28,7 @@ export default {
           800: '#1c2030', // borders and inactive
           700: '#2a3046', // subtle hover
           600: '#3c4563',
+          500: '#5c698e',
           400: '#7481a5',
           300: '#9aa5c4',
           200: '#cbd3e6',

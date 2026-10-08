@@ -1,7 +1,7 @@
 import uuid
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Text, Uuid as UUID, func
 from sqlalchemy.orm import relationship
-from app.core.database import Base
+from app.core.database import Base, BigIntId
 
 
 class RolePermission(Base):
@@ -17,6 +17,11 @@ class Role(Base):
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     name = Column(String(50), unique=True, nullable=False, index=True)
     description = Column(String(255), nullable=True)
+    # System identity and content scope are independent of editable display names.
+    system_key = Column(String(50), unique=True, nullable=True,
+        default=lambda context: context.get_current_parameters().get('name') if context.get_current_parameters().get('name') in {'creator', 'superadmin'} else None)
+    scope = Column(String(20), nullable=False, server_default='global',
+        default=lambda context: 'own_content' if context.get_current_parameters().get('name') == 'creator' else 'global')
 
     permissions = relationship("Permission", secondary="role_permissions", back_populates="roles")
     staff_users = relationship("StaffUser", back_populates="role")
@@ -36,6 +41,7 @@ class StaffUser(Base):
     __tablename__ = "staff_users"
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    user_id = Column(BigIntId, ForeignKey("users.id", ondelete="SET NULL"), unique=True, nullable=True, index=True)
     username = Column(String(50), unique=True, index=True, nullable=False)
     email = Column(String(255), unique=True, index=True, nullable=False)
     hashed_password = Column(String(255), nullable=False)

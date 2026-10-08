@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime, timezone, timedelta
 from typing import Callable, List, Optional, Tuple
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -11,6 +12,18 @@ from app.core.security import decode_token
 from app.modules.staff.models import Role, StaffSession, StaffUser
 
 security_bearer = HTTPBearer(auto_error=False)
+
+
+def is_superadmin(staff: StaffUser) -> bool:
+    return staff.role.system_key == 'superadmin'
+
+
+def owns_content_only(staff: StaffUser) -> bool:
+    return staff.role.scope == 'own_content'
+
+
+def can_approve_chapters(staff: StaffUser) -> bool:
+    return is_superadmin(staff) or any(permission.code == 'chapters:approve' for permission in staff.role.permissions)
 
 
 async def get_current_staff_and_session(
@@ -45,7 +58,8 @@ async def get_current_staff_and_session(
     stmt = select(StaffSession).where(
         StaffSession.id == session_id,
         StaffSession.staff_id == staff_id,
-        StaffSession.is_active.is_(True)
+        StaffSession.is_active.is_(True),
+        StaffSession.expires_at > datetime.now(timezone.utc)
     )
     res = await db.execute(stmt)
     session = res.scalar_one_or_none()
@@ -54,6 +68,13 @@ async def get_current_staff_and_session(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Ushbu xodim seansi bekor qilingan yoki muddati tugagan"
         )
+
+    last = session.last_active_at
+    if last.tzinfo is None:
+        last = last.replace(tzinfo=timezone.utc)
+    if datetime.now(timezone.utc) - last > timedelta(minutes=5):
+        session.last_active_at = datetime.now(timezone.utc)
+        await db.commit()
 
     # Fetch staff with role and permissions
     s_stmt = (
@@ -68,6 +89,12 @@ async def get_current_staff_and_session(
     if not staff:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Xodim topilmadi yoki bloklangan")
 
+    if staff.user_id:
+        from app.modules.users.models import User
+        reader = await db.get(User, staff.user_id)
+        if not reader or not reader.is_active:
+            raise HTTPException(401, "Linked reader account is unavailable")
+    staff._authenticated_session_id = session_id_str
     return staff, session_id_str
 
 
@@ -82,7 +109,7 @@ def require_permission(permission_code: str) -> Callable:
         staff: StaffUser = Depends(get_current_staff)
     ) -> StaffUser:
         # Superadmin bypasses all permission checks
-        if staff.role.name == "superadmin":
+        if is_superadmin(staff):
             return staff
 
         staff_permissions = [p.code for p in staff.role.permissions]
@@ -100,7 +127,7 @@ def require_any_permission(*permission_codes: str) -> Callable:
     async def permission_checker(
         staff: StaffUser = Depends(get_current_staff)
     ) -> StaffUser:
-        if staff.role.name == "superadmin":
+        if is_superadmin(staff):
             return staff
 
         staff_permissions = [p.code for p in staff.role.permissions]

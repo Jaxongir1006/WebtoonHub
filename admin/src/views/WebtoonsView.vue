@@ -1,10 +1,11 @@
 <template>
   <div class="space-y-6">
+    <LoadState :loading="isLoading" :empty="!isLoading && !loadError && !webtoons.length" :error="loadError" @retry="loadData" />
     <!-- Top Action Bar -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
       <div>
         <h2 class="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
-          <svg class="w-6 h-6 text-brand-500 dark:text-brand-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg class="w-6 h-6 text-brand-700 dark:text-brand-500 dark:text-brand-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
           </svg>
           {{ $t('webtoons.title') }}
@@ -14,16 +15,15 @@
         </p>
       </div>
 
-      <div class="flex items-center gap-3">
+      <div class="flex flex-wrap items-center gap-3">
+        <Button v-if="authStore.hasPermission('chapters:create')" variant="secondary" size="md" @click="showChapterImport = true">{{ $t('chapterImport.title') }}</Button>
         <Button
           v-if="authStore.hasPermission('genres:manage')"
           variant="ghost"
           size="md"
           class="border border-slate-200 dark:border-white/10"
           @click="showGenreModal = true"
-        >
-          🏷 Janrlar
-        </Button>
+        > {{ $t('staff.s531') }} </Button>
 
         <Button
           v-if="authStore.hasPermission('chapters:create')"
@@ -62,10 +62,10 @@
           v-model="selectedType"
           class="px-3 py-2 text-xs bg-white dark:bg-studio-900 border border-slate-200 dark:border-white/10 rounded-xl text-slate-800 dark:text-studio-200 focus:outline-none shadow-sm dark:shadow-none font-medium"
         >
-          <option value="all">Barcha Formatlar</option>
-          <option value="manhwa">📱 Manhwa (Vertikal)</option>
-          <option value="manga">📖 Manga (RTL)</option>
-          <option value="novel">📜 Novel (Matnli)</option>
+          <option value="all"> {{ $t('staff.s532') }} </option>
+          <option value="manhwa"> {{ $t('staff.s533') }} </option>
+          <option value="manga"> {{ $t('staff.s534') }} </option>
+          <option value="novel"> {{ $t('staff.s535') }} </option>
         </select>
 
         <!-- Status Filter -->
@@ -80,7 +80,7 @@
 
         <!-- Genre Filter -->
         <select
-          v-model="selectedGenre"
+          v-if="canReadGenres" v-model="selectedGenre"
           class="px-3 py-2 text-xs bg-white dark:bg-studio-900 border border-slate-200 dark:border-white/10 rounded-xl text-slate-800 dark:text-studio-200 focus:outline-none shadow-sm dark:shadow-none"
         >
           <option value="all">{{ $t('webtoons.all_genres') }}</option>
@@ -92,18 +92,20 @@
         <!-- View Mode Switcher -->
         <div class="p-1 rounded-xl bg-slate-100 dark:bg-studio-900 border border-slate-200 dark:border-white/10 flex items-center">
           <button
-            :class="['p-1.5 rounded-lg transition-colors', isGrid ? 'bg-white dark:bg-studio-800 text-slate-900 dark:text-white shadow-sm' : 'text-slate-400 dark:text-studio-500']"
+            :class="['p-1.5 rounded-lg transition-colors', isGrid ? 'bg-white dark:bg-studio-800 text-slate-900 dark:text-white shadow-sm' : 'text-slate-600 dark:text-studio-400 dark:text-studio-500']"
             @click="isGrid = true"
-            title="Grid"
+            :aria-pressed="isGrid"
+            :title="$t('staff.s536')" :aria-label="$t('staff.s536')"
           >
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
             </svg>
           </button>
           <button
-            :class="['p-1.5 rounded-lg transition-colors', !isGrid ? 'bg-white dark:bg-studio-800 text-slate-900 dark:text-white shadow-sm' : 'text-slate-400 dark:text-studio-500']"
+            :class="['p-1.5 rounded-lg transition-colors', !isGrid ? 'bg-white dark:bg-studio-800 text-slate-900 dark:text-white shadow-sm' : 'text-slate-600 dark:text-studio-400 dark:text-studio-500']"
             @click="isGrid = false"
-            title="Table"
+            :aria-pressed="!isGrid"
+            :title="$t('staff.s537')" :aria-label="$t('staff.s537')"
           >
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
@@ -132,7 +134,7 @@
 
             <!-- Status & Format Badges -->
             <div class="absolute top-3 left-3 flex flex-col gap-1.5 items-start">
-              <Badge :variant="item.status === 'completed' ? 'success' : 'primary'" :dot="true">
+              <Badge :solid="true" :variant="item.status === 'completed' ? 'success' : 'primary'" :dot="true">
                 {{ item.status === 'completed' ? $t('webtoons.completed') : $t('webtoons.ongoing') }}
               </Badge>
               <span
@@ -154,7 +156,7 @@
 
             <!-- Chapter Counter Badge -->
             <div class="absolute bottom-3 left-3 right-3 flex items-center justify-between">
-              <span class="px-2.5 py-1 rounded-lg bg-black/80 backdrop-blur-md text-xs font-mono font-bold text-brand-300 border border-white/10">
+              <span class="px-2.5 py-1 rounded-lg bg-black/80 backdrop-blur-md text-xs font-mono font-bold text-brand-300 border border-slate-200 dark:border-white/10">
                 📖 {{ getWebtoonChaptersCount(item.id) }} {{ $t('webtoons.chapters_count') }}
               </span>
             </div>
@@ -166,7 +168,7 @@
               {{ item.title }}
             </h3>
             <p class="text-xs text-slate-500 dark:text-studio-400 flex items-center gap-1">
-              <span>✍️</span> {{ item.author_name || 'Muallif ko\'rsatilmagan' }}
+              <span>✍️</span> {{ item.author_name || $t('staff.s538') }}
             </p>
 
             <!-- Genres Badges -->
@@ -178,7 +180,7 @@
               >
                 {{ g }}
               </span>
-              <span v-if="item.genres?.length > 2" class="text-[10px] text-slate-400 dark:text-studio-500">
+              <span v-if="item.genres?.length> 2" class="text-[10px] text-slate-600 dark:text-studio-400 dark:text-studio-500">
                 +{{ item.genres.length - 2 }}
               </span>
             </div>
@@ -225,8 +227,8 @@
         <table class="w-full text-left text-sm">
           <thead class="bg-slate-100 dark:bg-studio-900/80 text-xs uppercase font-bold text-slate-600 dark:text-studio-400 border-b border-slate-200 dark:border-white/5">
             <tr>
-              <th class="px-5 py-3.5">Loyiha</th>
-              <th class="px-5 py-3.5">Format</th>
+              <th class="px-5 py-3.5"> {{ $t('staff.s539') }} </th>
+              <th class="px-5 py-3.5"> {{ $t('staff.s540') }} </th>
               <th class="px-5 py-3.5">{{ $t('webtoons.author') }}</th>
               <th class="px-5 py-3.5">{{ $t('common.status') }}</th>
               <th class="px-5 py-3.5">{{ $t('webtoons.chapters_count') }}</th>
@@ -242,15 +244,15 @@
                   <router-link :to="`/webtoons/${item.id}`" class="font-bold text-slate-900 dark:text-white hover:text-brand-500">
                     {{ item.title }}
                   </router-link>
-                  <p class="text-xs text-slate-400 dark:text-studio-500 font-mono">{{ item.slug }}</p>
+                  <p class="text-xs text-slate-600 dark:text-studio-400 dark:text-studio-500 font-mono">{{ item.slug }}</p>
                 </div>
               </td>
               <td class="px-5 py-3">
                 <span
                   :class="[
                     'px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider inline-block',
-                    item.type === 'novel' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' :
-                    item.type === 'manga' ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' :
+                    item.type === 'novel' ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30' :
+                    item.type === 'manga' ? 'bg-rose-500/20 text-rose-700 dark:text-rose-400 border border-rose-500/30' :
                     'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
                   ]"
                 >
@@ -263,7 +265,7 @@
                   {{ item.status === 'completed' ? $t('webtoons.completed') : $t('webtoons.ongoing') }}
                 </Badge>
               </td>
-              <td class="px-5 py-3 font-mono font-bold text-brand-600 dark:text-brand-400">
+              <td class="px-5 py-3 font-mono font-bold text-brand-700 dark:text-brand-400">
                 {{ getWebtoonChaptersCount(item.id) }}
               </td>
               <td class="px-5 py-3 font-mono text-slate-500 dark:text-studio-400 text-xs">
@@ -302,24 +304,32 @@
     <!-- Modals -->
     <WebtoonFormModal
       v-model="showCreateModal"
-      :webtoon="selectedWebtoon"
-      @save="onWebtoonSaved"
+      :webtoon="selectedWebtoon" :genres="genres"
+      :on-save="onWebtoonSaved"
     />
 
     <ChapterUploadModal
       v-model="showChapterUpload"
-      @upload-success="onChapterUploaded"
+      :on-upload="onChapterUploaded"
     />
 
     <GenreManageModal
-      v-model="showGenreModal"
+      v-model="showGenreModal" @changed="loadData"
     />
+    <ChapterImportWorkspace v-model="showChapterImport" :webtoons="webtoons" @updated="loadData" />
+    <Pagination v-model:page="page" :limit="limit" :total="totalItems" :loading="isLoading" />
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import i18n from '../i18n/index.js'
+const tr = (...args) => i18n.global.t(...args)
+
+import { ref, computed, onMounted, watch, onUnmounted } from 'vue'
 import { useAuthStore } from '../stores/auth'
+import Pagination from '../components/common/Pagination.vue'
+import LoadState from '../components/common/LoadState.vue'
+import { getErrorMessage, pageCount } from '../utils/forms'
 import { useSystemStore } from '../stores/system'
 import { webtoonsApi } from '../api/webtoons'
 import Badge from '../components/common/Badge.vue'
@@ -327,6 +337,7 @@ import Button from '../components/common/Button.vue'
 import SearchInput from '../components/common/SearchInput.vue'
 import WebtoonFormModal from '../components/webtoons/WebtoonFormModal.vue'
 import ChapterUploadModal from '../components/webtoons/ChapterUploadModal.vue'
+import ChapterImportWorkspace from '../components/webtoons/ChapterImportWorkspace.vue'
 import GenreManageModal from '../components/webtoons/GenreManageModal.vue'
 
 const authStore = useAuthStore()
@@ -340,65 +351,57 @@ const selectedGenre = ref('all')
 
 const showCreateModal = ref(false)
 const showChapterUpload = ref(false)
+const showChapterImport = ref(false)
 const showGenreModal = ref(false)
 const selectedWebtoon = ref(null)
 
 const webtoons = ref([])
 const genres = ref([])
+const canReadGenres = computed(() => ['genres:manage','webtoons:create','webtoons:edit'].some(code => authStore.hasPermission(code)))
 const isLoading = ref(false)
 
+const page = ref(1)
+const limit = 25
+const loadError = ref('')
+let loadSequence = 0
+const totalItems = ref(0)
 async function loadData() {
+  const sequence = ++loadSequence
+  loadError.value = ''
   isLoading.value = true
   try {
     const [wRes, gRes] = await Promise.all([
-      webtoonsApi.getWebtoons({ limit: 100 }),
-      webtoonsApi.getGenres()
+      webtoonsApi.getWebtoons({ page: page.value, limit, search: searchQuery.value || undefined, type: selectedType.value === 'all' ? undefined : selectedType.value, status: selectedStatus.value === 'all' ? undefined : selectedStatus.value, genre: genres.value.find(g => g.id === Number(selectedGenre.value))?.slug }),
+      canReadGenres.value ? webtoonsApi.getGenres() : Promise.resolve({data: []})
     ])
+    if (sequence !== loadSequence) return
+    totalItems.value = wRes.data?.total ?? 0
+    if (page.value> pageCount(totalItems.value, limit)) { page.value = pageCount(totalItems.value, limit); return }
     webtoons.value = wRes.data?.items || wRes.data || []
     genres.value = gRes.data || []
   } catch (err) {
+    if (sequence !== loadSequence) return
+    loadError.value = getErrorMessage(err)
     console.error('Failed to load webtoons:', err)
   } finally {
-    isLoading.value = false
+    if (sequence === loadSequence) isLoading.value = false
   }
 }
 
 onMounted(() => {
   loadData()
+  window.addEventListener('chapter-import-complete', importedChapter)
 })
+const importedChapter = () => loadData()
 
-const filteredWebtoons = computed(() => {
-  return webtoons.value.filter((w) => {
-    const matchesSearch =
-      !searchQuery.value ||
-      w.title.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-      w.author_name?.toLowerCase().includes(searchQuery.value.toLowerCase())
-
-    const matchesType =
-      selectedType.value === 'all' || (w.type || 'manhwa') === selectedType.value
-
-    const matchesStatus =
-      selectedStatus.value === 'all' || w.status === selectedStatus.value
-
-    let matchesGenre = true
-    if (selectedGenre.value !== 'all') {
-      const targetGenre = genres.value.find((g) => g.id === Number(selectedGenre.value))
-      if (targetGenre) {
-        matchesGenre = (w.genres && w.genres.includes(targetGenre.name)) ||
-          (w.genre_ids && w.genre_ids.includes(Number(selectedGenre.value)))
-      }
-    }
-
-    return matchesSearch && matchesType && matchesStatus && matchesGenre
-  })
-})
+const filteredWebtoons = computed(() => webtoons.value)
 
 function getWebtoonChaptersCount(itemOrId) {
   if (typeof itemOrId === 'object' && itemOrId !== null) {
-    return itemOrId.latest_chapter?.chapter_number || itemOrId.chapters_count || 0
+    return itemOrId.chapter_count ?? itemOrId.chapters_count ?? 0
   }
   const found = webtoons.value.find((w) => w.id === itemOrId)
-  return found?.latest_chapter?.chapter_number || found?.chapters_count || 0
+  return found?.chapter_count ?? found?.chapters_count ?? 0
 }
 
 function openCreateModal() {
@@ -417,8 +420,8 @@ async function onWebtoonSaved(savedItem) {
       await webtoonsApi.updateWebtoon(savedItem.id, savedItem)
       systemStore.addToast({
         type: 'success',
-        title: 'Loyiha yangilandi',
-        message: `"${savedItem.title}" muvaffaqiyatli saqlandi`
+        title: tr('staff.s541'),
+        message: tr('staff.s479', { value0: savedItem.title })
       })
     } else {
       const formData = new FormData()
@@ -428,72 +431,79 @@ async function onWebtoonSaved(savedItem) {
       if (savedItem.author_name) formData.append('author_name', savedItem.author_name)
       formData.append('status', savedItem.status || 'ongoing')
       formData.append('genre_ids', JSON.stringify(savedItem.genre_ids || []))
-      if (!savedItem.cover_image_file) throw new Error('Muqova rasmini tanlang')
+      if (!savedItem.cover_image_file) throw new Error(tr('staff.s346'))
       formData.append('cover_image', savedItem.cover_image_file)
       await webtoonsApi.createWebtoon(formData)
       systemStore.addToast({
         type: 'success',
-        title: 'Loyiha yaratildi',
-        message: `"${savedItem.title}" muvaffaqiyatli katalogga qo'shildi`
+        title: tr('staff.s542'),
+        message: tr('staff.s348', { value0: savedItem.title })
       })
     }
     await loadData()
   } catch (err) {
     systemStore.addToast({
       type: 'error',
-      title: 'Xatolik',
-      message: err.message || 'Loyihani saqlashda xatolik yuz berdi'
+      title: tr('staff.s024'),
+      message: err.message || tr('staff.s543')
     })
+    throw err
   }
 }
 
 async function deleteWebtoon(id) {
-  if (confirm('Rostdan ham ushbu loyiha va uning barcha boblarini o\'chirmoqchimisiz?')) {
+  if (confirm(tr('staff.s544'))) {
     try {
       await webtoonsApi.deleteWebtoon(id)
       systemStore.addToast({
         type: 'info',
-        title: 'Loyiha o\'chirildi',
-        message: 'Loyiha va uning barcha ma\'lumotlari bazadan o\'chirildi'
+        title: tr('staff.s545'),
+        message: tr('staff.s546')
       })
       await loadData()
     } catch (err) {
       systemStore.addToast({
         type: 'error',
-        title: 'Xatolik',
-        message: err.message || 'O\'chirishda xatolik yuz berdi'
+        title: tr('staff.s024'),
+        message: err.message || tr('staff.s305')
       })
     }
   }
 }
 
-async function onChapterUploaded(data) {
+async function onChapterUploaded(data, onProgress) {
   try {
     const formData = new FormData()
     formData.append('webtoon_id', data.webtoon_id)
     formData.append('chapter_number', data.chapter_number)
     if (data.title) formData.append('title', data.title)
-    if (data.reward_coins) formData.append('reward_coins', data.reward_coins)
+    if (data.reward_coins !== undefined) formData.append('reward_coins', data.reward_coins)
     if (data.content_text) formData.append('content_text', data.content_text)
 
-    if (data.rawFiles && data.rawFiles.length > 0) {
+    if (data.rawFiles && data.rawFiles.length> 0) {
       data.rawFiles.forEach((f) => formData.append('images', f))
     } else if (!data.content_text?.trim()) {
-      throw new Error('Bob uchun rasm yoki matn kiriting')
+      throw new Error(tr('staff.s350'))
     }
-    await webtoonsApi.uploadChapter(formData)
+    await webtoonsApi.uploadChapter(formData, onProgress)
     await loadData()
     systemStore.addToast({
       type: 'success',
-      title: 'Bob yuklandi',
-      message: `${data.chapter_number}-bob muvaffaqiyatli yuklandi va moderatsiya navbatiga qo'shildi`
+      title: tr('staff.s351'),
+      message: tr('staff.s547', { value0: data.chapter_number })
     })
   } catch (err) {
     systemStore.addToast({
       type: 'error',
-      title: 'Xatolik',
-      message: err.message || 'Bobni yuklashda xatolik yuz berdi'
+      title: tr('staff.s024'),
+      message: err.message || tr('staff.s353')
     })
+    throw err
   }
 }
+
+watch(page, loadData)
+onUnmounted(() => { loadSequence++; clearTimeout(searchTimer); window.removeEventListener('chapter-import-complete', importedChapter) })
+let searchTimer = null
+watch([searchQuery, selectedType, selectedStatus, selectedGenre], () => { clearTimeout(searchTimer); searchTimer = setTimeout(() => { if (page.value !== 1) page.value = 1; else loadData() }, 250) })
 </script>

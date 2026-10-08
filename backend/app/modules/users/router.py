@@ -1,6 +1,10 @@
 import os
 import shutil
 import time
+import uuid
+import re
+from app.core.storage import StorageService
+from app.core.media_cleanup import delete_unreferenced_media
 from typing import Optional
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from pydantic import BaseModel, Field
@@ -26,6 +30,7 @@ MAX_AVATAR_SIZE = 5 * 1024 * 1024  # 5 MB
 
 class UserProfileUpdatePayload(BaseModel):
     bio: Optional[str] = Field(None, max_length=500)
+    avatar_url: Optional[str] = Field(None, max_length=500)
     username: Optional[str] = Field(None, min_length=3, max_length=50, pattern=r"^[a-zA-Z0-9_-]+$")
 
 
@@ -43,37 +48,20 @@ async def upload_avatar(
         )
 
     # Read content & size validation
-    content = await file.read()
+    content = await file.read(MAX_AVATAR_SIZE + 1)
     if len(content) > MAX_AVATAR_SIZE:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Avatar hajmi 5MB dan oshmasligi kerak",
         )
 
-    # Backend storage dir
-    root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-    backend_avatars_dir = os.path.join(root_dir, "public_content", "avatars")
-    os.makedirs(backend_avatars_dir, exist_ok=True)
-
-    filename = f"avatar_{current_user.id}_{int(time.time())}{ext}"
-    target_path = os.path.join(backend_avatars_dir, filename)
-
-    with open(target_path, "wb") as f:
-        f.write(content)
-
-    # Also mirror to frontend/public/content/avatars if exists
-    frontend_avatars_dir = os.path.join(os.path.dirname(root_dir), "frontend", "public", "content", "avatars")
-    if os.path.exists(os.path.dirname(frontend_avatars_dir)):
-        os.makedirs(frontend_avatars_dir, exist_ok=True)
-        try:
-            shutil.copyfile(target_path, os.path.join(frontend_avatars_dir, filename))
-        except Exception:
-            pass
-
-    avatar_url = f"/content/avatars/{filename}"
+    filename = f"avatar_{current_user.id}_{uuid.uuid4().hex}{ext}"
+    avatar_url = await StorageService.upload_file_async(bucket_name='avatars', object_name=f'avatars/{filename}', data=content)
+    old_avatar = current_user.avatar_url
     current_user.avatar_url = avatar_url
     await db.commit()
     await db.refresh(current_user)
+    await delete_unreferenced_media(db, old_avatar)
 
     return {
         "success": True,
@@ -101,11 +89,21 @@ async def update_my_profile(
             )
         current_user.username = payload.username
 
+    old_avatar = current_user.avatar_url
+    if payload.avatar_url is not None:
+        if payload.avatar_url != current_user.avatar_url and not re.fullmatch(rf'/content/avatars/avatar_{current_user.id}_[a-f0-9]{{32}}\.webp', payload.avatar_url):
+            raise HTTPException(422, 'Use an avatar uploaded for this account')
+        from app.core.storage import safe_path
+        if not safe_path(payload.avatar_url.removeprefix("/content/")).is_file():
+            raise HTTPException(422, "Avatar draft no longer exists")
+        current_user.avatar_url = payload.avatar_url
     if payload.bio is not None:
         current_user.bio = payload.bio
 
     await db.commit()
     await db.refresh(current_user)
+    if old_avatar != current_user.avatar_url:
+        await delete_unreferenced_media(db, old_avatar)
 
     return {
         "success": True,
@@ -125,15 +123,11 @@ async def get_public_profile(
     current_user: Optional[User] = Depends(get_optional_user),
     db: AsyncSession = Depends(get_db),
 ):
-    # Determine if identifier is ID or username
-    target_user = None
-    if identifier.isdigit():
-        stmt = select(User).where(User.id == int(identifier))
-        target_user = (await db.execute(stmt)).scalar_one_or_none()
-
-    if not target_user:
-        stmt = select(User).where(User.username == identifier)
-        target_user = (await db.execute(stmt)).scalar_one_or_none()
+    # Exact usernames have priority over numeric legacy ID links
+    stmt = select(User).where(User.username == identifier)
+    target_user = (await db.execute(stmt)).scalar_one_or_none()
+    if not target_user and identifier.isdigit():
+        target_user = await db.get(User, int(identifier))
 
     if not target_user:
         raise HTTPException(
@@ -224,6 +218,8 @@ async def get_public_profile(
                     else:
                         friendship_status = "pending_received"
 
+    from app.modules.shop.collection import collection_summary
+    card_collection = await collection_summary(db, target_user.id)
     return {
         "success": True,
         "data": {
@@ -234,6 +230,7 @@ async def get_public_profile(
             "created_at": target_user.created_at,
             "active_frame": active_frame,
             "active_background": active_background,
+            "card_collection": card_collection,
             "clan": clan_info,
             "friendship": {
                 "status": friendship_status,
@@ -247,3 +244,19 @@ async def get_public_profile(
             },
         },
     }
+
+@router.post('/avatar/draft')
+async def draft_avatar(file: UploadFile = File(...), current_user: User = Depends(get_current_user)):
+    content = await file.read(MAX_AVATAR_SIZE + 1)
+    if len(content) > MAX_AVATAR_SIZE:
+        raise HTTPException(413, 'Avatar must be at most 5 MB')
+    url = await StorageService.upload_file_async(bucket_name='avatars', object_name=f'avatars/avatar_{current_user.id}_{uuid.uuid4().hex}.webp', data=content)
+    return {'success': True, 'data': {'avatar_url': url}}
+
+
+@router.get('/id/{user_id}/public-profile')
+async def public_profile_by_id(user_id: int, current_user: Optional[User] = Depends(get_optional_user), db=Depends(get_db)):
+    target = await db.get(User, user_id)
+    if target is None:
+        raise HTTPException(404, 'User not found')
+    return await get_public_profile(target.username, current_user, db)

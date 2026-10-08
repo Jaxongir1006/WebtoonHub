@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { rewardsApi } from '../../api/rewards';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
@@ -10,19 +10,26 @@ interface RewardClaimCardProps {
   initialClaimed: boolean;
   rewardAmount?: number;
   onClaimSuccess?: () => void;
+  ready?: boolean;
 }
 
 export const RewardClaimCard: React.FC<RewardClaimCardProps> = ({
   chapterId,
   initialClaimed,
   rewardAmount = 5,
-  onClaimSuccess
+  onClaimSuccess,
+  ready = true
 }) => {
-  const { isAuthenticated, updateCoinsLocally, openAuthModal } = useAuth();
+  const { user, isAuthenticated, updateCoinsLocally, openAuthModal } = useAuth();
   const { t } = useLanguage();
   const [isClaimed, setIsClaimed] = useState(initialClaimed);
   const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const alive = useRef(true);
+  const pending = useRef(false);
+  const identity = `${chapterId}:${user?.id || 'guest'}`;
+  const current = useRef(identity); current.current = identity;
+  useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
 
   // Sync state when navigating between chapters
   React.useEffect(() => {
@@ -31,15 +38,17 @@ export const RewardClaimCard: React.FC<RewardClaimCardProps> = ({
   }, [chapterId, initialClaimed]);
 
   const handleClaim = async () => {
+    if (pending.current || loading || isClaimed || rewardAmount === 0 || (isAuthenticated && !ready)) return;
     if (!isAuthenticated) {
       openAuthModal('login');
       return;
     }
 
-    setLoading(true);
+    const captured = identity; pending.current = true; setLoading(true);
     setFeedback(null);
     try {
       const res = await rewardsApi.claimChapterReward(chapterId);
+      if (!alive.current || current.current !== captured) return;
       setIsClaimed(true);
       const newBalance = res.data?.total_lightning_coins ?? res.data?.new_balance;
       if (typeof newBalance === 'number') {
@@ -47,16 +56,18 @@ export const RewardClaimCard: React.FC<RewardClaimCardProps> = ({
       }
       setFeedback({
         type: 'success',
-        message: res.message || t('reader.rewardClaimed')
+        message: t('reader.rewardClaimed')
       });
       onClaimSuccess?.();
     } catch (err) {
       const msg = getApiErrorMessage(err, t('common.error'));
-      setFeedback({ type: 'error', message: msg });
+      if (alive.current && current.current === captured) setFeedback({ type: 'error', message: msg });
     } finally {
-      setLoading(false);
+      pending.current = false; if (alive.current) setLoading(false);
     }
   };
+
+  if (rewardAmount === 0) return <p className="text-center text-sm text-studio-400 py-6">{t('readerFix.rewardDisabled')}</p>;
 
   return (
     <div className="w-full max-w-xl mx-auto my-8 p-6 rounded-3xl bg-studio-900 border border-studio-800 shadow-2xl relative overflow-hidden">
@@ -93,6 +104,7 @@ export const RewardClaimCard: React.FC<RewardClaimCardProps> = ({
 
           {feedback && (
             <div
+              role="status"
               className={`p-3 rounded-xl text-xs flex items-center justify-center gap-2 ${
                 feedback.type === 'success'
                   ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-400'
@@ -110,7 +122,7 @@ export const RewardClaimCard: React.FC<RewardClaimCardProps> = ({
 
           <button
             onClick={handleClaim}
-            disabled={loading}
+            disabled={loading || (isAuthenticated && !ready)}
             className="w-full py-3.5 px-6 rounded-2xl font-bold bg-gradient-to-r from-brand-500 to-amber-400 text-studio-950 hover:from-brand-400 hover:to-amber-300 active:scale-98 shadow-glow-brand transition-all flex items-center justify-center gap-2 text-sm disabled:opacity-50"
           >
             {loading ? (
@@ -118,6 +130,8 @@ export const RewardClaimCard: React.FC<RewardClaimCardProps> = ({
                 <Loader2 className="w-4 h-4 animate-spin" />
                 <span>{t('reader.claiming')}</span>
               </>
+            ) : isAuthenticated && !ready ? (
+              <span>{t('ux.waitToRead')}</span>
             ) : isAuthenticated ? (
               <>
                 <Zap className="w-4 h-4 fill-studio-950" />

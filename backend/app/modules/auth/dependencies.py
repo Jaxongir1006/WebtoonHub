@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime, timezone, timedelta
 from typing import Optional, Tuple
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -47,7 +48,8 @@ async def get_current_user_and_session(
     stmt = select(UserSession).where(
         UserSession.id == session_id,
         UserSession.user_id == user_id,
-        UserSession.is_active.is_(True)
+        UserSession.is_active.is_(True),
+        UserSession.expires_at > datetime.now(timezone.utc)
     )
     res = await db.execute(stmt)
     session = res.scalar_one_or_none()
@@ -56,6 +58,13 @@ async def get_current_user_and_session(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Ushbu seans bekor qilingan yoki muddati tugagan"
         )
+
+    last = session.last_active_at
+    if last.tzinfo is None:
+        last = last.replace(tzinfo=timezone.utc)
+    if datetime.now(timezone.utc) - last > timedelta(minutes=5):
+        session.last_active_at = datetime.now(timezone.utc)
+        await db.commit()
 
     # Fetch User
     u_stmt = select(User).where(User.id == user_id, User.is_active.is_(True))

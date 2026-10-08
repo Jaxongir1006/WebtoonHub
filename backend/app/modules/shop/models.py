@@ -1,4 +1,4 @@
-from sqlalchemy import BigInteger, Boolean, Column, DateTime, ForeignKey, Integer, String, UniqueConstraint, func
+from sqlalchemy import BigInteger, Boolean, Column, DateTime, ForeignKey, ForeignKeyConstraint, Integer, String, UniqueConstraint, func, false
 from sqlalchemy.orm import relationship
 from app.core.database import Base, BigIntId
 
@@ -11,6 +11,12 @@ class ShopItem(Base):
     item_type = Column(String(20), nullable=False, index=True) # frame, background
     price_coins = Column(Integer, nullable=False)
     asset_url = Column(String(500), nullable=False)
+    rarity = Column(String(20), nullable=True)
+    character_name = Column(String(100), nullable=True)
+    series_title = Column(String(255), nullable=True)
+    webtoon_id = Column(BigIntId, ForeignKey('webtoons.id', name='fk_shop_item_webtoon', ondelete='SET NULL'), nullable=True)
+    asset_preview_url = Column(String(500), nullable=True)
+    asset_animated = Column(Boolean, default=False, server_default=false(), nullable=False)
     is_available = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
@@ -32,3 +38,14 @@ class UserInventory(Base):
 
     user = relationship("User", back_populates="inventory")
     item = relationship("ShopItem", back_populates="inventories")
+
+
+class UserFeaturedCard(Base):
+    __tablename__ = 'user_featured_cards'
+    user_id = Column(BigIntId, ForeignKey('users.id', ondelete='CASCADE'), primary_key=True)
+    item_id = Column(Integer, ForeignKey('shop_items.id', ondelete='CASCADE'), primary_key=True)
+    order_index = Column(Integer, nullable=False)
+    __table_args__ = (
+        ForeignKeyConstraint(['user_id', 'item_id'], ['user_inventory.user_id', 'user_inventory.item_id'], ondelete='CASCADE'),
+        UniqueConstraint('user_id', 'order_index', name='uq_user_featured_card_order'),
+    )

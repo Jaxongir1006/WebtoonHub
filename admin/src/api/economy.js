@@ -1,4 +1,5 @@
 import apiClient from './client'
+import { coinRequestConfig } from '../utils/operationIntents'
 
 export const economyApi = {
   async getSettings() {
@@ -16,8 +17,8 @@ export const economyApi = {
     return res.data
   },
 
-  async distributeCoins(data) {
-    const res = await apiClient.post('/coins/distribute', data)
+  async distributeCoins(data, operationKey) {
+    const res = await apiClient.post('/coins/distribute', data, coinRequestConfig(operationKey))
     return res.data
   }
 }

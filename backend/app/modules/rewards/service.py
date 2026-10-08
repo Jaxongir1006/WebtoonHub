@@ -1,4 +1,6 @@
+from app.core.transactions import serialize_user, serialize_wallet_targets
 from datetime import datetime, timezone
+from app.modules.library.progress import utc
 from zoneinfo import ZoneInfo
 from fastapi import HTTPException, status
 from sqlalchemy import select
@@ -15,8 +17,9 @@ from app.modules.webtoons.models import Chapter
 
 class RewardService:
     @staticmethod
+    @serialize_user
     async def claim_daily_checkin(db: AsyncSession, user_id: int) -> DailyCheckinResponse:
-        stmt = select(User).where(User.id == user_id)
+        stmt = select(User).where(User.id == user_id).with_for_update().execution_options(populate_existing=True)
         result = await db.execute(stmt)
         user = result.scalar_one_or_none()
         if not user:
@@ -27,20 +30,22 @@ class RewardService:
         now_uz = now_utc.astimezone(uz_tz)
 
         if user.last_daily_login:
-            last_uz = user.last_daily_login.astimezone(uz_tz)
+            last_uz = utc(user.last_daily_login).astimezone(uz_tz)
             if last_uz.date() == now_uz.date():
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Bugungi kunlik bonus allaqachon olingan. Keyingi bonus Toshkent vaqti bilan 00:00 da ochiladi."
                 )
 
-        user.lightning_coins += settings.DAILY_LOGIN_COINS
+        from app.core.economy import economy_value
+        daily_coins = await economy_value(db, "daily_checkin_reward")
+        user.lightning_coins += daily_coins
         user.last_daily_login = now_utc
 
         await RewardService.record_transaction(
             db=db,
             user_id=user.id,
-            amount=settings.DAILY_LOGIN_COINS,
+            amount=daily_coins,
             transaction_type="daily_checkin",
             description="Kunlik kirish bonusi"
         )
@@ -49,14 +54,14 @@ class RewardService:
         await db.refresh(user)
 
         return DailyCheckinResponse(
-            reward_amount=settings.DAILY_LOGIN_COINS,
+            reward_amount=daily_coins,
             total_lightning_coins=user.lightning_coins,
             claimed_at=now_uz
         )
 
     @staticmethod
     async def get_daily_status(db: AsyncSession, user_id: int) -> dict:
-        stmt = select(User).where(User.id == user_id)
+        stmt = select(User).where(User.id == user_id).with_for_update().execution_options(populate_existing=True)
         result = await db.execute(stmt)
         user = result.scalar_one_or_none()
         if not user:
@@ -68,17 +73,24 @@ class RewardService:
         daily_bonus_claimed = False
 
         if user.last_daily_login:
-            last_uz = user.last_daily_login.astimezone(uz_tz)
+            last_uz = utc(user.last_daily_login).astimezone(uz_tz)
             daily_bonus_claimed = (last_uz.date() == now_uz.date())
 
         return {
             "claimed_today": daily_bonus_claimed,
-            "reward_amount": settings.DAILY_LOGIN_COINS,
+            "reward_amount": await __import__("app.core.economy", fromlist=["economy_value"]).economy_value(db, "daily_checkin_reward"),
             "last_daily_login": user.last_daily_login.isoformat() if user.last_daily_login else None
         }
 
     @staticmethod
+    @serialize_user
     async def claim_chapter_reward(db: AsyncSession, user_id: int, chapter_id: int) -> ChapterRewardResponse:
+        u_stmt = select(User).where(User.id == user_id).with_for_update().execution_options(populate_existing=True)
+        u_res = await db.execute(u_stmt)
+        user = u_res.scalar_one_or_none()
+        if not user:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Foydalanuvchi topilmadi")
+
         # 1. Verify chapter exists and is published
         ch_stmt = select(Chapter).where(Chapter.id == chapter_id)
         ch_res = await db.execute(ch_stmt)
@@ -105,13 +117,29 @@ class RewardService:
             )
 
         # 3. Add reward and increment coins
-        u_stmt = select(User).where(User.id == user_id)
-        u_res = await db.execute(u_stmt)
-        user = u_res.scalar_one_or_none()
-        if not user:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Foydalanuvchi topilmadi")
-
-        reward_coins = chapter.reward_coins or settings.CHAPTER_READ_COINS
+        from app.modules.library.progress import ReadingProgress
+        receipt = (await db.execute(select(ReadingProgress).where(ReadingProgress.user_id == user_id,
+                        ReadingProgress.chapter_id == chapter_id, ReadingProgress.completed.is_(True)))).scalar_one_or_none()
+        if receipt is None:
+            raise HTTPException(409, 'Finish the chapter and save reading progress before claiming its reward')
+        reward_coins = chapter.reward_coins
+        from app.core.economy import economy_value
+        from app.modules.rewards.models import CoinTransaction
+        from sqlalchemy import func
+        from datetime import timedelta
+        today = datetime.now(timezone.utc).astimezone(ZoneInfo(settings.TIMEZONE)).replace(hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc)
+        cap = await economy_value(db, 'daily_max_limit')
+        earned = (await db.execute(select(func.coalesce(func.sum(CoinTransaction.amount), 0)).where(
+                      CoinTransaction.user_id == user_id, CoinTransaction.transaction_type == 'chapter_read',
+                      CoinTransaction.created_at >= today))).scalar()
+        if cap and earned + reward_coins > cap:
+            raise HTTPException(409, 'Daily chapter reward limit reached')
+        cooldown = await economy_value(db, 'anti_farming_cooldown_min')
+        if cooldown:
+            recent = (await db.execute(select(ReadReward.id).where(ReadReward.user_id == user_id,
+                         ReadReward.claimed_at > datetime.now(timezone.utc) - timedelta(minutes=cooldown)).limit(1))).scalar_one_or_none()
+            if recent:
+                raise HTTPException(409, 'Please wait before claiming the next chapter reward')
 
         read_record = ReadReward(
             user_id=user.id,
@@ -139,7 +167,9 @@ class RewardService:
         cm = (await db.execute(clan_stmt)).scalar_one_or_none()
         if cm and cm.clan:
             clan_xp_gain = 25
-            cm.clan.xp += clan_xp_gain
+            from app.modules.clans.models import Clan
+            from sqlalchemy import update
+            await db.execute(update(Clan).where(Clan.id == cm.clan_id).values(xp=Clan.xp + clan_xp_gain))
             cm.contribution_points += clan_xp_gain
 
         await db.commit()
@@ -223,16 +253,23 @@ class RewardService:
         )
 
     @staticmethod
+    @serialize_user
     async def adjust_user_coins(
         db: AsyncSession,
         staff_id: int,
         user_id: int,
         amount_delta: int,
-        reason: str
+        reason: str,
+        operation_key: str = None
     ):
         from app.modules.rewards.schemas import AdjustUserCoinsResponse
+        from app.core.idempotency import begin_operation, commit_operation
+        receipt, replay = await begin_operation(db, f'staff:{staff_id}', 'coins.adjust', operation_key,
+            {'user_id': user_id, 'amount_delta': amount_delta, 'reason': reason})
+        if replay is not None:
+            return AdjustUserCoinsResponse.model_validate(replay)
 
-        stmt = select(User).where(User.id == user_id)
+        stmt = select(User).where(User.id == user_id).with_for_update().execution_options(populate_existing=True)
         res = await db.execute(stmt)
         user = res.scalar_one_or_none()
         if not user:
@@ -254,35 +291,46 @@ class RewardService:
             staff_id=staff_id
         )
 
-        await db.commit()
+        await db.flush()
         await db.refresh(user)
 
-        return AdjustUserCoinsResponse(
+        response = AdjustUserCoinsResponse(
             user_id=user.id,
             previous_coins=prev,
             new_coins=new_val,
             amount_delta=actual_delta,
             reason=reason
         )
+        await commit_operation(db, receipt, response)
+        return response
 
     @staticmethod
+    @serialize_wallet_targets
     async def distribute_coins(
         db: AsyncSession,
         staff_id: int,
         amount: int,
         reason: str,
         all_active_users: bool = True,
-        target_user_ids: list = None
+        target_user_ids: list = None,
+        operation_key: str = None
     ):
         from app.modules.rewards.schemas import DistributeCoinsResponse
+        from app.core.idempotency import begin_operation, commit_operation
+        receipt, replay = await begin_operation(db, f'staff:{staff_id}', 'coins.distribute', operation_key,
+            {'amount': amount, 'reason': reason, 'all_active_users': all_active_users,
+             'target_user_ids': sorted(set(target_user_ids or []))})
+        if replay is not None:
+            return DistributeCoinsResponse.model_validate(replay)
 
         if all_active_users:
             stmt = select(User).where(User.is_active.is_(True))
         elif target_user_ids:
             stmt = select(User).where(User.id.in_(target_user_ids), User.is_active.is_(True))
         else:
-            stmt = select(User).where(User.is_active.is_(True))
+            raise HTTPException(422, "Select at least one target reader")
 
+        stmt = stmt.order_by(User.id).with_for_update().execution_options(populate_existing=True)
         res = await db.execute(stmt)
         users = res.scalars().all()
 
@@ -297,14 +345,14 @@ class RewardService:
                 staff_id=staff_id
             )
 
-        await db.commit()
-
-        return DistributeCoinsResponse(
+        response = DistributeCoinsResponse(
             rewarded_users_count=len(users),
             amount_per_user=amount,
             total_coins_distributed=len(users) * amount,
             reason=reason
         )
+        await commit_operation(db, receipt, response)
+        return response
 
     @staticmethod
     async def get_coins_summary(db: AsyncSession):
@@ -318,7 +366,7 @@ class RewardService:
         earned_stmt = select(func.coalesce(func.sum(CoinTransaction.amount), 0)).where(CoinTransaction.amount > 0)
         total_earned = (await db.execute(earned_stmt)).scalar() or 0
 
-        spent_stmt = select(func.coalesce(func.sum(func.abs(CoinTransaction.amount)), 0)).where(CoinTransaction.amount < 0)
+        spent_stmt = select(func.coalesce(func.sum(func.abs(CoinTransaction.amount)), 0)).where(CoinTransaction.transaction_type == "shop_purchase")
         total_spent = (await db.execute(spent_stmt)).scalar() or 0
 
         return CoinsSummaryResponse(

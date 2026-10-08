@@ -1,12 +1,13 @@
 from datetime import datetime
 from typing import List, Optional
 from pydantic import BaseModel, Field
+from app.modules.shop.schemas import CardFields
 
 
 # ----------------------------------------------------
 # Nested Shop Item Schema for Wheel Item
 # ----------------------------------------------------
-class WheelShopItemInfo(BaseModel):
+class WheelShopItemInfo(CardFields):
     id: int
     name: str
     item_type: str
@@ -134,6 +135,9 @@ class SpinResultResponse(BaseModel):
     new_balance: int
     is_free_spin: bool
     message: str
+    outcome: str = "coins"
+    reward_coins: int = 0
+    reward_item_name: Optional[str] = None
 
 
 class SpinHistoryItem(BaseModel):

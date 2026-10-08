@@ -13,7 +13,7 @@ from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from fastapi.staticfiles import StaticFiles
+from app.core.content import ProtectedContent
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.core.config import settings
@@ -61,9 +61,13 @@ async def lifespan(app: FastAPI):
     # initialize MinIO storage buckets and connect to Redis
     init_storage()
     await get_redis_client()
-    yield
-    # Shutdown: close Redis client connection
-    await close_redis()
+    from app.modules.clans.connection_manager import clan_ws_manager
+    await clan_ws_manager.start()
+    try:
+        yield
+    finally:
+        await clan_ws_manager.stop()
+        await close_redis()
 
 
 # FastAPI app instance (Swagger UI disabled as per Document-First rule)
@@ -89,7 +93,7 @@ app.add_middleware(
 content_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "public_content")
 os.makedirs(content_dir, exist_ok=True)
 mimetypes.add_type("image/webp", ".webp")
-app.mount("/content", StaticFiles(directory=content_dir), name="content")
+app.mount("/content", ProtectedContent(directory=content_dir), name="content")
 
 
 # Standardized Error Handlers conforming to docs/03_API_STANDARDS.md
@@ -166,9 +170,23 @@ app.include_router(clans_client_router, prefix=settings.API_V1_STR)
 app.include_router(clans_staff_router, prefix=settings.API_V1_STR)
 
 
+from app.modules.library.progress import router as progress_router
+app.include_router(progress_router, prefix=settings.API_V1_STR)
+
 # Health Check
 @app.get(f"{settings.API_V1_STR}/health", tags=["Health"])
 async def health_check():
+    import asyncio
+    from sqlalchemy import text
+    from app.core.database import AsyncSessionLocal
+    from app.core.storage import CONTENT_ROOT
+    try:
+        async with AsyncSessionLocal() as db:
+            await asyncio.wait_for(db.execute(text("SELECT 1")), timeout=2)
+        if not CONTENT_ROOT.is_dir() or not os.access(CONTENT_ROOT, os.W_OK):
+            raise OSError("Media storage unavailable")
+    except Exception:
+        return JSONResponse(status_code=503, content={"success": False, "error": {"code": "NOT_READY", "message": "Required storage is unavailable"}})
     return {
         "success": True,
         "data": {
@@ -178,3 +196,19 @@ async def health_check():
         },
         "message": "WebtoonHub API ish holatida"
     }
+
+from app.modules.auth.recovery import router as recovery_router
+app.include_router(recovery_router, prefix=settings.API_V1_STR)
+
+from app.modules.webtoons.imports import router as chapter_import_router
+app.include_router(chapter_import_router, prefix=settings.API_V1_STR)
+
+from app.core.rate_limit import enforce_rate_limit
+app.middleware("http")(enforce_rate_limit)
+
+
+from sqlalchemy.exc import IntegrityError
+@app.exception_handler(IntegrityError)
+async def integrity_exception_handler(request: Request, exc: IntegrityError):
+    return JSONResponse(status_code=409, content={'success': False, 'error': {'code': 'DATA_CONFLICT',
+        'message': 'A value is already in use or a referenced record changed. Refresh and try again.', 'details': None}})

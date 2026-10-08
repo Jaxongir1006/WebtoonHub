@@ -1,129 +1,108 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
+import { SupportedLocale, getExtraTranslation } from '../i18n';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || '/api/v1';
-
+export const API_BASE_URL = import.meta.env.VITE_API_URL || '/api/v1';
+export const ACCESS_TOKEN_KEY = 'webtoonhub_access_token';
+export const REFRESH_TOKEN_KEY = 'webtoonhub_refresh_token';
+export function currentLocale(): SupportedLocale {
+  const saved = localStorage.getItem('webtoonhub_lang');
+  if (saved === 'uz' || saved === 'ru' || saved === 'en') return saved;
+  return navigator.language.startsWith('ru') ? 'ru' : navigator.language.startsWith('en') ? 'en' : 'uz';
+}
+export function clearReaderSession() {
+  localStorage.removeItem(ACCESS_TOKEN_KEY); localStorage.removeItem(REFRESH_TOKEN_KEY);
+  delete apiClient.defaults.headers.common.Authorization;
+  window.dispatchEvent(new Event('webtoonhub:auth-ended'));
+}
+const refreshClient = axios.create({ baseURL: API_BASE_URL, timeout: 15000 });
+type ReaderRequestConfig = InternalAxiosRequestConfig & {
+  _retry?: boolean;
+  _authSnapshot?: { accessToken: string | null; refreshToken: string | null };
+};
 export const apiClient = axios.create({
-  baseURL: API_BASE_URL,
-  timeout: 15000,
-  headers: {
-    'Content-Type': 'application/json',
-    'X-Device-Type': 'Desktop'
+  baseURL: API_BASE_URL, timeout: 15000,
+  headers: { 'Content-Type': 'application/json' }
+});
+apiClient.interceptors.request.use((config: ReaderRequestConfig) => {
+  const token = localStorage.getItem(ACCESS_TOKEN_KEY);
+  const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
+  const snapshot = config._authSnapshot;
+  if (config._retry && snapshot && (snapshot.accessToken !== token || snapshot.refreshToken !== refreshToken)) {
+    throw new axios.CanceledError('Account changed before request retry');
   }
+  config._authSnapshot = { accessToken: token, refreshToken };
+  if (token) config.headers.set('Authorization', 'Bearer ' + token);
+  else config.headers.delete('Authorization');
+  config.headers.set('Accept-Language', currentLocale());
+  config.headers.set('X-Device-Type', /iPad|Tablet/i.test(navigator.userAgent) ? 'Tablet' : /Mobi|Android/i.test(navigator.userAgent) ? 'Mobile' : 'Desktop');
+  return config;
+}, error => { throw error; }, { synchronous: true });
+
+let refreshFlight: Promise<string> | null = null;
+apiClient.interceptors.response.use(response => response, async (error: AxiosError) => {
+  const original = error.config as ReaderRequestConfig | undefined;
+  if (!original || error.response?.status !== 401 || original._retry ||
+      /\/auth\/(login|register|refresh|password)/.test(original.url || '')) return Promise.reject(error);
+  const refresh = localStorage.getItem(REFRESH_TOKEN_KEY);
+  const snapshot = original._authSnapshot;
+  if (snapshot && (snapshot.accessToken !== localStorage.getItem(ACCESS_TOKEN_KEY) || snapshot.refreshToken !== refresh)) {
+    throw new axios.CanceledError('Account changed while the request was pending');
+  }
+  if (!refresh) { clearReaderSession(); return Promise.reject(error); }
+  original._retry = true;
+  if (!refreshFlight) {
+    refreshFlight = refreshClient.post('/auth/refresh', { refresh_token: refresh }).then(response => {
+      const data = response.data.data;
+      if (localStorage.getItem(REFRESH_TOKEN_KEY) !== refresh) {
+        // Rotation can finish after local logout. Revoke that captured session
+        // with its returned credentials without touching the current account.
+        void refreshClient.post('/auth/logout', { refresh_token: data.refresh_token || refresh }, {
+          timeout: 15000,
+          headers: data.access_token ? { Authorization: 'Bearer ' + data.access_token } : {}
+        }).catch(() => {});
+        throw new axios.CanceledError('Account changed during refresh');
+      }
+      localStorage.setItem(ACCESS_TOKEN_KEY, data.access_token);
+      if (data.refresh_token) localStorage.setItem(REFRESH_TOKEN_KEY, data.refresh_token);
+      return data.access_token as string;
+    }).catch(refreshError => {
+      if (localStorage.getItem(REFRESH_TOKEN_KEY) === refresh) clearReaderSession();
+      throw refreshError;
+    }).finally(() => { refreshFlight = null; });
+  }
+  const refreshedAccess = await refreshFlight;
+  if (localStorage.getItem(ACCESS_TOKEN_KEY) !== refreshedAccess) throw new axios.CanceledError('Account changed before request retry');
+  if (original.signal?.aborted) throw new axios.CanceledError();
+  original._authSnapshot = { accessToken: refreshedAccess, refreshToken: localStorage.getItem(REFRESH_TOKEN_KEY) };
+  // Let queued sign-in/logout changes settle; dispatch rechecks this captured owner.
+  await Promise.resolve();
+  return apiClient(original);
 });
 
-// Request interceptor: attach JWT access token
-apiClient.interceptors.request.use(
-  (config: InternalAxiosRequestConfig) => {
-    const token = localStorage.getItem('webtoonhub_access_token');
-    if (token && config.headers) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
-
-// Response interceptor: auto-refresh on 401
-let isRefreshing = false;
-let failedQueue: Array<{
-  resolve: (value?: unknown) => void;
-  reject: (reason?: unknown) => void;
-}> = [];
-
-const processQueue = (error: any, token: string | null = null) => {
-  failedQueue.forEach((prom) => {
-    if (error) {
-      prom.reject(error);
-    } else {
-      prom.resolve(token);
-    }
-  });
-  failedQueue = [];
-};
-
-apiClient.interceptors.response.use(
-  (response) => response,
-  async (error: AxiosError) => {
-    const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
-
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      if (originalRequest.url?.includes('/auth/login') || originalRequest.url?.includes('/auth/refresh')) {
-        return Promise.reject(error);
-      }
-
-      const refreshToken = localStorage.getItem('webtoonhub_refresh_token');
-      if (!refreshToken) {
-        localStorage.removeItem('webtoonhub_access_token');
-        localStorage.removeItem('webtoonhub_refresh_token');
-        return Promise.reject(error);
-      }
-
-      if (isRefreshing) {
-        return new Promise((resolve, reject) => {
-          failedQueue.push({ resolve, reject });
-        })
-          .then((token) => {
-            if (originalRequest.headers) {
-              originalRequest.headers.Authorization = `Bearer ${token}`;
-            }
-            return apiClient(originalRequest);
-          })
-          .catch((err) => Promise.reject(err));
-      }
-
-      originalRequest._retry = true;
-      isRefreshing = true;
-
-      try {
-        const response = await axios.post(`${API_BASE_URL}/auth/refresh`, {
-          refresh_token: refreshToken
-        });
-
-        const newAccessToken = response.data.data.access_token;
-        localStorage.setItem('webtoonhub_access_token', newAccessToken);
-
-        apiClient.defaults.headers.common['Authorization'] = `Bearer ${newAccessToken}`;
-        if (originalRequest.headers) {
-          originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
-        }
-
-        processQueue(null, newAccessToken);
-        return apiClient(originalRequest);
-      } catch (refreshErr) {
-        processQueue(refreshErr, null);
-        localStorage.removeItem('webtoonhub_access_token');
-        localStorage.removeItem('webtoonhub_refresh_token');
-        return Promise.reject(refreshErr);
-      } finally {
-        isRefreshing = false;
-      }
-    }
-
-    return Promise.reject(error);
-  }
-);
-
-export const getApiErrorMessage = (error: unknown, defaultMessage = "Xatolik yuz berdi"): string => {
+export const getApiErrorMessage = (error: unknown, defaultMessage?: string): string => {
+  const locale = currentLocale();
+  const message = (key: string) => getExtraTranslation(locale, 'readerFix.' + key) || defaultMessage || key;
   if (axios.isAxiosError(error)) {
-    const data = error.response?.data;
-    if (data?.error?.message) {
-      if (Array.isArray(data.error.details) && data.error.details.length > 0) {
-        const issues = data.error.details
-          .map((d: any) => d.issue || (typeof d === 'string' ? d : ''))
-          .filter(Boolean);
-        if (issues.length > 0) {
-          return `${data.error.message}: ${issues.join(', ')}`;
-        }
-      }
-      return data.error.message;
+    if (!error.response) return message('offline');
+    const status = error.response.status;
+    const data = error.response.data;
+    const validation = data?.error?.details;
+    if (status === 422 && Array.isArray(validation) && validation.some(item => typeof item.field === 'string' && /(?:^| -> )content$/.test(item.field))) {
+      return getExtraTranslation(locale, 'comments.tooLong', { limit: 500 }) || message('apiValidation');
     }
-    if (data?.message) {
-      return data.message;
+    if (status === 401 && /\/auth\/login/.test(error.config?.url || '')) return getExtraTranslation(locale, 'ux.invalidCredentials') || defaultMessage || message('apiValidation');
+    // Keep server-specific details in the primary language; other locales get
+    // actionable translated feedback rather than untranslated system strings.
+    if (locale === 'uz') {
+      const value = data?.error?.message ?? data?.message ?? data?.detail;
+      if (typeof value === 'string') return value;
     }
-    if (typeof data?.detail === 'string') {
-      return data.detail;
-    }
+    if (status === 401) return message('apiSession');
+    if (status === 403) return message('apiAccess');
+    if (status === 404) return message('notFound');
+    if (status === 409) return message('apiConflict');
+    if (status === 422 || status === 400) return message('apiValidation');
+    if (status === 429) return message('apiRate');
   }
-  return defaultMessage;
+  return defaultMessage || message('loadError');
 };
-

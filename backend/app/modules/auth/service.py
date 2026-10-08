@@ -1,4 +1,5 @@
 import hashlib
+import asyncio
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Tuple
@@ -45,6 +46,8 @@ def _is_daily_bonus_claimed(last_daily_login: Optional[datetime]) -> bool:
         return False
     uz_tz = ZoneInfo(settings.TIMEZONE)
     now_uz = datetime.now(timezone.utc).astimezone(uz_tz)
+    if last_daily_login.tzinfo is None:
+        last_daily_login = last_daily_login.replace(tzinfo=timezone.utc)
     last_uz = last_daily_login.astimezone(uz_tz)
     return last_uz.date() == now_uz.date()
 
@@ -53,20 +56,22 @@ class AuthService:
     @staticmethod
     async def register(db: AsyncSession, data: UserRegisterRequest) -> User:
         # Check if email or username already exists
-        stmt = select(User).where((User.email == data.email) | (User.username == data.username))
+        stmt = select(User).where((User.email == str(data.email).lower()) | (User.username == data.username))
         result = await db.execute(stmt)
-        existing = result.scalar_one_or_none()
+        existing = result.scalars().first()
         if existing:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="Ushbu email yoki username orqali avval ro'yxatdan o'tilgan"
             )
 
+        from app.core.economy import economy_value
+        initial_coins = await economy_value(db, "welcome_bonus")
         new_user = User(
-            email=data.email,
+            email=str(data.email).lower(),
             username=data.username,
-            hashed_password=hash_password(data.password),
-            lightning_coins=settings.INITIAL_COINS,
+            hashed_password=await asyncio.to_thread(hash_password, data.password),
+            lightning_coins=initial_coins,
             is_active=True
         )
         db.add(new_user)
@@ -76,7 +81,7 @@ class AuthService:
         await RewardService.record_transaction(
             db=db,
             user_id=new_user.id,
-            amount=settings.INITIAL_COINS,
+            amount=initial_coins,
             transaction_type="register_bonus",
             description="Ro'yxatdan o'tish sovg'asi"
         )
@@ -86,7 +91,7 @@ class AuthService:
 
         # Trigger welcome email asynchronously (non-blocking)
         try:
-            await send_welcome_email(new_user.email, new_user.username)
+            asyncio.create_task(send_welcome_email(new_user.email, new_user.username, initial_coins))
         except Exception:
             pass
 
@@ -101,11 +106,11 @@ class AuthService:
         user_agent: Optional[str] = None
     ) -> TokenResponse:
         # Find user
-        stmt = select(User).where(User.email == email)
+        stmt = select(User).where(User.email == email.lower())
         result = await db.execute(stmt)
         user = result.scalar_one_or_none()
 
-        if not user or not verify_password(password, user.hashed_password):
+        if not user or not await asyncio.to_thread(verify_password, password, user.hashed_password):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Kiritilgan email yoki parol noto'g'ri"
@@ -184,6 +189,11 @@ class AuthService:
                 detail="Seans muddati tugagan yoki bekor qilingan. Iltimos, qaytadan kiring."
             )
 
+        new_refresh_token = str(uuid.uuid4())
+        changed = await db.execute(update(UserSession).where(UserSession.id == session.id, UserSession.refresh_token_hash == refresh_hash)
+                   .values(refresh_token_hash=_hash_refresh_token(new_refresh_token)))
+        if changed.rowcount != 1:
+            raise HTTPException(401, "Refresh token was already used")
         # Update last active timestamp
         session.last_active_at = datetime.now(timezone.utc)
         await db.commit()
@@ -198,7 +208,7 @@ class AuthService:
                 "username": session.user.username
             }
         )
-        return new_access_token
+        return {"access_token": new_access_token, "refresh_token": new_refresh_token, "token_type": "bearer", "expires_in": settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60}
 
     @staticmethod
     async def get_profile(db: AsyncSession, user_id: int) -> UserProfileResponse:
@@ -253,6 +263,8 @@ class AuthService:
                 "contribution_points": clan_member.contribution_points
             }
 
+        from app.modules.shop.collection import collection_summary
+        card_collection = await collection_summary(db, user_id)
         return UserProfileResponse(
             id=user.id,
             email=user.email,
@@ -263,6 +275,7 @@ class AuthService:
             clan=clan_info,
             active_frame=active_frame,
             active_background=active_background,
+            card_collection=card_collection,
             daily_bonus_claimed=_is_daily_bonus_claimed(user.last_daily_login),
             last_daily_login=user.last_daily_login,
             created_at=user.created_at
@@ -276,7 +289,7 @@ class AuthService:
     ) -> List[UserSessionItem]:
         stmt = (
             select(UserSession)
-            .where(UserSession.user_id == user_id, UserSession.is_active.is_(True))
+            .where(UserSession.user_id == user_id, UserSession.is_active.is_(True), UserSession.expires_at > datetime.now(timezone.utc))
             .order_by(UserSession.last_active_at.desc())
         )
         result = await db.execute(stmt)
@@ -353,12 +366,14 @@ class AuthService:
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Parolni o'zgartirish uchun eski parolni kiritish shart"
                 )
-            if not verify_password(data.old_password, user.hashed_password):
+            if not await asyncio.to_thread(verify_password, data.old_password, user.hashed_password):
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Eski parol noto'g'ri kiritildi"
                 )
-            user.hashed_password = hash_password(data.new_password)
+            user.hashed_password = await asyncio.to_thread(hash_password, data.new_password)
+            from app.modules.auth.recovery import revoke_user_sessions
+            await revoke_user_sessions(db, user.id)
 
         await db.commit()
         await db.refresh(user)

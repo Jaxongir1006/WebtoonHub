@@ -5,4 +5,5 @@ After=docker.service
 
 [Service]
 Type=oneshot
+EnvironmentFile=-/opt/webtoonhub-staging/backup.env
 ExecStart=/opt/webtoonhub-staging/backup.sh

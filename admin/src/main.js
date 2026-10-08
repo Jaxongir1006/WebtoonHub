@@ -1,4 +1,4 @@
-import { createApp } from 'vue'
+import { createApp, watch } from 'vue'
 import { createPinia } from 'pinia'
 import router from './router'
 import i18n from './i18n'
@@ -18,4 +18,5 @@ app.use(i18n)
 const systemStore = useSystemStore(pinia)
 systemStore.applyTheme()
 
+watch(i18n.global.locale, locale => { document.documentElement.lang = locale }, { immediate: true })
 app.mount('#app')
