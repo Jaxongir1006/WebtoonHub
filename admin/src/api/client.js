@@ -4,11 +4,14 @@ import i18n from '../i18n'
 import { isStaffLoginRequest, localizeApiError } from '../utils/apiErrors'
 
 export const apiConnectionStatus = ref('checking')
+const configuredTimeout = Number(import.meta.env?.VITE_API_TIMEOUT_MS)
+const apiTimeout = Number.isFinite(configuredTimeout) && configuredTimeout >= 1000 && configuredTimeout <= 120000
+  ? configuredTimeout : 10000
 
 // Axios instance
 const apiClient = axios.create({
   baseURL: import.meta.env.VITE_API_URL || '/api/v1/staff',
-  timeout: 10000,
+  timeout: apiTimeout,
   headers: {
     'Content-Type': 'application/json',
     'X-Device-Type': /Mobi|Android/i.test(navigator.userAgent) ? 'Mobile' : 'Desktop'

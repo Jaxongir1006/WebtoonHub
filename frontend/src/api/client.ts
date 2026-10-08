@@ -2,6 +2,9 @@ import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { SupportedLocale, getExtraTranslation } from '../i18n';
 
 export const API_BASE_URL = import.meta.env.VITE_API_URL || '/api/v1';
+const configuredTimeout = Number(import.meta.env?.VITE_API_TIMEOUT_MS);
+export const API_TIMEOUT_MS = Number.isFinite(configuredTimeout) && configuredTimeout >= 1000 && configuredTimeout <= 120000
+  ? configuredTimeout : 15000;
 export const ACCESS_TOKEN_KEY = 'webtoonhub_access_token';
 export const REFRESH_TOKEN_KEY = 'webtoonhub_refresh_token';
 export function currentLocale(): SupportedLocale {
@@ -14,13 +17,13 @@ export function clearReaderSession() {
   delete apiClient.defaults.headers.common.Authorization;
   window.dispatchEvent(new Event('webtoonhub:auth-ended'));
 }
-const refreshClient = axios.create({ baseURL: API_BASE_URL, timeout: 15000 });
+const refreshClient = axios.create({ baseURL: API_BASE_URL, timeout: API_TIMEOUT_MS });
 type ReaderRequestConfig = InternalAxiosRequestConfig & {
   _retry?: boolean;
   _authSnapshot?: { accessToken: string | null; refreshToken: string | null };
 };
 export const apiClient = axios.create({
-  baseURL: API_BASE_URL, timeout: 15000,
+  baseURL: API_BASE_URL, timeout: API_TIMEOUT_MS,
   headers: { 'Content-Type': 'application/json' }
 });
 apiClient.interceptors.request.use((config: ReaderRequestConfig) => {
@@ -57,7 +60,7 @@ apiClient.interceptors.response.use(response => response, async (error: AxiosErr
         // Rotation can finish after local logout. Revoke that captured session
         // with its returned credentials without touching the current account.
         void refreshClient.post('/auth/logout', { refresh_token: data.refresh_token || refresh }, {
-          timeout: 15000,
+          timeout: API_TIMEOUT_MS,
           headers: data.access_token ? { Authorization: 'Bearer ' + data.access_token } : {}
         }).catch(() => {});
         throw new axios.CanceledError('Account changed during refresh');

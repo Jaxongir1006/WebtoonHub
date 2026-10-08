@@ -3,6 +3,9 @@
 Target services: Supabase PostgreSQL and Storage, Render FastAPI and Redis,
 and separate Vercel reader and admin projects. Deployment is still in progress.
 
+Backend URL: `https://webtoonhub-api.onrender.com`. Its production health check
+passed after the initial Render deployment.
+
 ## Supabase setup completed
 
 Project reference: `mtzdzuetxohglhpxkztv`.
@@ -85,8 +88,39 @@ Render's Free filesystem is ephemeral, services sleep after 15 minutes of idle
 time, and the next request can take about a minute to wake up. Its Free Redis
 cache may lose data on restart; durable application records remain in PostgreSQL.
 Email delivery still needs a provider reachable from Render: outbound SMTP ports
-25, 465 and 587 are blocked. Frontend/admin deployment and initial admin setup
-are still pending.
+25, 465 and 587 are blocked. Initial admin setup is still pending.
+
+## Vercel setup
+
+Create two projects from this repository on the Hobby plan. Select the Vite
+framework, `npm run build` as the build command, and `dist` as the output directory.
+Use `frontend` as the reader project's Root Directory and `admin` for the admin.
+Both directories have `vercel.json` files for SPA refresh routing and `/content`
+requests to the backend, including unpublished chapter media authentication.
+
+Set these build environment variables before deploying:
+
+| Project | Variable | Value |
+| --- | --- | --- |
+| Reader | `VITE_API_URL` | `https://webtoonhub-api.onrender.com/api/v1` |
+| Reader | `VITE_API_TIMEOUT_MS` | `90000` |
+| Reader | `VITE_ADMIN_URL` | Actual admin project HTTPS origin |
+| Admin | `VITE_API_URL` | `https://webtoonhub-api.onrender.com/api/v1/staff` |
+| Admin | `VITE_API_TIMEOUT_MS` | `90000` |
+| Admin | `VITE_BASE_PATH` | `/` |
+
+Deploy the admin first so its URL can be used when deploying the reader. These are
+public frontend settings; do not add Supabase secrets or the database URL to either
+Vercel project. API and clan WebSocket traffic connects directly to Render. The
+longer bounded API timeout allows a sleeping Free backend to wake up.
+
+Once both project URLs are known, update Render's `ALLOWED_ORIGINS` to a JSON array
+containing both HTTPS origins and `FRONTEND_URL` to the reader's origin. Do not add
+URL paths or trailing slashes to those origins. Save and redeploy the backend,
+then verify login, browser page refresh, uploads and unpublished chapter previews.
+
+References: [Vercel Vite routing](https://vercel.com/docs/frameworks/frontend/vite),
+[External rewrites](https://vercel.com/docs/routing/rewrites).
 
 References: [Render Free](https://render.com/docs/free),
 [Blueprint configuration](https://render.com/docs/blueprint-spec),

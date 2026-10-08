@@ -1,0 +1,11 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "vite",
+  "rewrites": [
+    { "source": "/content/:path*", "destination": "https://webtoonhub-api.onrender.com/content/:path*" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ],
+  "headers": [
+    { "source": "/content/:path*", "headers": [{ "key": "Cache-Control", "value": "private, no-store" }] }
+  ]
+}
