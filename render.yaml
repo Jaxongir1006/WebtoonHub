@@ -46,6 +46,6 @@ services:
       - key: STORAGE_BUCKET_IMPORTS
         value: webtoonhub-imports
       - key: ALLOWED_ORIGINS
-        sync: false
+        value: '["https://webtoon-hub-xmfh.vercel.app","https://webtoon-hub-nine.vercel.app"]'
       - key: FRONTEND_URL
-        sync: false
+        value: https://webtoon-hub-xmfh.vercel.app

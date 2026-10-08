@@ -5,6 +5,8 @@ and separate Vercel reader and admin projects. Deployment is still in progress.
 
 Backend URL: `https://webtoonhub-api.onrender.com`. Its production health check
 passed after the initial Render deployment.
+Reader URL: `https://webtoon-hub-xmfh.vercel.app`.
+Admin URL: `https://webtoon-hub-nine.vercel.app`.
 
 ## Supabase setup completed
 
@@ -118,6 +120,9 @@ Once both project URLs are known, update Render's `ALLOWED_ORIGINS` to a JSON ar
 containing both HTTPS origins and `FRONTEND_URL` to the reader's origin. Do not add
 URL paths or trailing slashes to those origins. Save and redeploy the backend,
 then verify login, browser page refresh, uploads and unpublished chapter previews.
+The root Blueprint now contains these actual public origins so Blueprint sync can
+apply them automatically. Private database and Supabase credentials remain manual
+environment variables.
 
 References: [Vercel Vite routing](https://vercel.com/docs/frameworks/frontend/vite),
 [External rewrites](https://vercel.com/docs/routing/rewrites).
