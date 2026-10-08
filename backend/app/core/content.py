@@ -2,6 +2,7 @@
 from datetime import timedelta, datetime, timezone
 import uuid
 from pathlib import PurePosixPath
+import asyncio
 from fastapi import HTTPException
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import select
@@ -11,6 +12,9 @@ from app.core.security import create_access_token, decode_token
 from app.modules.webtoons.models import Chapter, ChapterImage
 from app.modules.staff.models import StaffUser, Role, StaffSession
 from app.modules.staff.dependencies import is_superadmin, owns_content_only
+from starlette.responses import RedirectResponse, Response
+from app.core.storage import StorageService
+from app.core.remote_storage import SupabaseStorage, object_key
 
 
 def staff_media_url(url, staff):
@@ -19,7 +23,9 @@ def staff_media_url(url, staff):
 
 class ProtectedContent(StaticFiles):
     async def get_response(self, path, scope):
-        public_path = path.replace(chr(92), '/')
+        if scope['method'] not in {'GET', 'HEAD'}:
+            raise HTTPException(405, 'Method not allowed')
+        public_path = object_key(path)
         parts = PurePosixPath(public_path).parts
         # Chapter uploads have numeric work/chapter prefixes; legacy chapter namespace also guarded.
         is_chapter = (len(parts) >= 2 and parts[0].isdigit() and parts[1].isdigit()) or bool(parts and parts[0] == 'chapters')
@@ -50,7 +56,15 @@ class ProtectedContent(StaticFiles):
                         raise HTTPException(403, 'Chapter asset unavailable')
                     if not is_superadmin(staff) and not {'webtoons:create','webtoons:edit','webtoons:delete','chapters:create','chapters:edit','chapters:delete','chapters:approve'} & {p.code for p in staff.role.permissions}:
                         raise HTTPException(403, 'Chapter asset permission missing')
-        response = await super().get_response(path, scope)
+        if StorageService.remote():
+            if public_path.lower().endswith('.svg'):
+                data = await asyncio.to_thread(StorageService.read_bytes, public_path)
+                response = Response(data, media_type='image/svg+xml')
+            else:
+                url = await asyncio.to_thread(SupabaseStorage.signed_url, public_path)
+                response = RedirectResponse(url, status_code=302, headers={'Cache-Control': 'private, no-store'})
+        else:
+            response = await super().get_response(path, scope)
         response.headers['X-Content-Type-Options'] = 'nosniff'
         if path.lower().endswith('.svg'):
             response.headers['Content-Security-Policy'] = "default-src 'none'; style-src 'unsafe-inline'; sandbox"

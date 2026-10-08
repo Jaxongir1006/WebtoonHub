@@ -12,6 +12,8 @@ BigIntId = BigInteger().with_variant(Integer, "sqlite")
 # Create async engine for PostgreSQL or SQLite
 is_sqlite = settings.DATABASE_URL.startswith("sqlite")
 connect_args = {"check_same_thread": False} if is_sqlite else {}
+if not is_sqlite and settings.DATABASE_SSL_REQUIRE:
+    connect_args['ssl'] = 'require'
 
 engine = create_async_engine(
     settings.DATABASE_URL,
@@ -19,7 +21,9 @@ engine = create_async_engine(
     hide_parameters=True,
     future=True,
     connect_args=connect_args,
-    **({} if is_sqlite else {"pool_size": 10, "max_overflow": 20})
+    **({} if is_sqlite else {"pool_size": settings.DATABASE_POOL_SIZE,
+                           "max_overflow": settings.DATABASE_MAX_OVERFLOW,
+                           "pool_pre_ping": True, "pool_recycle": 1800})
 )
 
 if is_sqlite:

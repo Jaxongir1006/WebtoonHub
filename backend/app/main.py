@@ -58,7 +58,7 @@ async def lifespan(app: FastAPI):
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
 
-    # initialize MinIO storage buckets and connect to Redis
+    # Initialize media storage and connect to Redis.
     init_storage()
     await get_redis_client()
     from app.modules.clans.connection_manager import clan_ws_manager
@@ -179,11 +179,15 @@ async def health_check():
     import asyncio
     from sqlalchemy import text
     from app.core.database import AsyncSessionLocal
-    from app.core.storage import CONTENT_ROOT
+    from app.core.storage import CONTENT_ROOT, StorageService
+    from app.core.remote_storage import SupabaseStorage
     try:
         async with AsyncSessionLocal() as db:
             await asyncio.wait_for(db.execute(text("SELECT 1")), timeout=2)
-        if not CONTENT_ROOT.is_dir() or not os.access(CONTENT_ROOT, os.W_OK):
+        if StorageService.remote():
+            if not await asyncio.wait_for(asyncio.to_thread(SupabaseStorage.ready), timeout=12):
+                raise OSError('Private media storage unavailable')
+        elif not CONTENT_ROOT.is_dir() or not os.access(CONTENT_ROOT, os.W_OK):
             raise OSError("Media storage unavailable")
     except Exception:
         return JSONResponse(status_code=503, content={"success": False, "error": {"code": "NOT_READY", "message": "Required storage is unavailable"}})

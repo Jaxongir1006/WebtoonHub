@@ -93,8 +93,8 @@ async def update_my_profile(
     if payload.avatar_url is not None:
         if payload.avatar_url != current_user.avatar_url and not re.fullmatch(rf'/content/avatars/avatar_{current_user.id}_[a-f0-9]{{32}}\.webp', payload.avatar_url):
             raise HTTPException(422, 'Use an avatar uploaded for this account')
-        from app.core.storage import safe_path
-        if not safe_path(payload.avatar_url.removeprefix("/content/")).is_file():
+        import asyncio
+        if not await asyncio.to_thread(StorageService.exists, payload.avatar_url.removeprefix("/content/")):
             raise HTTPException(422, "Avatar draft no longer exists")
         current_user.avatar_url = payload.avatar_url
     if payload.bio is not None:

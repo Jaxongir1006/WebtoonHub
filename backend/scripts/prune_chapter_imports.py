@@ -15,6 +15,8 @@ from app.core.database import AsyncSessionLocal
 from app.core.transactions import entity_lock
 from app.modules.webtoons.import_models import ChapterImport
 from app.modules.webtoons.imports import STAGING_ROOT, _staging_path, _pages
+from app.core.storage import StorageService
+from app.core.remote_storage import SupabaseStorage
 
 
 async def prune(apply=False):
@@ -34,6 +36,25 @@ async def prune(apply=False):
                 if session.status == 'uploading' and expiry > datetime.now(timezone.utc):
                     continue
                 pages = await _pages(db, import_id)
+                if StorageService.remote():
+                    import uuid
+                    uuid.UUID(import_id)
+                    files = await asyncio.to_thread(SupabaseStorage.list_files, import_id + '/', True)
+                    removed += len(files)
+                    expired += int(session.status == 'uploading')
+                    if apply:
+                        if session.status == 'uploading':
+                            session.status = 'cancelled'
+                        # Retain page records until remote cleanup succeeds, so failed
+                        # cleanup remains retryable even when storage is unavailable.
+                        await db.commit()
+                        for file in files:
+                            await asyncio.to_thread(SupabaseStorage.delete, file['name'], True)
+                        if session.status == 'cancelled':
+                            for page in pages:
+                                await db.delete(page)
+                            await db.commit()
+                    continue
                 # Only the exact private directory assigned by the durable session is eligible.
                 directory = _staging_path(import_id, '.').resolve()
                 if directory == STAGING_ROOT.resolve():

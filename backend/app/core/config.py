@@ -1,6 +1,7 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import model_validator, Field
-from typing import List
+from pydantic import model_validator, Field, SecretStr
+from typing import List, Literal
+from urllib.parse import urlsplit
 
 
 class Settings(BaseSettings):
@@ -45,6 +46,9 @@ class Settings(BaseSettings):
     POSTGRES_HOST: str = "localhost"
     POSTGRES_PORT: int = 5432
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/webtoonhub"
+    DATABASE_SSL_REQUIRE: bool = False
+    DATABASE_POOL_SIZE: int = Field(10, ge=1, le=20)
+    DATABASE_MAX_OVERFLOW: int = Field(20, ge=0, le=20)
 
     # Cache (Redis)
     REDIS_HOST: str = "localhost"
@@ -59,6 +63,12 @@ class Settings(BaseSettings):
     MINIO_BUCKET_CHAPTERS: str = "chapter-images"
     MINIO_BUCKET_SHOP: str = "shop-assets"
     MINIO_SECURE: bool = False
+    STORAGE_BACKEND: Literal['local', 'supabase'] = 'local'
+    SUPABASE_URL: str = ''
+    SUPABASE_SECRET_KEY: SecretStr = SecretStr('')
+    STORAGE_BUCKET_MEDIA: str = 'webtoonhub-media'
+    STORAGE_BUCKET_IMPORTS: str = 'webtoonhub-imports'
+    STORAGE_SIGNED_URL_SECONDS: int = Field(60, ge=15, le=300)
 
     # Email & SMTP (Mailpit / Production SMTP)
     SMTP_HOST: str = "localhost"
@@ -77,6 +87,17 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_deployment(self):
+        if self.STORAGE_BACKEND == 'supabase':
+            endpoint = urlsplit(self.SUPABASE_URL)
+            if (endpoint.scheme != 'https' or not endpoint.hostname
+                    or not endpoint.hostname.endswith('.supabase.co')
+                    or endpoint.path not in {'', '/'} or endpoint.query or endpoint.fragment
+                    or endpoint.username or endpoint.password or endpoint.port not in {None, 443}):
+                raise ValueError('SUPABASE_URL must be the HTTPS URL of your Supabase project')
+            if not self.SUPABASE_SECRET_KEY.get_secret_value().startswith('sb_secret_'):
+                raise ValueError('Set a backend Supabase secret key beginning with sb_secret_')
+            if self.STORAGE_BUCKET_MEDIA == self.STORAGE_BUCKET_IMPORTS:
+                raise ValueError('Media and private import staging require separate buckets')
         if self.APP_ENV.lower() not in {"development", "test"}:
             if self.DEBUG:
                 raise ValueError("DEBUG must be disabled outside development and test")

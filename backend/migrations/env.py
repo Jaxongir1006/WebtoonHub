@@ -36,7 +36,9 @@ def run_migrations_online() -> None:
     url = database_url()
     configuration = config.get_section(config.config_ini_section, {})
     configuration["sqlalchemy.url"] = url.replace("%", "%%")
-    connectable = engine_from_config(configuration, prefix="sqlalchemy.", poolclass=pool.NullPool)
+    connect_args = {'sslmode': 'require'} if settings.DATABASE_SSL_REQUIRE and url.startswith('postgresql') else {}
+    connectable = engine_from_config(configuration, prefix="sqlalchemy.", poolclass=pool.NullPool,
+                                    connect_args=connect_args)
     with connectable.connect() as connection:
         context.configure(connection=connection, target_metadata=target_metadata,
                           compare_type=True, render_as_batch=connection.dialect.name == "sqlite")

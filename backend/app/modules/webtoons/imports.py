@@ -21,6 +21,7 @@ from app.core.database import get_db
 from app.core.economy import economy_value
 from app.core.redis import CacheService
 from app.core.storage import MAX_MEDIA_BYTES, StorageService, safe_path, validated_media
+from app.core.remote_storage import SupabaseStorage, object_key
 from app.core.transactions import entity_lock
 from app.modules.staff.dependencies import require_permission, can_approve_chapters
 from app.modules.staff.models import Role, StaffUser
@@ -98,6 +99,52 @@ def _write_private(path, data):
     except OSError as exc:
         logger.warning('Import media storage unavailable', exc_info=True)
         raise HTTPException(503, 'Image storage is unavailable; retry this page') from exc
+
+
+def _stage_key(import_id, name):
+    try:
+        uuid.UUID(import_id)
+    except (ValueError, TypeError):
+        raise HTTPException(400, 'Invalid import storage path')
+    return object_key(import_id + '/' + name)
+
+
+def _write_stage(import_id, name, data):
+    if StorageService.remote():
+        SupabaseStorage.write(_stage_key(import_id, name), data, private=True)
+    else:
+        _write_private(_staging_path(import_id, name), data)
+
+
+def _read_stage(import_id, name):
+    if StorageService.remote():
+        try:
+            return SupabaseStorage.read(_stage_key(import_id, name), private=True)
+        except HTTPException as exc:
+            if exc.status_code != 404:
+                raise
+    else:
+        path = _staging_path(import_id, name)
+        if path.is_file():
+            return path.read_bytes()
+    raise HTTPException(409, 'A saved page is missing; discard this import and upload it again')
+
+
+def _delete_stage(import_id, name):
+    try:
+        if StorageService.remote():
+            SupabaseStorage.delete(_stage_key(import_id, name), private=True)
+        else:
+            _staging_path(import_id, name).unlink(missing_ok=True)
+    except (OSError, HTTPException):
+        logger.warning('Private stage cleanup could not complete')
+
+
+def _write_final_page(name, content):
+    if StorageService.remote():
+        StorageService.write_bytes(name, content)
+    else:
+        _write_private(safe_path(name), content)
 
 
 async def _pages(db, session_id):
@@ -229,8 +276,7 @@ async def upload_page(import_id: str, index: int, image: UploadFile = File(...),
         with Image.open(io.BytesIO(content)) as decoded:
             width, height = decoded.size
         name = f'{index:03d}_{uuid.uuid4().hex}.webp'
-        path = _staging_path(import_id, name)
-        await asyncio.to_thread(_write_private, path, content)
+        await asyncio.to_thread(_write_stage, import_id, name, content)
         page = ChapterImportPage(import_id=import_id, page_index=index, original_name=expected['name'],
             source_size=len(data), sha256=digest, staging_name=name, width=width, height=height)
         db.add(page)
@@ -239,7 +285,7 @@ async def upload_page(import_id: str, index: int, image: UploadFile = File(...),
             await db.commit()
         except Exception:
             await db.rollback()
-            await asyncio.to_thread(path.unlink, missing_ok=True)
+            await asyncio.to_thread(_delete_stage, import_id, name)
             raise
         return await _response(db, session)
 
@@ -278,13 +324,9 @@ async def finalize_import(import_id: str, data: FinalizeRequest,
         try:
             await db.flush()
             for page in pages:
-                source = _staging_path(import_id, page.staging_name)
-                if not source.is_file():
-                    raise HTTPException(409, 'A saved page is missing; discard this import and upload it again')
                 object_name = f'{session.webtoon_id}/{chapter.id}/{page.page_index + 1:03d}_{uuid.UUID(import_id).hex}.webp'
-                destination = safe_path(object_name)
-                content = await asyncio.to_thread(source.read_bytes)
-                await asyncio.to_thread(_write_private, destination, content)
+                content = await asyncio.to_thread(_read_stage, import_id, page.staging_name)
+                await asyncio.to_thread(_write_final_page, object_name, content)
                 url = '/content/' + object_name
                 copied.append(url)
                 db.add(ChapterImage(chapter_id=chapter.id, image_url=url, order_index=page.page_index + 1,
@@ -298,10 +340,7 @@ async def finalize_import(import_id: str, data: FinalizeRequest,
                 await StorageService.delete_url(url)
             raise
         for page in pages:
-            try:
-                await asyncio.to_thread(_staging_path(import_id, page.staging_name).unlink, missing_ok=True)
-            except OSError:
-                logger.warning('Finalized private stage could not be removed', exc_info=True)
+            await asyncio.to_thread(_delete_stage, import_id, page.staging_name)
         await _invalidate(db, session.webtoon_id)
         return await _response(db, session)
 
@@ -319,8 +358,5 @@ async def cancel_import(import_id: str, staff: StaffUser = Depends(require_permi
             await db.delete(page)
         await db.commit()
         for page in pages:
-            try:
-                await asyncio.to_thread(_staging_path(import_id, page.staging_name).unlink, missing_ok=True)
-            except OSError:
-                logger.warning('Discarded private stage could not be removed', exc_info=True)
+            await asyncio.to_thread(_delete_stage, import_id, page.staging_name)
         return {'success': True, 'data': {'id': import_id, 'status': 'cancelled'}}

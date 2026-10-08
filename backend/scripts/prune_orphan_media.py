@@ -7,7 +7,8 @@ from pathlib import Path
 from sqlalchemy import select
 import app.models
 from app.core.database import AsyncSessionLocal
-from app.core.storage import CONTENT_ROOT
+from app.core.storage import CONTENT_ROOT, StorageService
+from app.core.remote_storage import SupabaseStorage
 from app.core.media_cleanup import delete_unreferenced_media
 from app.modules.users.models import User
 from app.modules.webtoons.models import Webtoon, ChapterImage
@@ -25,9 +26,18 @@ async def run(apply=False, days=7):
         # Preserve optimized siblings of retained legacy raster images.
         references.update(str(Path(url).with_suffix('.webp')).replace(chr(92), '/') for url in list(references) if url.lower().endswith(('.png','.jpg','.jpeg')))
         candidates = []
-        for path in root.rglob('*'):
+        paths = root.rglob('*')
+        if StorageService.remote():
+            from datetime import datetime
+            files = await asyncio.to_thread(SupabaseStorage.list_files)
+            paths = []
+            for file in files:
+                timestamp = file.get('updated_at') or file.get('created_at')
+                if timestamp and datetime.fromisoformat(timestamp.replace('Z', '+00:00')).timestamp() < cutoff:
+                    paths.append(root / file['name'])
+        for path in paths:
             resolved = path.resolve()
-            if not resolved.is_relative_to(root) or not path.is_file() or path.stat().st_mtime >= cutoff:
+            if not resolved.is_relative_to(root) or (not StorageService.remote() and (not path.is_file() or path.stat().st_mtime >= cutoff)):
                 continue
             relative = path.relative_to(root)
             parts = relative.parts
