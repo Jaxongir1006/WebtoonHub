@@ -22,7 +22,10 @@ export async function loadClient() {
   const result = await build({
     entryPoints: [fileURLToPath(new URL('src/api/client.ts', root))],
     bundle: true, write: false, format: 'esm', platform: 'node',
-    define: { 'import.meta.env.VITE_API_URL': JSON.stringify('/api/v1') },
+    define: {
+      'import.meta.env.VITE_API_URL': JSON.stringify('/api/v1'),
+      'import.meta.env.BASE_URL': JSON.stringify('/')
+    },
     plugins: [{
       name: 'shared-axios',
       setup(builder) {
@@ -45,7 +48,10 @@ export async function loadModuleWithMocks(relativePath, mocks) {
     const result = await build({
       entryPoints: [fileURLToPath(new URL(relativePath, root))],
       bundle: true, write: false, format: 'esm', platform: 'node',
-      define: { 'import.meta.env.VITE_API_URL': JSON.stringify('/api/v1') },
+      define: {
+        'import.meta.env.VITE_API_URL': JSON.stringify('/api/v1'),
+        'import.meta.env.BASE_URL': JSON.stringify('/')
+      },
       plugins: [{
         name: 'test-seams',
         setup(builder) {
