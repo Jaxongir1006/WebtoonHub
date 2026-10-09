@@ -100,7 +100,7 @@ async def unequip_item(
 async def create_shop_item(
     name: str = Form(..., min_length=1, max_length=100),
     item_type: str = Form(..., pattern=r"^(frame|background|card)$"),
-    price_coins: int = Form(..., ge=1),
+    price_coins: Optional[int] = Form(None, ge=0),
     asset_file: Optional[UploadFile] = File(None),
     asset_url: Optional[str] = Form(None),
     rarity: Optional[str] = Form(None, pattern=r'^(common|rare|epic|legendary)$'),

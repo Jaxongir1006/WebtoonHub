@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import BigInteger, Boolean, Column, DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import BigInteger, Boolean, CheckConstraint, Column, DateTime, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import relationship
 from app.core.database import Base, BigIntId
 
@@ -45,6 +45,7 @@ class WheelItem(Base):
     # Relationships
     wheel = relationship("Wheel", back_populates="items")
     shop_item = relationship("ShopItem")
+    __table_args__ = (CheckConstraint("reward_type = 'coins' AND shop_item_id IS NULL AND COALESCE(reward_coins, 0) >= 0", name='ck_wheel_lightning_only'),)
 
 
 class WheelSpin(Base):

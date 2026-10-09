@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import axios from 'axios';
-import { Link } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
+import { CharacterGachaPanel } from '../components/cards/CharacterGachaPanel';
 import confetti from 'canvas-confetti';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
-import { wheelApi, WheelSummary, WheelDetail, WheelItem, SpinResult, SpinHistoryItem } from '../api/wheel';
+import { wheelApi, WheelSummary, WheelDetail, SpinResult, SpinHistoryItem } from '../api/wheel';
 import { getApiErrorMessage } from '../api/client';
 import { Modal } from '../components/common/Modal';
 import { useReducedMotion } from '../hooks/useReducedMotion';
@@ -12,22 +13,16 @@ import { PendingSpin, readPendingSpin, storePendingSpin, clearPendingSpin } from
 import {
   Sparkles,
   Zap,
-  Gift,
-  Flame,
   Award,
   History,
   Info,
-  Clock,
-  CheckCircle2,
   AlertCircle,
   Volume2,
   VolumeX,
-  RotateCw,
-  ShoppingBag,
-  Coins
+  RotateCw
 } from 'lucide-react';
 
-export const LuckyWheelPage: React.FC = () => {
+const LightningWheel: React.FC<{ onBusyChange: (busy: boolean) => void }> = ({ onBusyChange }) => {
   const { user, isAuthenticated, isLoading: authLoading, openAuthModal, updateCoinsLocally, refreshProfile } = useAuth();
   const { t, language } = useLanguage();
   const reducedMotion = useReducedMotion();
@@ -59,7 +54,8 @@ export const LuckyWheelPage: React.FC = () => {
   const [winResult, setWinResult] = useState<SpinResult | null>(null);
   const [showWinModal, setShowWinModal] = useState<boolean>(false);
   const [errorToast, setErrorToast] = useState<string | null>(null);
-  const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
+  const [soundEnabled, setSoundEnabled] = useState<boolean>(false);
+  useEffect(() => { onBusyChange(spinning); }, [spinning, onBusyChange]);
 
   const audioCtxRef = useRef<AudioContext | null>(null);
 
@@ -328,6 +324,7 @@ export const LuckyWheelPage: React.FC = () => {
   };
 
   if (authLoading) return <div role="status" className="py-24 text-center">{t('common.loading')}</div>;
+  const spinUnavailable = spinning || (!pendingIntent && isAuthenticated && !wheelDetail?.is_free_spin_available && (user?.lightning_coins ?? 0) < (wheelDetail?.cost_coins ?? 0));
 
   return (
     <div className="wheel-page min-h-screen bg-studio-950 text-studio-100 py-8 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
@@ -433,6 +430,8 @@ export const LuckyWheelPage: React.FC = () => {
                   onClick={() => setSoundEnabled(!soundEnabled)}
                   className="p-2 rounded-xl bg-studio-800/60 hover:bg-studio-800 text-studio-400 hover:text-white transition-colors"
                   title={soundEnabled ? t('wheel.soundOff') : t('wheel.soundOn')}
+                  aria-label={soundEnabled ? t('wheel.soundOff') : t('wheel.soundOn')}
+                  aria-pressed={soundEnabled}
                 >
                   {soundEnabled ? <Volume2 className="w-4 h-4 text-brand-400" /> : <VolumeX className="w-4 h-4" />}
                 </button>
@@ -495,7 +494,7 @@ export const LuckyWheelPage: React.FC = () => {
 
                 {/* Center Hub & Action Button */}
                 <button
-                  disabled={spinning}
+                  disabled={spinUnavailable}
                   onClick={handleSpin}
                   className={`absolute z-20 w-20 h-20 sm:w-24 sm:h-24 rounded-full flex flex-col items-center justify-center font-black text-xs sm:text-sm tracking-wider uppercase transition-all shadow-[0_0_30px_rgba(0,0,0,0.8)] ${
                     spinning
@@ -513,7 +512,7 @@ export const LuckyWheelPage: React.FC = () => {
               {/* Spin Action CTA Button Bar */}
               <div className="w-full max-w-sm mt-4 space-y-2">
                 <button
-                  disabled={spinning}
+                  disabled={spinUnavailable}
                   onClick={handleSpin}
                   className={`w-full py-4 rounded-2xl font-black text-sm tracking-wide transition-all shadow-xl flex items-center justify-center gap-2 ${
                     spinning
@@ -555,6 +554,7 @@ export const LuckyWheelPage: React.FC = () => {
                     </span>
                   </div>
                 )}
+                {spinUnavailable && !spinning && <p className="pt-2 text-center text-xs text-amber-300">{t('socialFix.needCoins', { amount: wheelDetail.cost_coins - (user?.lightning_coins ?? 0) })}</p>}
               </div>
             </div>
           </div>
@@ -640,7 +640,7 @@ export const LuckyWheelPage: React.FC = () => {
 
                         <div className="font-bold font-mono text-right">
                           <span className="text-amber-400 flex items-center gap-1">
-                            {item.reward_type === 'coins' ? '⚡' : '🎁'} {item.reward_label}
+                            {item.reward_label}
                           </span>
                         </div>
                       </div>
@@ -749,11 +749,7 @@ export const LuckyWheelPage: React.FC = () => {
             {/* Prize Badge Icon */}
             <div className="relative mx-auto w-24 h-24 rounded-3xl bg-gradient-to-tr from-amber-500 to-yellow-300 p-1 flex items-center justify-center shadow-glow-brand animate-bounce">
               <div className="w-full h-full rounded-[22px] bg-studio-950 flex items-center justify-center">
-                {winResult.winning_item.reward_type === 'coins' ? (
-                  <Zap className="w-12 h-12 text-amber-400 fill-amber-400" />
-                ) : (
-                  <Gift className="w-12 h-12 text-purple-400" />
-                )}
+                <Zap className="w-12 h-12 text-amber-400 fill-amber-400" />
               </div>
             </div>
 
@@ -768,7 +764,7 @@ export const LuckyWheelPage: React.FC = () => {
 
             {/* Notification message */}
             <div className="p-3.5 rounded-2xl bg-studio-800/80 border border-studio-700/80 text-xs sm:text-sm text-studio-200">
-              {t(winResult.outcome === 'duplicate_item' ? 'wheel.duplicateResult' : winResult.outcome === 'item' || winResult.winning_item.reward_type === 'shop_item' && !winResult.outcome ? 'wheel.itemResult' : 'wheel.coinResult', { amount: winResult.reward_coins ?? winResult.winning_item.reward_coins, name: winResult.reward_item_name ?? winResult.winning_item.shop_item?.name ?? winResult.winning_item.label })}
+              {t('wheel.coinResult', { amount: winResult.reward_coins ?? winResult.winning_item.reward_coins })}
             </div>
 
             {/* Balance info */}
@@ -782,16 +778,6 @@ export const LuckyWheelPage: React.FC = () => {
 
             {/* Action Buttons */}
             <div className="flex flex-col sm:flex-row items-center gap-2 pt-2">
-              {winResult.winning_item.reward_type === 'shop_item' && (
-                <Link
-                  to="/inventory"
-                  onClick={() => setShowWinModal(false)}
-                  className="w-full sm:flex-1 py-3 rounded-xl text-xs font-bold bg-studio-800 hover:bg-studio-700 text-white flex items-center justify-center gap-1.5 transition-colors"
-                >
-                  <ShoppingBag className="w-4 h-4 text-purple-400" />
-                  <span>{t('wheel.profileAndInventory')}</span>
-                </Link>
-              )}
               <button
                 onClick={() => setShowWinModal(false)}
                 className="w-full sm:flex-1 py-3 rounded-xl text-xs font-black bg-brand-500 hover:bg-brand-400 text-slate-950 transition-all shadow-glow-brand"
@@ -804,6 +790,37 @@ export const LuckyWheelPage: React.FC = () => {
       )}
     </div>
   );
+};
+
+export const LuckyWheelPage: React.FC = () => {
+  const { t } = useLanguage();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const category = searchParams.get('category') === 'gacha' ? 'gacha' : 'wheel';
+  const [wheelBusy, setWheelBusy] = useState(false);
+  const [gachaBusy, setGachaBusy] = useState(false);
+  const busy = wheelBusy || gachaBusy;
+  const select = (next: 'wheel' | 'gacha') => {
+    if (busy) return;
+    const params = new URLSearchParams(searchParams);
+    if (next === 'wheel') params.delete('category'); else params.set('category', next);
+    setSearchParams(params, { replace: true });
+    document.getElementById(`rewards-tab-${next}`)?.focus();
+  };
+  return <main className="min-h-screen bg-studio-950 text-studio-100">
+    <div className="mx-auto max-w-6xl px-4 pt-8 sm:px-6 lg:px-8">
+      <div role="tablist" aria-label={t('gacha.categories')} className="flex gap-2 rounded-2xl border border-studio-800 bg-studio-900 p-2" onKeyDown={event => {
+        if (busy) return;
+        if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) {
+          event.preventDefault(); select(event.key === 'Home' ? 'wheel' : event.key === 'End' ? 'gacha' : category === 'wheel' ? 'gacha' : 'wheel');
+        }
+      }}>
+        {(['wheel', 'gacha'] as const).map(value => <button key={value} type="button" id={`rewards-tab-${value}`} role="tab" aria-selected={category === value} aria-controls={`rewards-panel-${value}`} tabIndex={category === value ? 0 : -1} disabled={busy && category !== value} onClick={() => select(value)} className={`min-h-12 flex-1 rounded-xl px-3 text-sm font-bold transition-colors disabled:opacity-50 ${category === value ? 'bg-brand-500 text-studio-950' : 'text-studio-300 hover:bg-studio-800'}`}>{value === 'wheel' ? '⚡ ' : '✦ '}{t(`gacha.category.${value}`)}</button>)}
+      </div>
+      <p className="mt-3 text-center text-xs leading-relaxed text-studio-400">{t('gacha.exclusive')}</p>
+    </div>
+    <div id="rewards-panel-wheel" role="tabpanel" aria-labelledby="rewards-tab-wheel" hidden={category !== 'wheel'}><LightningWheel onBusyChange={setWheelBusy} /></div>
+    <div id="rewards-panel-gacha" role="tabpanel" aria-labelledby="rewards-tab-gacha" hidden={category !== 'gacha'}><CharacterGachaPanel onBusyChange={setGachaBusy} /></div>
+  </main>;
 };
 
 export default LuckyWheelPage;

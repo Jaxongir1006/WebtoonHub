@@ -1,5 +1,10 @@
 <template>
   <div class="space-y-6">
+    <div class="flex flex-wrap gap-2" :aria-label="$t('gacha.categories')">
+      <button v-for="category in ['wheel', 'gacha']" :key="category" type="button" :aria-pressed="activeCategory === category" class="rounded-xl px-4 py-2 text-sm font-bold transition-colors" :class="activeCategory === category ? 'bg-brand-500 text-slate-950' : 'bg-slate-100 text-slate-700 dark:bg-studio-800 dark:text-studio-200'" @click="activeCategory = category">{{ $t('gacha.' + category + 'Tab') }}</button>
+    </div>
+    <GachaManagement v-if="activeCategory === 'gacha'" />
+    <div v-show="activeCategory === 'wheel'" class="space-y-6">
     <LoadState :error="loadError" @retry="loadWheels()" />
     <!-- Top Action Header -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -8,7 +13,7 @@
           <svg class="w-6 h-6 text-brand-700 dark:text-brand-500 dark:text-brand-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v13m0-13V3m0 5l4 4m-4-4l-4 4m13-1a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg> {{ $t('staff.s548') }} </h2>
-        <p class="text-xs text-slate-500 dark:text-studio-400 mt-1"> {{ $t('staff.s549') }} </p>
+        <p class="text-xs text-slate-500 dark:text-studio-400 mt-1"> {{ $t('gacha.wheelDescription') }} </p>
       </div>
 
       <div class="flex items-center gap-3">
@@ -286,11 +291,8 @@
 
                     <!-- Reward Details -->
                     <td class="py-3">
-                      <div v-if="item.reward_type === 'coins'" class="flex items-center gap-1.5 font-mono text-amber-700 dark:text-amber-500 font-bold">
-                        <span>⚡ +{{ item.reward_coins }} {{ $t('staff.s104') }} </span>
-                      </div>
-                      <div v-else class="flex items-center gap-1.5 text-purple-700 dark:text-purple-400 font-medium">
-                        <span>🎁 {{ item.shop_item?.name || $t('staff.s584') }}</span>
+                      <div class="flex items-center gap-1.5 font-mono text-amber-700 dark:text-amber-500 font-bold">
+                        <span>⚡ +{{ item.reward_coins }} {{ $t('staff.s104') }}</span>
                       </div>
                     </td>
 
@@ -497,49 +499,10 @@
             />
           </div>
 
-          <div class="grid grid-cols-2 gap-3">
-            <div>
-              <label for="WheelManagementView-field-6" class="block text-xs font-semibold text-slate-700 dark:text-studio-300 mb-1"> {{ $t('staff.s581') }} </label>
-              <select
-                id="WheelManagementView-field-6"
-                v-model="sectorForm.reward_type"
-                class="w-full px-3 py-2 rounded-xl text-xs bg-slate-50 dark:bg-studio-900 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white outline-none focus:border-brand-500"
-              >
-                <option value="coins"> {{ $t('staff.s603') }} </option>
-                <option value="shop_item"> {{ $t('staff.s604') }} </option>
-              </select>
-            </div>
-
-            <div v-if="sectorForm.reward_type === 'coins'">
-              <label for="WheelManagementView-field-7" class="block text-xs font-semibold text-slate-700 dark:text-studio-300 mb-1"> {{ $t('staff.s605') }} </label>
-              <input
-                id="WheelManagementView-field-7"
-                v-model.number="sectorForm.reward_coins"
-                type="number"
-                min="0"
-                required
-                :placeholder="$t('staff.s606')"
-                class="w-full px-3 py-2 rounded-xl text-xs bg-slate-50 dark:bg-studio-900 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white outline-none focus:border-brand-500"
-              />
-            </div>
-
-            <div v-else>
-              <LoadState :loading="shopLoading" :error="shopError" @retry="loadShopItems" />
-              <label for="WheelManagementView-field-8" class="block text-xs font-semibold text-slate-700 dark:text-studio-300 mb-1"> {{ $t('staff.s607') }} </label>
-              <select
-                id="WheelManagementView-field-8"
-                v-if="availableShopItems.length> 0"
-                v-model.number="sectorForm.shop_item_id"
-                required
-                class="w-full px-3 py-2 rounded-xl text-xs bg-slate-50 dark:bg-studio-900 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white outline-none focus:border-brand-500"
-              >
-                <option :value="null" disabled> {{ $t('staff.s608') }} </option>
-                <option v-for="item in availableShopItems" :key="item.id" :value="item.id">
-                  {{ item.name }} ({{ item.price_coins }} ⚡)
-                </option>
-              </select>
-              <div v-else-if="!shopLoading && !shopError" class="text-[11px] text-amber-700 dark:text-amber-500 p-2 rounded-lg bg-amber-500/10"> {{ $t('staff.s609') }} </div>
-            </div>
+          <p class="rounded-xl bg-amber-500/10 p-3 text-xs text-amber-800 dark:text-amber-300">{{ $t('gacha.wheelOnlyHint') }}</p>
+          <div>
+            <label for="WheelManagementView-field-7" class="mb-1 block text-xs font-semibold text-slate-700 dark:text-studio-300">{{ $t('staff.s605') }}</label>
+            <input id="WheelManagementView-field-7" v-model.number="sectorForm.reward_coins" type="number" min="0" max="1000000" step="1" required class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-900 dark:border-white/10 dark:bg-studio-900 dark:text-white" />
           </div>
 
           <div class="grid grid-cols-2 gap-3">
@@ -619,6 +582,7 @@
     </form>
       </div>
     </Modal>
+    </div>
   </div>
 </template>
 
@@ -628,20 +592,18 @@ const tr = (...args) => i18n.global.t(...args)
 
 import { ref, computed, onMounted } from 'vue'
 import { wheelApi } from '../api/wheel'
-import { shopApi } from '../api/shop'
+import GachaManagement from '../components/gacha/GachaManagement.vue'
 import LoadState from '../components/common/LoadState.vue'
 import { getErrorMessage } from '../utils/forms'
 import Modal from '../components/common/Modal.vue'
 import { useSystemStore } from '../stores/system'
 
 const systemStore = useSystemStore()
+const activeCategory = ref('wheel')
 
 const wheels = ref([])
 const selectedWheel = ref(null)
 const wheelSpins = ref([])
-const availableShopItems = ref([])
-const shopLoading = ref(false)
-const shopError = ref('')
 
 const loadError = ref('')
 const formError = ref('')
@@ -666,7 +628,6 @@ const sectorForm = ref({
   label: '',
   reward_type: 'coins',
   reward_coins: 25,
-  shop_item_id: null,
   color: '#0F766E',
   text_color: '#FFFFFF',
   weight: 20,
@@ -785,16 +746,6 @@ async function loadSpinsHistory(wheelId) {
   finally { if (sequence === spinsSequence) spinsLoading.value = false }
 }
 
-async function loadShopItems() {
-  shopLoading.value = true; shopError.value = ''
-  try {
-    const res = await shopApi.getItems()
-    availableShopItems.value = res.data || []
-  } catch (err) {
-    shopError.value = getErrorMessage(err)
-  } finally { shopLoading.value = false }
-}
-
 function selectWheel(w) {
   selectedWheel.value = w
   loadSpinsHistory(w.id)
@@ -890,13 +841,11 @@ async function deleteWheel(id) {
 }
 
 function openCreateSectorModal() {
-  loadShopItems()
   editingSector.value = null
   sectorForm.value = {
     label: '',
     reward_type: 'coins',
     reward_coins: 50,
-    shop_item_id: null,
     color: '#0F766E',
     text_color: '#FFFFFF',
     weight: 15,
@@ -906,13 +855,11 @@ function openCreateSectorModal() {
 }
 
 function openEditSectorModal(item) {
-  loadShopItems()
   editingSector.value = item
   sectorForm.value = {
     label: item.label,
-    reward_type: item.reward_type,
+    reward_type: 'coins',
     reward_coins: item.reward_coins ?? 0,
-    shop_item_id: item.shop_item_id ?? null,
     color: item.color || '#0F766E',
     text_color: item.text_color || '#FFFFFF',
     weight: item.weight ?? 10,
@@ -930,24 +877,13 @@ async function saveSector() {
   try {
     const payload = {
       label: (sectorForm.value.label || '').trim(),
-      reward_type: sectorForm.value.reward_type,
-      reward_coins: sectorForm.value.reward_type === 'coins' ? (Number(sectorForm.value.reward_coins) || 0) : 0,
-      shop_item_id: sectorForm.value.reward_type === 'shop_item' ? sectorForm.value.shop_item_id : null,
+      reward_type: 'coins',
+      reward_coins: Number(sectorForm.value.reward_coins),
       color: sectorForm.value.color,
       text_color: sectorForm.value.text_color || '#FFFFFF',
       weight: Number(sectorForm.value.weight),
       is_jackpot: Boolean(sectorForm.value.is_jackpot),
       order_index: editingSector.value ? editingSector.value.order_index : (selectedWheel.value.items?.length || 0)
-    }
-
-    if (payload.reward_type === 'shop_item' && !payload.shop_item_id) {
-      systemStore.addToast({
-        type: 'warning',
-        title: tr('staff.s623'),
-        message: tr('staff.s624')
-      })
-      saving.value = false
-      return
     }
 
     if (editingSector.value) {
@@ -1027,6 +963,5 @@ async function deleteSector(itemId) {
 
 onMounted(() => {
   loadWheels()
-  loadShopItems()
 })
 </script>

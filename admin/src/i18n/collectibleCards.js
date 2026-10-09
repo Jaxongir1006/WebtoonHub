@@ -6,7 +6,7 @@ export default {
     artwork: 'Card artwork', artHint: 'JPG, PNG, WebP or GIF · maximum 10 MiB · up to 4 million pixels.', animationHint: 'GIF and animated WebP keep their animation. Maximum 100 frames, 10 seconds and 60 million decoded pixels. A still preview is shown first.',
     play: 'Play animation', pause: 'Pause animation', chooseArt: 'Choose card artwork to preview it.', previewUnavailable: 'Artwork preview is unavailable.', animationUnavailable: 'Animation could not load. The still preview is retained.', preparing: 'Preparing the still preview…',
     file_type: 'Choose a JPG, PNG, WebP or GIF image. SVG and video files are not supported for cards.', file_size: 'Card artwork must be between 1 byte and 10 MiB.', file_pixels: 'Use artwork with no more than 4 million pixels.', file_decode: 'This image could not be opened. Choose a valid image file.', requiredCharacter: 'Enter the character name.', requiredRarity: 'Choose a rarity.', requiredArt: 'Choose card artwork before saving.',
-    identityLocked: 'Readers already own this card. Its name, character, series and rarity are fixed; you can change price, availability or artwork.', collected: '{count} collected', staticArt: 'Still artwork', animatedArt: 'Animated artwork',
+    identityLocked: 'Readers already own this card. Its name, character, series and rarity are fixed; you can change availability or artwork.', collected: '{count} collected', staticArt: 'Still artwork', animatedArt: 'Animated artwork',
     rarities: { common: 'Common', rare: 'Rare', epic: 'Epic', legendary: 'Legendary' }
   } },
   uz: { collectibleCards: {
@@ -16,7 +16,7 @@ export default {
     artwork: 'Karta rasmi', artHint: 'JPG, PNG, WebP yoki GIF · eng ko‘pi 10 MiB · 4 million pikselgacha.', animationHint: 'GIF va animatsiyali WebP harakatni saqlaydi. Eng ko‘pi 100 kadr, 10 soniya va jami 60 million piksel. Avval harakatsiz tasvir ko‘rsatiladi.',
     play: 'Animatsiyani ijro etish', pause: 'Animatsiyani to‘xtatish', chooseArt: 'Ko‘rish uchun karta rasmini tanlang.', previewUnavailable: 'Rasmni oldindan ko‘rib bo‘lmaydi.', animationUnavailable: 'Animatsiya yuklanmadi. Harakatsiz tasvir saqlanadi.', preparing: 'Harakatsiz tasvir tayyorlanmoqda…',
     file_type: 'JPG, PNG, WebP yoki GIF tanlang. Kartalarda SVG va video qo‘llab-quvvatlanmaydi.', file_size: 'Karta rasmi 1 baytdan 10 MiB gacha bo‘lishi kerak.', file_pixels: '4 million pikseldan oshmagan rasm tanlang.', file_decode: 'Bu rasm ochilmadi. To‘g‘ri rasm faylini tanlang.', requiredCharacter: 'Qahramon nomini kiriting.', requiredRarity: 'Noyoblik darajasini tanlang.', requiredArt: 'Saqlashdan oldin karta rasmini tanlang.',
-    identityLocked: 'O‘quvchilar bu kartani olgan. Nomi, qahramoni, asari va noyobligi o‘zgarmaydi; narxi, sotuv holati yoki rasmini o‘zgartirishingiz mumkin.', collected: '{count} ta olindi', staticArt: 'Harakatsiz rasm', animatedArt: 'Animatsiyali rasm',
+    identityLocked: 'O‘quvchilar bu kartani olgan. Nomi, qahramoni, asari va noyobligi o‘zgarmaydi; mavjudlik holati yoki rasmini o‘zgartirishingiz mumkin.', collected: '{count} ta olindi', staticArt: 'Harakatsiz rasm', animatedArt: 'Animatsiyali rasm',
     rarities: { common: 'Oddiy', rare: 'Noyob', epic: 'Epik', legendary: 'Afsonaviy' }
   } },
   ru: { collectibleCards: {
@@ -26,7 +26,7 @@ export default {
     artwork: 'Изображение карточки', artHint: 'JPG, PNG, WebP или GIF · до 10 МиБ · до 4 миллионов пикселей.', animationHint: 'GIF и анимированный WebP сохраняют анимацию. До 100 кадров, 10 секунд и 60 миллионов декодированных пикселей. Сначала показывается статичный кадр.',
     play: 'Воспроизвести анимацию', pause: 'Остановить анимацию', chooseArt: 'Выберите изображение для предпросмотра.', previewUnavailable: 'Предпросмотр изображения недоступен.', animationUnavailable: 'Анимация не загрузилась. Статичный кадр сохранён.', preparing: 'Подготовка статичного кадра…',
     file_type: 'Выберите JPG, PNG, WebP или GIF. SVG и видео для карточек не поддерживаются.', file_size: 'Изображение должно быть размером от 1 байта до 10 МиБ.', file_pixels: 'Используйте изображение до 4 миллионов пикселей.', file_decode: 'Не удалось открыть изображение. Выберите корректный файл.', requiredCharacter: 'Введите имя персонажа.', requiredRarity: 'Выберите редкость.', requiredArt: 'Выберите изображение перед сохранением.',
-    identityLocked: 'Читатели уже получили эту карточку. Название, персонаж, произведение и редкость зафиксированы; можно менять цену, доступность и изображение.', collected: 'Получено: {count}', staticArt: 'Статичное изображение', animatedArt: 'Анимированное изображение',
+    identityLocked: 'Читатели уже получили эту карточку. Название, персонаж, произведение и редкость зафиксированы; можно менять доступность и изображение.', collected: 'Получено: {count}', staticArt: 'Статичное изображение', animatedArt: 'Анимированное изображение',
     rarities: { common: 'Обычная', rare: 'Редкая', epic: 'Эпическая', legendary: 'Легендарная' }
   } }
 }

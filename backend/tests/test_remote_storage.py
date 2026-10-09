@@ -136,7 +136,7 @@ class RemoteStorageFlowTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(asset['asset_animated'])
         self.assertEqual(len(self.objects), 2)
         result = await self.client.post('/api/v1/staff/shop/items', data={
-            'name': 'Remote hero', 'item_type': 'card', 'price_coins': 20,
+            'name': 'Remote hero', 'item_type': 'card',
             'rarity': 'rare', 'character_name': 'Hero', 'asset_url': asset['asset_url']}, headers=self.staff_auth())
         self.assertEqual(result.status_code, 201, result.text)
         self.assertEqual(result.json()['data']['asset_preview_url'], asset['asset_preview_url'])

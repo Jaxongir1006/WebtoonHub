@@ -155,7 +155,7 @@ test('profile decorations stay clearly separate when a reader owns cards but no 
   assert.ok(inventory.includes("t('inventory.tabAll')") && inventory.includes('{items.length}'), 'the full inventory continues to include cards in its all-items count');
 });
 
-test('card purchase feedback uses the chosen locale rather than a raw backend message', async () => {
+test('decoration purchase feedback uses the chosen locale rather than a raw backend message', async () => {
   const source = await readFile(new URL('../src/pages/ShopPage.tsx', import.meta.url), 'utf8');
   const ast = ts.createSourceFile('ShopPage.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
   let purchase;
@@ -164,20 +164,21 @@ test('card purchase feedback uses the chosen locale rather than a raw backend me
   assert.ok(purchase, 'Execute the real shop purchase handler');
   const { cardTranslations } = await loadUtility('src/i18n/cards.ts');
   const { currentAudit } = await loadUtility('src/i18n/currentAudit.ts');
+  const decoration = { ...animated, item_type: 'frame', name: 'Profile frame' };
   for (const locale of ['en', 'uz', 'ru']) {
     let toast; let sentPrice;
     const bindings = {
-      items: [animated], actionLock: { current: false }, actorIdentity: { current: 7 }, setActionBusy() {}, setItems() {}, updateCoinsLocally() {},
-      shopApi: { buyItem: async (id, price) => { sentPrice = price; return { message: 'Buyum muvaffaqiyatli xarid qilindi...', data: { remaining_coins: 80, item_name: animated.name, price_paid: 20 } }; } },
+      items: [decoration], actionLock: { current: false }, actorIdentity: { current: 7 }, setActionBusy() {}, setItems() {}, updateCoinsLocally() {},
+      shopApi: { buyItem: async (id, price) => { sentPrice = price; return { message: 'Buyum muvaffaqiyatli xarid qilindi...', data: { remaining_coins: 80, item_name: decoration.name, price_paid: 20 } }; } },
       showToast: (type, message) => { toast = { type, message }; }, t: (key, values = {}) => (cardTranslations[locale][key] || currentAudit[locale][key] || key).replace(/\{(\w+)\}/g, (_, name) => String(values[name] ?? '')),
       fetchItems: async () => {}, refreshProfile: async () => {}, getApiErrorMessage: () => ''
     };
     const output = ts.transpileModule('const action = ' + purchase, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText;
     const handler = new Function(...Object.keys(bindings), output + ';return action;')(...Object.values(bindings));
-    assert.equal(await handler(animated.id), true);
-    assert.equal(sentPrice, animated.price_coins, 'the accepted offer must be sent before charging');
-    const receipt = currentAudit[locale]['shop.receipt'].replace('{name}', animated.name).replace('{price}', '20');
-    assert.deepEqual(toast, { type: 'success', message: cardTranslations[locale]['cards.collectSuccess'] + ' ' + receipt });
+    assert.equal(await handler(decoration.id), true);
+    assert.equal(sentPrice, decoration.price_coins, 'the accepted offer must be sent before charging');
+    const receipt = currentAudit[locale]['shop.receipt'].replace('{name}', decoration.name).replace('{price}', '20');
+    assert.deepEqual(toast, { type: 'success', message: receipt });
   }
 });
 

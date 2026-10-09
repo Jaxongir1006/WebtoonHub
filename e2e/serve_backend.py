@@ -66,11 +66,15 @@ async def main():
             Image.new('RGBA', (200, 200), '#f59e0b80').save(frame, 'WEBP')
             item = ShopItem(name='Fixture frame', item_type='frame', price_coins=100, asset_url='/content/frames/fixture.webp')
             db.add(item)
+            gacha_reader = User(username='fixture_gacha_reader', email='fixture-gacha@example.com',
+                hashed_password=fixture.reader.hashed_password, lightning_coins=1000, is_active=True)
+            db.add(gacha_reader)
             await db.commit()
             data = {'novel_work_id': fixture.work.id, 'novel_chapter_id': fixture.chapter.id,
                 'comic_work_id': comic.id, 'comic_chapter_id': chapter.id, 'manga_chapter_id': manga.id, 'shop_item_id': item.id,
                 'reader_email': fixture.reader.email, 'admin_email': fixture.admin.email,
                 'creator_email': fixture.creator.email, 'profile_reader_email': fixture.third.email,
+                'gacha_reader_email': gacha_reader.email,
                 'password': 'regression-password-long'}
 
         @app.get('/__e2e__/fixtures')

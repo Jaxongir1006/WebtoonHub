@@ -14,13 +14,15 @@ from app.modules.users.models import User
 from app.modules.webtoons.models import Webtoon, ChapterImage
 from app.modules.shop.models import ShopItem
 from app.modules.clans.models import Clan
+from app.modules.gacha.models import GachaRoll
 
 async def run(apply=False, days=7):
     cutoff = time.time() - days*86400
     root = CONTENT_ROOT.resolve()
     async with AsyncSessionLocal() as db:
         references = set()
-        columns = [User.avatar_url, Webtoon.cover_image_url, ChapterImage.image_url, ShopItem.asset_url, ShopItem.asset_preview_url, Clan.avatar_url, Clan.banner_url, Clan.frame_url]
+        columns = [User.avatar_url, Webtoon.cover_image_url, ChapterImage.image_url, ShopItem.asset_url, ShopItem.asset_preview_url, Clan.avatar_url, Clan.banner_url, Clan.frame_url,
+            GachaRoll.card_snapshot['asset_url'].as_string(), GachaRoll.card_snapshot['asset_preview_url'].as_string()]
         for column in columns:
             references.update(url.split('?')[0] for url in (await db.execute(select(column).where(column.isnot(None)))).scalars() if url and url.startswith('/content/'))
         # Preserve optimized siblings of retained legacy raster images.

@@ -7,6 +7,7 @@ import { socialFixes } from './social';
 import { uxFixes } from './uxFixes';
 import { cardTranslations } from './cards';
 import { currentAudit } from './currentAudit';
+import { gachaTranslations } from './gacha';
 
 export * from './types';
 
@@ -25,7 +26,7 @@ export const localeMeta: Record<SupportedLocale, { code: SupportedLocale; name: 
 export const defaultLocale: SupportedLocale = 'uz';
 
 export function getExtraTranslation(locale: SupportedLocale, path: string, params?: Record<string, string | number>): string | undefined {
-  const value = currentAudit[locale][path] ?? readerFixes[locale][path] ?? socialFixes[locale][path] ?? uxFixes[locale][path] ?? cardTranslations[locale][path];
+  const value = gachaTranslations[locale][path] ?? currentAudit[locale][path] ?? readerFixes[locale][path] ?? socialFixes[locale][path] ?? uxFixes[locale][path] ?? cardTranslations[locale][path];
   return value?.replace(/\{(\w+)\}/g, (_, key) => params && key in params ? String(params[key]) : `{${key}}`);
 }
 

@@ -25,8 +25,8 @@
         />
       </div>
 
-      <!-- Type & Price -->
-      <div class="grid grid-cols-2 gap-4">
+      <!-- Cards are created for gacha; only cosmetics have a shop price. -->
+      <div class="grid gap-4" :class="isCard ? 'grid-cols-1' : 'grid-cols-2'">
         <div>
           <label for="ShopItemModal-field-2" class="block text-xs font-semibold text-slate-700 dark:text-studio-300 uppercase tracking-wider mb-1.5">
             {{ $t('shop.field_type') }}
@@ -43,7 +43,7 @@
           </select>
         </div>
 
-        <div>
+        <div v-if="!isCard">
           <label for="ShopItemModal-field-3" class="block text-xs font-semibold text-slate-700 dark:text-studio-300 uppercase tracking-wider mb-1.5">
             {{ $t('shop.field_price') }}
           </label>
@@ -61,6 +61,7 @@
 
       <section v-if="isCard" class="space-y-3 rounded-xl border border-slate-200 p-3 dark:border-studio-700">
         <p class="text-xs text-slate-600 dark:text-studio-300">{{ $t('collectibleCards.description') }}</p>
+        <p class="rounded-lg bg-brand-500/10 p-2 text-xs text-brand-800 dark:text-brand-300">{{ $t('gacha.cardOnlyHint') }}</p>
         <p v-if="identityLocked" class="rounded-lg bg-amber-50 p-2 text-xs text-amber-900 dark:bg-amber-500/10 dark:text-amber-200">{{ $t('collectibleCards.identityLocked') }}</p>
         <div class="grid gap-3 sm:grid-cols-2">
           <div><label for="card-character" class="mb-1 block text-xs font-semibold">{{ $t('collectibleCards.character') }}</label><input id="card-character" v-model="form.character_name" :disabled="identityLocked" maxlength="100" required class="card-input" /></div>
@@ -282,7 +283,7 @@ async function handleSubmit() {
     await props.onSave({
       name: form.name,
       ...(!props.item ? { item_type: form.item_type } : {}),
-      price_coins: form.price_coins,
+      ...(!isCard.value ? { price_coins: form.price_coins } : {}),
       asset_url: form.asset_file && !props.item ? '' : finalUrl,
       ...(isCard.value ? cardItemMetadata(form) : {}),
       asset_file: props.item ? undefined : form.asset_file

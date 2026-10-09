@@ -42,6 +42,7 @@ from app.modules.wheel.router import (
     client_router as wheel_client_router,
     staff_router as wheel_staff_router,
 )
+from app.modules.gacha.router import client_router as gacha_client_router, staff_router as gacha_staff_router
 from app.modules.library.router import router as library_router
 from app.modules.comments.router import router as comments_router
 from app.modules.users.router import router as users_router
@@ -162,6 +163,8 @@ app.include_router(shop_client_router, prefix=settings.API_V1_STR)
 app.include_router(shop_staff_router, prefix=settings.API_V1_STR)
 app.include_router(wheel_client_router, prefix=settings.API_V1_STR)
 app.include_router(wheel_staff_router, prefix=settings.API_V1_STR)
+app.include_router(gacha_client_router, prefix=settings.API_V1_STR)
+app.include_router(gacha_staff_router, prefix=settings.API_V1_STR)
 app.include_router(library_router, prefix=settings.API_V1_STR)
 app.include_router(comments_router, prefix=settings.API_V1_STR)
 app.include_router(users_router, prefix=settings.API_V1_STR)

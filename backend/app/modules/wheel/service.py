@@ -94,7 +94,7 @@ class WheelService:
                     icon=w.icon,
                     color=w.color,
                     is_active=w.is_active,
-                    items_count=len(w.items),
+                    items_count=sum(item.reward_type == 'coins' for item in w.items),
                 )
             )
         return results
@@ -136,9 +136,11 @@ class WheelService:
         total_spins_res = await db.execute(total_spins_stmt)
         total_spins = total_spins_res.scalar() or 0
 
-        total_weight = sum(item.weight for item in wheel.items) or 1
+        total_weight = sum(item.weight for item in wheel.items if item.reward_type == 'coins') or 1
         items_resp = []
         for item in wheel.items:
+            if item.reward_type != 'coins':
+                continue
             shop_info = None
             if item.shop_item:
                 shop_info = WheelShopItemInfo(
@@ -202,6 +204,9 @@ class WheelService:
         wheel = res.scalar_one_or_none()
         if not wheel:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Omad charxi topilmadi")
+
+        if any(item.reward_type != 'coins' or item.shop_item_id is not None or (item.reward_coins or 0) < 0 for item in wheel.items):
+            raise HTTPException(409, 'This wheel contains legacy item prizes. Update its Lightning sectors before spinning.')
 
         if not wheel.items or len(wheel.items) < 2:
             raise HTTPException(
@@ -278,41 +283,6 @@ class WheelService:
                     description=f"'{wheel.title}' charxidan yutuq: +{coins_won} Chaqmoq",
                 )
             message = f"Tabriklaymiz! Siz {winning_item.label} yutib oldingiz!"
-        elif winning_item.reward_type == "shop_item":
-            if winning_item.shop_item_id:
-                locked_item = await db.scalar(select(ShopItem).where(ShopItem.id == winning_item.shop_item_id)
-                    .with_for_update().execution_options(populate_existing=True))
-                if locked_item is None:
-                    raise HTTPException(409, 'Wheel prize changed; retry the spin')
-                winning_item.shop_item = locked_item
-            # Check duplicate in inventory
-            inv_stmt = select(UserInventory).where(
-                UserInventory.user_id == user.id,
-                UserInventory.item_id == winning_item.shop_item_id,
-            )
-            inv_res = await db.execute(inv_stmt)
-            already_owned = inv_res.scalar_one_or_none() is not None
-
-            if already_owned:
-                comp_coins = winning_item.shop_item.price_coins if winning_item.shop_item else 100
-                user.lightning_coins += comp_coins
-                await RewardService.record_transaction(
-                    db=db,
-                    user_id=user.id,
-                    amount=comp_coins,
-                    transaction_type="wheel_reward",
-                    description=f"Charx yutug'i: '{winning_item.label}' allaqachon mavjudligi sababli kompensatsiya",
-                )
-                message = f"Tabriklaymiz! Siz '{winning_item.label}' yutib oldingiz! Ushbu buyum inventaringizda allaqachon mavjud bo'lgani sababli {comp_coins} ⚡ Chaqmoq hisobingizga qo'shildi!"
-            else:
-                new_inv = UserInventory(
-                    user_id=user.id,
-                    item_id=winning_item.shop_item_id,
-                    is_active=False,
-                )
-                db.add(new_inv)
-                message = f"Tabriklaymiz! Siz maxsus buyum: '{winning_item.label}' yutib oldingiz! U profilingiz inventariga qo'shildi."
-
         # 8. Record spin log
         spin_record = WheelSpin(
             user_id=user.id,
@@ -366,7 +336,7 @@ class WheelService:
             new_balance=user.lightning_coins,
             is_free_spin=is_free,
             message=message,
-            outcome=("coins" if winning_item.reward_type == "coins" else "duplicate_item" if already_owned else "item"),
+            outcome="coins",
             reward_coins=spin_record.reward_coins or 0,
             reward_item_name=winning_item.shop_item.name if winning_item.shop_item else None,
         )
@@ -482,6 +452,7 @@ class WheelService:
         return results
 
     @staticmethod
+    @serialize_shop_catalog
     async def create_wheel(db: AsyncSession, data: WheelCreateRequest) -> Wheel:
         base_slug = data.slug or slugify(data.title)
         slug = base_slug
@@ -511,6 +482,7 @@ class WheelService:
         return wheel
 
     @staticmethod
+    @serialize_shop_catalog
     async def update_wheel(db: AsyncSession, wheel_id: int, data: WheelUpdateRequest) -> Wheel:
         stmt = select(Wheel).where(Wheel.id == wheel_id)
         res = await db.execute(stmt)
@@ -542,6 +514,7 @@ class WheelService:
         return wheel
 
     @staticmethod
+    @serialize_shop_catalog
     async def delete_wheel(db: AsyncSession, wheel_id: int) -> None:
         stmt = select(Wheel).where(Wheel.id == wheel_id)
         res = await db.execute(stmt)
@@ -553,28 +526,18 @@ class WheelService:
         await db.commit()
 
     @staticmethod
+    @serialize_shop_catalog
     async def create_wheel_item(db: AsyncSession, wheel_id: int, data: WheelItemCreateRequest) -> WheelItem:
         wheel_stmt = select(Wheel).where(Wheel.id == wheel_id)
         wheel_res = await db.execute(wheel_stmt)
         if not wheel_res.scalar_one_or_none():
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Omad charxi topilmadi")
 
-        if data.reward_type == "shop_item":
-            if not data.shop_item_id:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Do'kon buyumi mukofoti uchun 'shop_item_id' ko'rsatilishi shart",
-                )
-            si_stmt = select(ShopItem).where(ShopItem.id == data.shop_item_id)
-            si_res = await db.execute(si_stmt)
-            if not si_res.scalar_one_or_none():
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tanlangan do'kon buyumi topilmadi")
-
         item = WheelItem(
             wheel_id=wheel_id,
             reward_type=data.reward_type,
-            reward_coins=data.reward_coins if data.reward_type == "coins" else 0,
-            shop_item_id=data.shop_item_id if data.reward_type == "shop_item" else None,
+            reward_coins=data.reward_coins,
+            shop_item_id=None,
             label=data.label,
             color=data.color or "#F59E0B",
             text_color=data.text_color or "#FFFFFF",
@@ -589,6 +552,7 @@ class WheelService:
         return item
 
     @staticmethod
+    @serialize_shop_catalog
     async def update_wheel_item(db: AsyncSession, item_id: int, data: WheelItemUpdateRequest) -> WheelItem:
         stmt = select(WheelItem).where(WheelItem.id == item_id)
         res = await db.execute(stmt)
@@ -596,30 +560,10 @@ class WheelService:
         if not item:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Charx sektori topilmadi")
 
-        if data.reward_type is not None:
-            item.reward_type = data.reward_type
-            if data.reward_type == "coins":
-                item.shop_item_id = None
-            elif data.reward_type == "shop_item":
-                item.reward_coins = 0
-
-        if item.reward_type == "coins":
-            if data.reward_coins is not None:
-                item.reward_coins = data.reward_coins
-            item.shop_item_id = None
-        elif item.reward_type == "shop_item":
-            item.reward_coins = 0
-            if data.shop_item_id is not None:
-                item.shop_item_id = data.shop_item_id
-            if not item.shop_item_id:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Do'kon buyumi mukofoti uchun buyum tanlanishi shart",
-                )
-            si_stmt = select(ShopItem).where(ShopItem.id == item.shop_item_id)
-            si_res = await db.execute(si_stmt)
-            if not si_res.scalar_one_or_none():
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tanlangan do'kon buyumi topilmadi")
+        item.reward_type = "coins"
+        item.shop_item_id = None
+        if data.reward_coins is not None:
+            item.reward_coins = data.reward_coins
 
         if data.label is not None:
             item.label = data.label.strip()
@@ -641,23 +585,13 @@ class WheelService:
         return item
 
     @staticmethod
+    @serialize_shop_catalog
     async def populate_preset_sectors(db: AsyncSession, wheel_id: int) -> List[WheelItem]:
         wheel_stmt = select(Wheel).where(Wheel.id == wheel_id)
         wheel_res = await db.execute(wheel_stmt)
         wheel = wheel_res.scalar_one_or_none()
         if not wheel:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Omad charxi topilmadi")
-
-        # Fetch available shop items if any
-        shop_stmt = select(ShopItem).order_by(ShopItem.id.asc()).limit(3)
-        shop_res = await db.execute(shop_stmt)
-        shop_items = shop_res.scalars().all()
-
-        shop_item_1_id = shop_items[0].id if len(shop_items) > 0 else None
-        shop_item_1_name = shop_items[0].name if len(shop_items) > 0 else "+300 Chaqmoq"
-
-        shop_item_2_id = shop_items[1].id if len(shop_items) > 1 else None
-        shop_item_2_name = shop_items[1].name if len(shop_items) > 1 else "+500 Chaqmoq"
 
         presets = [
             {
@@ -721,25 +655,25 @@ class WheelService:
                 "order_index": 4,
             },
             {
-                "label": shop_item_1_name if shop_item_1_id else "+300 Chaqmoq",
-                "reward_type": "shop_item" if shop_item_1_id else "coins",
-                "reward_coins": 0 if shop_item_1_id else 300,
-                "shop_item_id": shop_item_1_id,
+                "label": "+300 Chaqmoq",
+                "reward_type": "coins",
+                "reward_coins": 300,
+                "shop_item_id": None,
                 "color": "#059669",
                 "text_color": "#FFFFFF",
-                "icon": "sparkles" if shop_item_1_id else "coins",
+                "icon": "coins",
                 "weight": 5,
                 "is_jackpot": False,
                 "order_index": 5,
             },
             {
-                "label": shop_item_2_name if shop_item_2_id else "+500 Chaqmoq",
-                "reward_type": "shop_item" if shop_item_2_id else "coins",
-                "reward_coins": 0 if shop_item_2_id else 500,
-                "shop_item_id": shop_item_2_id,
+                "label": "+500 Chaqmoq",
+                "reward_type": "coins",
+                "reward_coins": 500,
+                "shop_item_id": None,
                 "color": "#D97706",
                 "text_color": "#FFFFFF",
-                "icon": "sparkles" if shop_item_2_id else "coins",
+                "icon": "coins",
                 "weight": 3,
                 "is_jackpot": False,
                 "order_index": 6,
@@ -782,6 +716,7 @@ class WheelService:
         return created_items
 
     @staticmethod
+    @serialize_shop_catalog
     async def delete_wheel_item(db: AsyncSession, item_id: int) -> None:
         stmt = select(WheelItem).where(WheelItem.id == item_id)
         res = await db.execute(stmt)

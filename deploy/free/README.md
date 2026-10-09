@@ -13,7 +13,7 @@ Admin URL: `https://webtoon-hub-nine.vercel.app`.
 Project reference: `mtzdzuetxohglhpxkztv`.
 
 - All seven existing Alembic migrations were applied to an empty Supabase database.
-- Current Alembic revision: `aa42ef631d90`; 36 application tables including
+- Initial Alembic revision: `aa42ef631d90`; 36 application tables including
   `alembic_version`. A fresh temporary PostgreSQL migration and `alembic check`
   passed before applying the exported migration SQL remotely.
 - RLS is enabled on all application tables. Direct table and sequence privileges
@@ -30,6 +30,16 @@ Project reference: `mtzdzuetxohglhpxkztv`.
 
 Do not rerun the initial schema against this project. Future schema changes should
 use the existing Alembic migration workflow and retain backend-only table access.
+
+The character-card gacha release advances Alembic to `b840f216da73` through Render's
+startup migration and adds three protected tables (39 including `alembic_version`).
+It preserves inventories and old wheel receipts, removes future item prizes from
+wheels, and stores card prices as zero. Wheels left with fewer than two Lightning
+sectors are disabled until configured. Create a pool in **Wheel & Card Gacha →
+Character Card Gacha**, choose existing or new cards, set its cost and rarity
+weights, then activate it. No sample pool or new reader content is automatically
+published. See [schema and API flow](../../backend/docs/05_CHARACTER_CARD_GACHA.md)
+and [admin instructions](../../docs/ADMIN_CHARACTER_CARDS_GUIDE.md).
 
 ## Private setup values
 

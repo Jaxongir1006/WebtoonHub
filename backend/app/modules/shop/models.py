@@ -1,4 +1,4 @@
-from sqlalchemy import BigInteger, Boolean, Column, DateTime, ForeignKey, ForeignKeyConstraint, Integer, String, UniqueConstraint, func, false
+from sqlalchemy import BigInteger, Boolean, CheckConstraint, Column, DateTime, ForeignKey, ForeignKeyConstraint, Integer, String, UniqueConstraint, func, false
 from sqlalchemy.orm import relationship
 from app.core.database import Base, BigIntId
 
@@ -21,6 +21,7 @@ class ShopItem(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     inventories = relationship("UserInventory", back_populates="item", cascade="all, delete-orphan")
+    __table_args__ = (CheckConstraint("item_type != 'card' OR price_coins = 0", name='ck_character_card_no_price'),)
 
 
 class UserInventory(Base):

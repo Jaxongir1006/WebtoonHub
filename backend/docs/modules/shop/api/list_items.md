@@ -13,6 +13,10 @@
 ### Query Parametrlari:
 * `item_type`: string (ixtiyoriy: `frame` yoki `background`)
 
+Character cards are not sold. `item_type=card` is accepted for compatibility and
+returns an empty list. Browse available character draws through `/gacha/pools`;
+owned cards remain available in `/shop/inventory?item_type=card`.
+
 ### Sarlavhalar (Headers):
 ```http
 Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9... (ixtiyoriy)

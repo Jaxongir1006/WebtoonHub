@@ -6,6 +6,9 @@ Send JSON `{"expected_price": 100}` with the price shown to the reader. The serv
 locks the current offer and returns 409 if its price changed; no balance or inventory
 change is committed. A successful receipt reports the actual `price_paid`.
 
+Only frames and backgrounds can be purchased. A character card ID returns HTTP
+422 even when its stored price is zero; obtain cards through `/gacha/pools/{id}/roll`.
+
 ## Umumiy Ma'lumot
 * **Metod:** `POST`
 * **Yo'l:** `/api/v1/shop/buy/{item_id}`

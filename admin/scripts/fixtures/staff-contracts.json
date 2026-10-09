@@ -19,7 +19,7 @@
       "price_coins": {
         "anyOf": [
           {
-            "minimum": 1,
+            "minimum": 0,
             "type": "integer"
           },
           {
@@ -297,6 +297,467 @@
       }
     },
     "title": "EconomyUpdate",
+    "type": "object"
+  },
+  "PoolCreateRequest": {
+    "$defs": {
+      "PoolCardInput": {
+        "additionalProperties": false,
+        "properties": {
+          "item_id": {
+            "exclusiveMinimum": 0,
+            "title": "Item Id",
+            "type": "integer"
+          },
+          "weight": {
+            "default": 1,
+            "maximum": 1000000,
+            "minimum": 1,
+            "title": "Weight",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "item_id"
+        ],
+        "title": "PoolCardInput",
+        "type": "object"
+      },
+      "RarityWeights": {
+        "additionalProperties": false,
+        "properties": {
+          "common": {
+            "default": 70,
+            "maximum": 1000000,
+            "minimum": 0,
+            "title": "Common",
+            "type": "integer"
+          },
+          "rare": {
+            "default": 22,
+            "maximum": 1000000,
+            "minimum": 0,
+            "title": "Rare",
+            "type": "integer"
+          },
+          "epic": {
+            "default": 7,
+            "maximum": 1000000,
+            "minimum": 0,
+            "title": "Epic",
+            "type": "integer"
+          },
+          "legendary": {
+            "default": 1,
+            "maximum": 1000000,
+            "minimum": 0,
+            "title": "Legendary",
+            "type": "integer"
+          }
+        },
+        "title": "RarityWeights",
+        "type": "object"
+      }
+    },
+    "additionalProperties": false,
+    "properties": {
+      "title": {
+        "maxLength": 100,
+        "minLength": 1,
+        "title": "Title",
+        "type": "string"
+      },
+      "description": {
+        "anyOf": [
+          {
+            "maxLength": 5000,
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Description"
+      },
+      "cost_coins": {
+        "default": 100,
+        "maximum": 1000000,
+        "minimum": 1,
+        "title": "Cost Coins",
+        "type": "integer"
+      },
+      "is_active": {
+        "default": false,
+        "title": "Is Active",
+        "type": "boolean"
+      },
+      "rarity_weights": {
+        "$ref": "#/$defs/RarityWeights"
+      },
+      "cards": {
+        "items": {
+          "$ref": "#/$defs/PoolCardInput"
+        },
+        "maxItems": 500,
+        "title": "Cards",
+        "type": "array"
+      }
+    },
+    "required": [
+      "title"
+    ],
+    "title": "PoolCreateRequest",
+    "type": "object"
+  },
+  "PoolUpdateRequest": {
+    "$defs": {
+      "PoolCardInput": {
+        "additionalProperties": false,
+        "properties": {
+          "item_id": {
+            "exclusiveMinimum": 0,
+            "title": "Item Id",
+            "type": "integer"
+          },
+          "weight": {
+            "default": 1,
+            "maximum": 1000000,
+            "minimum": 1,
+            "title": "Weight",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "item_id"
+        ],
+        "title": "PoolCardInput",
+        "type": "object"
+      },
+      "RarityWeights": {
+        "additionalProperties": false,
+        "properties": {
+          "common": {
+            "default": 70,
+            "maximum": 1000000,
+            "minimum": 0,
+            "title": "Common",
+            "type": "integer"
+          },
+          "rare": {
+            "default": 22,
+            "maximum": 1000000,
+            "minimum": 0,
+            "title": "Rare",
+            "type": "integer"
+          },
+          "epic": {
+            "default": 7,
+            "maximum": 1000000,
+            "minimum": 0,
+            "title": "Epic",
+            "type": "integer"
+          },
+          "legendary": {
+            "default": 1,
+            "maximum": 1000000,
+            "minimum": 0,
+            "title": "Legendary",
+            "type": "integer"
+          }
+        },
+        "title": "RarityWeights",
+        "type": "object"
+      }
+    },
+    "additionalProperties": false,
+    "properties": {
+      "expected_version": {
+        "minimum": 1,
+        "title": "Expected Version",
+        "type": "integer"
+      },
+      "title": {
+        "anyOf": [
+          {
+            "maxLength": 100,
+            "minLength": 1,
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Title"
+      },
+      "description": {
+        "anyOf": [
+          {
+            "maxLength": 5000,
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Description"
+      },
+      "cost_coins": {
+        "anyOf": [
+          {
+            "maximum": 1000000,
+            "minimum": 1,
+            "type": "integer"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Cost Coins"
+      },
+      "is_active": {
+        "anyOf": [
+          {
+            "type": "boolean"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Is Active"
+      },
+      "rarity_weights": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/RarityWeights"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null
+      },
+      "cards": {
+        "anyOf": [
+          {
+            "items": {
+              "$ref": "#/$defs/PoolCardInput"
+            },
+            "maxItems": 500,
+            "type": "array"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Cards"
+      }
+    },
+    "required": [
+      "expected_version"
+    ],
+    "title": "PoolUpdateRequest",
+    "type": "object"
+  },
+  "WheelItemCreateRequest": {
+    "additionalProperties": false,
+    "properties": {
+      "reward_type": {
+        "const": "coins",
+        "default": "coins",
+        "title": "Reward Type",
+        "type": "string"
+      },
+      "reward_coins": {
+        "default": 0,
+        "maximum": 1000000,
+        "minimum": 0,
+        "title": "Reward Coins",
+        "type": "integer"
+      },
+      "shop_item_id": {
+        "default": null,
+        "title": "Shop Item Id",
+        "type": "null"
+      },
+      "label": {
+        "maxLength": 100,
+        "minLength": 1,
+        "title": "Label",
+        "type": "string"
+      },
+      "color": {
+        "default": "#F59E0B",
+        "maxLength": 30,
+        "title": "Color",
+        "type": "string"
+      },
+      "text_color": {
+        "default": "#FFFFFF",
+        "maxLength": 30,
+        "title": "Text Color",
+        "type": "string"
+      },
+      "icon": {
+        "default": "coins",
+        "maxLength": 50,
+        "title": "Icon",
+        "type": "string"
+      },
+      "weight": {
+        "default": 10,
+        "maximum": 10000,
+        "minimum": 1,
+        "title": "Weight",
+        "type": "integer"
+      },
+      "is_jackpot": {
+        "default": false,
+        "title": "Is Jackpot",
+        "type": "boolean"
+      },
+      "order_index": {
+        "default": 0,
+        "title": "Order Index",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "label"
+    ],
+    "title": "WheelItemCreateRequest",
+    "type": "object"
+  },
+  "WheelItemUpdateRequest": {
+    "additionalProperties": false,
+    "properties": {
+      "reward_type": {
+        "anyOf": [
+          {
+            "const": "coins",
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Reward Type"
+      },
+      "reward_coins": {
+        "anyOf": [
+          {
+            "maximum": 1000000,
+            "minimum": 0,
+            "type": "integer"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Reward Coins"
+      },
+      "shop_item_id": {
+        "default": null,
+        "title": "Shop Item Id",
+        "type": "null"
+      },
+      "label": {
+        "anyOf": [
+          {
+            "maxLength": 100,
+            "minLength": 1,
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Label"
+      },
+      "color": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Color"
+      },
+      "text_color": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Text Color"
+      },
+      "icon": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Icon"
+      },
+      "weight": {
+        "anyOf": [
+          {
+            "maximum": 10000,
+            "minimum": 1,
+            "type": "integer"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Weight"
+      },
+      "is_jackpot": {
+        "anyOf": [
+          {
+            "type": "boolean"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Is Jackpot"
+      },
+      "order_index": {
+        "anyOf": [
+          {
+            "type": "integer"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Order Index"
+      }
+    },
+    "title": "WheelItemUpdateRequest",
     "type": "object"
   }
 }

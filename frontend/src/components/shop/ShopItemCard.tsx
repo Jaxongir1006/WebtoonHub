@@ -31,12 +31,13 @@ export const ShopItemCard: React.FC<ShopItemCardProps> = ({
   const canAfford = (user?.lightning_coins || 0) >= item.price_coins;
 
   const handleAction = async () => {
+    if (item.item_type === 'card') return;
     if (!isAuthenticated) {
       openAuthModal('login');
       return;
     }
 
-    if (loading || actionBusy || (item.item_type === 'card' && item.is_owned)) return;
+    if (loading || actionBusy) return;
     setLoading(true);
     try {
       if (!item.is_owned) {
@@ -52,11 +53,7 @@ export const ShopItemCard: React.FC<ShopItemCardProps> = ({
   };
 
   if (item.item_type === 'card') return <CharacterCard item={item} owned={item.is_owned}>
-    {item.is_owned ? <Link to="/inventory?type=card" className="flex min-h-11 items-center justify-center rounded-xl border border-emerald-500/40 px-3 text-xs font-bold text-emerald-400">{t('cards.viewCollection')}</Link> : <>
-      <div className="mb-3 flex items-center gap-1 text-sm font-bold text-brand-400"><Zap className="h-4 w-4" aria-hidden="true" />{item.price_coins} {t('common.coins')}</div>
-      <button type="button" onClick={handleAction} disabled={loading || actionBusy || (isAuthenticated && !canAfford)} className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-brand-500 px-3 text-xs font-bold text-studio-950 disabled:opacity-50">{loading && <Loader2 className="h-4 w-4 animate-spin" />}{t(isAuthenticated ? 'cards.buy' : 'socialFix.signInToBuy')}</button>
-      {isAuthenticated && !canAfford && <p className="mt-2 text-xs text-studio-300">{t('socialFix.needCoins', { amount: item.price_coins - (user?.lightning_coins || 0) })}</p>}
-    </>}
+    {item.is_owned ? <Link to="/inventory?type=card" className="flex min-h-11 items-center justify-center rounded-xl border border-emerald-500/40 px-3 text-xs font-bold text-emerald-400">{t('cards.viewCollection')}</Link> : <><p className="mb-3 text-xs leading-relaxed text-studio-300">{t('gacha.exclusiveCard')}</p><Link to="/wheel?category=gacha" className="flex min-h-11 items-center justify-center rounded-xl border border-violet-400/40 px-3 text-xs font-bold text-violet-200">{t('gacha.open')}</Link></>}
   </CharacterCard>;
 
   return (

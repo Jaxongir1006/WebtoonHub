@@ -67,7 +67,7 @@ export const Navbar: React.FC = () => {
   const navLinks = [
     { label: t('nav.home'), path: '/' },
     { label: t('nav.catalog'), path: '/catalog', icon: <Compass className="w-4 h-4" /> },
-    { label: t('nav.wheel') || 'Omad Charxi', path: '/wheel', icon: <Sparkles className="w-4 h-4 text-amber-400" />, badge: t('wheel.freeBadge') },
+    { label: t('nav.wheel'), path: '/wheel', icon: <Sparkles className="w-4 h-4 text-amber-400" /> },
     { label: t('nav.library'), path: '/library', icon: <BookOpen className="w-4 h-4" /> },
   ];
 
@@ -107,11 +107,6 @@ export const Navbar: React.FC = () => {
                 >
                   {link.icon}
                   <span>{link.label}</span>
-                  {link.badge && (
-                    <span className="px-1.5 py-0.2 rounded-full text-[9px] font-black bg-gradient-to-r from-amber-400 to-yellow-300 text-slate-950 font-mono tracking-wider shadow-sm animate-pulse">
-                      {link.badge}
-                    </span>
-                  )}
                 </Link>
               );
             })}
@@ -359,11 +354,6 @@ export const Navbar: React.FC = () => {
                     {link.icon}
                     <span>{link.label}</span>
                   </div>
-                  {link.badge && (
-                    <span className="px-1.5 py-0.5 rounded-full text-[10px] font-black bg-amber-400 text-slate-950 font-mono">
-                      {link.badge}
-                    </span>
-                  )}
                 </Link>
               ))}
             </div>

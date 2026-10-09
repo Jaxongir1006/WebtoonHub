@@ -3,6 +3,10 @@
 ## 1. Modul Tavsifi
 Ushbu modul yig‘ilgan Chaqmoq ballariga avatar ramkalari va profil fonlarini xarid qilish, olingan buyumlarni profilga taqish / yechish hamda Admin tomonidan do‘konga yangi vizual buyumlar kiritish jarayonini boshqaradi.
 
+Character cards use this catalog and inventory, but have no purchase price and
+can only be obtained through [Character Card Gacha](../../05_CHARACTER_CARD_GACHA.md).
+Frames and backgrounds are purchase-only; Lucky Wheel grants Lightning only.
+
 ---
 
 ## 2. Biznes Qoidalari

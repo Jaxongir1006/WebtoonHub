@@ -21,9 +21,14 @@ Content-Type: multipart/form-data
 | Maydon | Tipi | Qoidalar | Tavsif |
 | :--- | :--- | :--- | :--- |
 | `name` | `string` | Majburiy (2-100 belgi) | Buyum nomi |
-| `item_type` | `string` | `frame` yoki `background` | Buyum turi |
-| `price_coins` | `integer` | Majburiy (kamida 1 Chaqmoq) | Chaqmoq narxi |
+| `item_type` | `string` | `frame`, `background` yoki `card` | Buyum turi |
+| `price_coins` | `integer` | Frame/background: kamida 1; card: yuborilmaydi yoki 0 | Chaqmoq narxi |
 | `asset_file` | `file` | Majburiy (PNG / WebP) | Bezak rasmi |
+
+Character cards additionally require `rarity` and `character_name`; omit the
+purchase price and assign the created card to a staff gacha pool. A nonzero card
+price is rejected with HTTP 422. A validated `asset_url` can be used instead of
+uploading `asset_file`. See [character cards](../character_cards.md).
 
 ---
 

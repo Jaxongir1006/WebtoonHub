@@ -294,7 +294,8 @@ try {
     await editor.state.handleSubmit()
     assert.equal(editor.state.submitError.value,'')
     const request=contractRequests.filter(request=>request.method==='patch').at(-1)
-    assert.equal(JSON.parse(request.data).price_coins,75)
+    if(type==='card') assert.equal(Object.hasOwn(JSON.parse(request.data),'price_coins'),false)
+    else assert.equal(JSON.parse(request.data).price_coins,75)
     assert.equal(Object.hasOwn(JSON.parse(request.data),'id'),false)
     assert.equal(Object.hasOwn(JSON.parse(request.data),'border_style'),false)
     checks+=4

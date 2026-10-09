@@ -7,6 +7,11 @@
 * **Talab etiladigan ruxsat:** `shop:manage`
 * **Tavsif:** Do'kondagi buyum narxi, nomi yoki uning sotuvda mavjudlik holatini (`is_available`) o'zgartirish.
 
+For character cards, omit `price_coins` (zero is the only accepted value). Their
+rarity and availability affect every linked gacha pool's version. Once collected,
+card identity is locked; artwork and availability can still be updated. A stale
+draw confirmation then receives HTTP 409 before charging.
+
 ---
 
 ## So'rov Parametrlari (Request)

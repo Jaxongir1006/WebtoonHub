@@ -380,21 +380,14 @@ async def seed_data():
             db.add(wheel)
             await db.flush()
 
-            # Fetch shop items for wheel prizes
-            neon_stmt = select(ShopItem).where(ShopItem.name == "Neon Chaqmoq Ramkasi")
-            neon_item = (await db.execute(neon_stmt)).scalar_one_or_none()
-
-            gold_stmt = select(ShopItem).where(ShopItem.name == "Oltin Qahramon Ramkasi")
-            gold_item = (await db.execute(gold_stmt)).scalar_one_or_none()
-
             default_slices = [
                 {"reward_type": "coins", "reward_coins": 10, "shop_item_id": None, "label": "+10 ⚡", "color": "#1E293B", "text_color": "#F8FAFC", "icon": "coins", "weight": 30, "is_jackpot": False, "order_index": 0},
                 {"reward_type": "coins", "reward_coins": 25, "shop_item_id": None, "label": "+25 ⚡", "color": "#0F766E", "text_color": "#FFFFFF", "icon": "coins", "weight": 25, "is_jackpot": False, "order_index": 1},
                 {"reward_type": "coins", "reward_coins": 50, "shop_item_id": None, "label": "+50 ⚡", "color": "#0369A1", "text_color": "#FFFFFF", "icon": "coins", "weight": 15, "is_jackpot": False, "order_index": 2},
                 {"reward_type": "coins", "reward_coins": 100, "shop_item_id": None, "label": "+100 ⚡", "color": "#4338CA", "text_color": "#FFFFFF", "icon": "coins", "weight": 12, "is_jackpot": False, "order_index": 3},
-                {"reward_type": "shop_item", "reward_coins": 0, "shop_item_id": neon_item.id if neon_item else None, "label": "Neon Ramka", "color": "#7C3AED", "text_color": "#FFFFFF", "icon": "sparkles", "weight": 8, "is_jackpot": False, "order_index": 4},
+                {"reward_type": "coins", "reward_coins": 75, "shop_item_id": None, "label": "+75 ⚡", "color": "#7C3AED", "text_color": "#FFFFFF", "icon": "coins", "weight": 8, "is_jackpot": False, "order_index": 4},
                 {"reward_type": "coins", "reward_coins": 250, "shop_item_id": None, "label": "+250 ⚡", "color": "#B45309", "text_color": "#FFFFFF", "icon": "coins", "weight": 5, "is_jackpot": False, "order_index": 5},
-                {"reward_type": "shop_item", "reward_coins": 0, "shop_item_id": gold_item.id if gold_item else None, "label": "Oltin Ramka", "color": "#BE185D", "text_color": "#FFFFFF", "icon": "award", "weight": 3, "is_jackpot": False, "order_index": 6},
+                {"reward_type": "coins", "reward_coins": 150, "shop_item_id": None, "label": "+150 ⚡", "color": "#BE185D", "text_color": "#FFFFFF", "icon": "coins", "weight": 3, "is_jackpot": False, "order_index": 6},
                 {"reward_type": "coins", "reward_coins": 500, "shop_item_id": None, "label": "JACKPOT +500 ⚡", "color": "#E11D48", "text_color": "#FFFFFF", "icon": "flame", "weight": 2, "is_jackpot": True, "order_index": 7},
             ]
 

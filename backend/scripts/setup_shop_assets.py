@@ -420,14 +420,6 @@ def update_database():
 
         print(f"User ID #{u_id} ({u[1]}): Equipped Frame ID #{inserted_frames[0]} and Background ID #{inserted_bgs[0]} + 1000 coins!")
 
-    # Update wheel_items that referenced old shop items to reference real new shop items
-    c.execute("SELECT id, label FROM wheel_items WHERE reward_type = 'shop_item'")
-    w_items = c.fetchall()
-    for idx, wi in enumerate(w_items):
-        target_item_id = inserted_frames[idx % len(inserted_frames)]
-        c.execute("UPDATE wheel_items SET shop_item_id = ? WHERE id = ?", (target_item_id, wi[0]))
-    print(f"Updated {len(w_items)} wheel items to reference real shop items!")
-
     conn.commit()
     conn.close()
     print("Database update complete!")

@@ -79,6 +79,7 @@ try {
   const saved = []
   const create = await mount('/src/components/shop/ShopItemModal.vue', { modelValue: true, initialType: 'card', onSave: async body => saved.push(body) })
   check(create.state.form.item_type === 'card' && create.html.includes('card-character'), 'The new-card shortcut opens card metadata, not cosmetic controls')
+  check(!create.html.includes('ShopItemModal-field-3'), 'Gacha-exclusive cards do not show a price input')
   check(!create.html.includes('ring-4 ring-amber-400 shadow-glow-brand'), 'Card forms do not render cosmetic border presets')
   create.state.form.name = 'Hero card'; create.state.form.character_name = 'Hero'; create.state.form.rarity = 'epic'
   create.state.form.asset_file = new File(['fixture bytes'], 'card.png', { type: 'image/png' }); create.state.form.asset_url = 'blob:fixture'
@@ -86,6 +87,7 @@ try {
   check(saved[0].item_type === 'card' && saved[0].rarity === 'epic' && saved[0].character_name === 'Hero', 'New-card saves include the agreed identity fields')
   check(!Object.hasOwn(saved[0], 'border_style') && !Object.hasOwn(saved[0], 'asset_animated'), 'Read-only media flags and cosmetic effects are absent from write payloads')
   check(saved[0].asset_file.name === 'card.png' && saved[0].asset_url === '', 'Creation sends the source File in the existing atomic upload request')
+  check(!Object.hasOwn(saved[0], 'price_coins'), 'Creating a gacha-exclusive card never sends a shop price')
   const locked = await mount('/src/components/shop/ShopItemModal.vue', { modelValue: true, item: { id: 3, name: 'Owned', item_type: 'card', character_name: 'Hero', rarity: 'rare', price_coins: 50, identity_locked: true, owned_count: 2, ...animated }, onSave: async () => {} })
   check(locked.state.identityLocked.value && locked.html.includes('Readers already own this card'), 'Owned-card identity locking is visible before a rejected save')
   check(/id="card-character"[^>]*disabled/.test(locked.html), 'Character identity inputs are disabled once collected')
@@ -99,6 +101,7 @@ try {
   fail = false; await edited.state.handleSubmit()
   check(requests.filter(request => request.url.endsWith('upload-asset')).length === 1, 'Retry does not upload replacement artwork twice')
   check(!Object.hasOwn(retryPayloads[1], 'item_type') && retryPayloads[1].rarity === 'common', 'Editing respects immutable type while retaining metadata')
+  check(!Object.hasOwn(retryPayloads[1], 'price_coins'), 'Editing a gacha card also omits its obsolete shop price')
   for (const locale of ['en', 'uz', 'ru']) {
     i18n.global.locale.value = locale
     for (const key of ['type', 'guide', 'play', 'pause', 'file_type', 'file_size', 'file_pixels', 'file_decode', 'identityLocked', 'character']) check(i18n.global.te('collectibleCards.' + key, locale), `${locale} translates ${key}`)

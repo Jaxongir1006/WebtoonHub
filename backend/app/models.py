@@ -8,6 +8,7 @@ from app.modules.shop.models import ShopItem, UserInventory, UserFeaturedCard
 from app.modules.comments.models import Comment
 from app.modules.library.models import Bookmark
 from app.modules.wheel.models import Wheel, WheelItem, WheelSpin
+from app.modules.gacha.models import GachaPool, GachaPoolCard, GachaRoll
 from app.modules.friends.models import Friendship
 from app.modules.clans.models import Clan, ClanMember, ClanLevelConfig, ClanMessage
 from app.core.idempotency import OperationReceipt
@@ -41,6 +42,9 @@ __all__ = [
     "Wheel",
     "WheelItem",
     "WheelSpin",
+    "GachaPool",
+    "GachaPoolCard",
+    "GachaRoll",
     "Friendship",
     "Clan",
     "ClanMember",

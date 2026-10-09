@@ -6,14 +6,17 @@ ROOT = Path(__file__).resolve().parents[2]
 CONTENT = {
     'en': {
         'language': 'English', 'title': 'Character cards for admins',
-        'intro': 'Create collectible cards for individual characters. Readers buy them with Lightning, keep them in their collection, and can feature up to three owned cards on their profile. Cards have no gameplay or reading effect.',
+        'intro': 'Create collectible cards for individual characters. Readers obtain them only through Character Card Gacha, keep them in their collection, and can feature up to three owned cards on their profile. Cards have no shop price, gameplay or reading effect. Profile frames and backgrounds are purchased separately; the lucky wheel awards Lightning only.',
         'create_title': 'Create a card',
         'steps': [
             'Sign in to the admin panel and open Shop. Creating cards requires the shop management permission.',
             'Choose New character card, or open the item form and select Character card as the item type.',
-            'Enter the card name, character name, price in Lightning, and rarity. Choose Common, Rare, Epic, or Legendary. Add a series name or link an existing work if appropriate.',
+            'Enter the card name, character name and rarity. Choose Common, Rare, Epic, or Legendary. Add a series name or link an existing work if appropriate. Character cards do not have a price field.',
             'Choose a JPG, JPEG, PNG, WebP, or GIF file. Review the still preview. For an animated file, use Play and Pause to check its movement.',
-            'Save the card. It appears in the reader shop when it is available for sale. Check its artwork, rarity, character, series, and price before readers purchase it.'
+            'Save the card and check its artwork, rarity, character and series. Saving a card does not automatically add it to a gacha pool.',
+            'Open Wheel & Card Gacha, select Character Card Gacha and choose New card pool. Give it a title, optional description and Lightning cost per roll.',
+            'Select the cards for the pool and set their relative weights. Configure the Common, Rare, Epic and Legendary rarity weights. Review the effective percentage shown for each rarity and card; empty or hidden rarities have zero chance.',
+            'Activate and save the pool once it has an available card in a rarity with a positive weight. An inactive pool may be saved as a draft. Readers now see the pool on the wheel page under Character Card Gacha.'
         ],
         'media_title': 'Prepare artwork',
         'media': [
@@ -23,27 +26,31 @@ CONTENT = {
             'If an animation is rejected, shorten the loop, reduce its frame rate or dimensions, and export it again as GIF or animated WebP. MP4, HTML, and SVG are not card upload formats in this release.'
         ],
         'rarity_title': 'Use rarity consistently',
-        'rarity': 'Rarity is an admin classification, not a gameplay advantage or a guarantee of limited supply. Choose a consistent policy for Common, Rare, Epic, and Legendary cards. Readers see their total number of different owned cards and the count in each rarity.',
+        'rarity': 'Choose a consistent classification for Common, Rare, Epic, and Legendary cards. For each pool the backend first chooses an eligible rarity using its configured weight, then a card using its weight within that rarity. Positive weights in rarities without available cards are excluded and the remaining chances are normalized. A zero rarity weight disables that tier. The admin shows the effective percentages; rarity itself is not a gameplay advantage or a promise of limited supply.',
         'ownership_title': 'Manage existing cards',
         'ownership': [
-            'A reader owns one copy of each card. Buying the same card again is prevented. Different artwork editions should be separate cards if readers should collect both.',
+            'A reader owns one copy of each card. If gacha rolls a card already owned, the full Lightning cost is refunded and the duplicate remains in roll history. Different artwork editions should be separate cards if readers should collect both.',
             'Cards appear in the collection without being equipped. Readers choose up to three owned cards to feature; their public profile shows those cards and the rarity totals.',
-            'Hide a card from sale to stop new purchases while preserving existing collections. Purchased cards and items used by a wheel cannot be deleted.',
-            'Once readers own a card, its name, character, series and rarity are locked. Create a separate card for a new identity or edition. Price, sale availability and validated artwork can still be updated; artwork changes are visible to existing owners.'
+            'Deactivate a card in Shop → Cards to stop future drops while preserving existing collections. Hidden cards stay assigned to their pools with zero chance. Deactivate a pool to stop new rolls without removing its history. Owned cards and cards assigned to a pool cannot be deleted.',
+            'Once readers own a card, its name, character, series and rarity are locked. Create a separate card for a new identity or edition. Availability and validated artwork can still be updated; artwork changes are visible to existing owners.',
+            'Pool edits save all settings together and include a configuration version. If another admin changes the pool first, your draft is retained with a conflict message; refresh and review the latest version before saving again.'
         ],
         'check_title': 'Before saving',
-        'check': 'Check the character and series spelling, rarity, price, portrait preview, and animation. In the reader shop, cards use still previews; animation plays on hover, keyboard focus, or Play, with Pause available. Reduced motion prevents automatic playback.',
+        'check': 'Check character and series spelling, rarity, portrait preview and animation. Check the pool’s Lightning cost, card availability and actual drop chances before activating it. Card previews start still with explicit Play and Pause controls. Reduced motion skips the moving roulette but still reveals the backend-selected result. The animation never changes the winning card.',
     },
     'uz': {
         'language': 'O‘zbekcha', 'title': 'Adminlar uchun qahramon kartalari',
-        'intro': 'Alohida qahramonlar uchun kolleksiya kartalarini yarating. O‘quvchilar ularni Chaqmoq bilan sotib oladi, kolleksiyasida saqlaydi va profilida o‘ziga tegishli uchtagacha kartani namoyish qiladi. Kartalar o‘qish yoki o‘yin imkoniyatlariga ta’sir qilmaydi.',
+        'intro': 'Alohida qahramonlar uchun kolleksiya kartalarini yarating. O‘quvchilar kartalarni faqat qahramon kartalari gachasi orqali oladi, kolleksiyasida saqlaydi va profilida uchtagacha kartani namoyish qiladi. Kartalarning do‘kon narxi yo‘q va ular o‘qish yoki o‘yin imkoniyatlariga ta’sir qilmaydi. Ramka va fonlar alohida sotib olinadi, omad charxi esa faqat Chaqmoq beradi.',
         'create_title': 'Kartani yaratish',
         'steps': [
             'Admin paneliga kiring va Do‘kon bo‘limini oching. Karta yaratish uchun do‘konni boshqarish huquqi kerak.',
             'Yangi karta tugmasini bosing yoki buyum yaratish formasida Qahramon kartasi turini tanlang.',
-            'Karta nomi, qahramon nomi, Chaqmoq narxi va noyoblik darajasini kiriting. Oddiy, Noyob, Epik yoki Afsonaviy darajani tanlang. Kerak bo‘lsa, asar nomini yozing yoki mavjud asarni bog‘lang.',
+            'Karta nomi, qahramon nomi va noyoblik darajasini kiriting. Oddiy, Noyob, Epik yoki Afsonaviy darajani tanlang. Kerak bo‘lsa, asar nomini yozing yoki mavjud asarni bog‘lang. Qahramon kartalarida narx maydoni yo‘q.',
             'JPG, JPEG, PNG, WebP yoki GIF faylini tanlang. Harakatsiz ko‘rinishini tekshiring. Animatsiyali faylda Ijro va Pauza yordamida harakatini tekshiring.',
-            'Kartani saqlang. Sotuv faol bo‘lsa, u o‘quvchilar do‘konida ko‘rinadi. Xaridlar boshlanishidan oldin rasm, daraja, qahramon, asar va narxni tekshiring.'
+            'Kartani saqlang va rasm, daraja, qahramon hamda asarni tekshiring. Saqlash kartani avtomatik ravishda gacha to‘plamiga qo‘shmaydi.',
+            'Charx va karta gachasi bo‘limida Qahramon kartalari gachasi turini tanlab, Yangi karta to‘plami tugmasini bosing. Nom, ixtiyoriy tavsif va har aylantirish uchun Chaqmoq narxini kiriting.',
+            'To‘plam kartalarini tanlab, ularning nisbiy vaznlarini belgilang. Oddiy, Noyob, Epik va Afsonaviy darajalar vaznini sozlang. Har bir daraja va karta uchun haqiqiy foizni tekshiring; mavjud kartasi yo‘q daraja ehtimoli nol bo‘ladi.',
+            'Musbat vaznli darajada kamida bitta mavjud karta bo‘lsa, to‘plamni faollashtirib saqlang. Faol bo‘lmagan to‘plamni qoralama sifatida saqlash mumkin. O‘quvchilar uni charx sahifasining Qahramon kartalari gachasi turida ko‘radi.'
         ],
         'media_title': 'Rasmni tayyorlash',
         'media': [
@@ -53,27 +60,31 @@ CONTENT = {
             'Animatsiya rad etilsa, davomiyligini, kadrlar sonini yoki o‘lchamini kamaytirib, GIF yoki animatsiyali WebP sifatida qayta saqlang. Ushbu versiyada MP4, HTML va SVG karta uchun qabul qilinmaydi.'
         ],
         'rarity_title': 'Noyoblik darajasini izchil tanlash',
-        'rarity': 'Noyoblik darajasi admin belgilaydigan tasnifdir. U o‘yin ustunligi bermaydi va nusxalar cheklanganini kafolatlamaydi. Oddiy, Noyob, Epik va Afsonaviy kartalar uchun izchil qoida tanlang. O‘quvchilar turli kartalarining jami sonini va har bir daraja bo‘yicha sonini ko‘radi.',
+        'rarity': 'Oddiy, Noyob, Epik va Afsonaviy kartalarni izchil tasniflang. Har bir to‘plamda server avval darajani uning vazniga qarab, keyin shu darajadagi kartani o‘z vazniga qarab tanlaydi. Mavjud kartasi yo‘q darajalar chiqarib tashlanadi va qolgan ehtimollar qayta hisoblanadi. Nol vazn darajani o‘chiradi. Admin haqiqiy foizlarni ko‘rsatadi; noyoblik o‘yin ustunligini yoki cheklangan nusxalarni kafolatlamaydi.',
         'ownership_title': 'Mavjud kartalarni boshqarish',
         'ownership': [
-            'Har bir o‘quvchi bitta kartaning bir nusxasiga ega bo‘ladi. Takroriy xarid bloklanadi. Ikkala rasm ham kolleksiyada bo‘lishi kerak bo‘lsa, boshqa rasmli variantni alohida karta sifatida yarating.',
+            'Har bir o‘quvchi kartadan bitta nusxa saqlaydi. Gachada avval olingan karta tushsa, aylantirish narxi to‘liq qaytariladi va natija tarixda saqlanadi. Ikkala rasm ham kolleksiyada bo‘lishi kerak bo‘lsa, boshqa rasmli variantni alohida karta sifatida yarating.',
             'Kartalar taqilmasdan kolleksiyada ko‘rinadi. O‘quvchi o‘ziga tegishli uchtagacha kartani profil uchun tanlaydi; ommaviy profilda ular va noyoblik bo‘yicha sonlar ko‘rinadi.',
-            'Yangi xaridlarni to‘xtatish uchun kartani sotuvdan yashiring. Avvalgi egalari kartani saqlaydi. Xarid qilingan yoki charxda ishlatilayotgan buyumni o‘chirib bo‘lmaydi.',
-            'Karta xarid qilingach, uning nomi, qahramoni, asari va darajasi qulflanadi. Yangi variant uchun alohida karta yarating. Narx, sotuv holati va tekshirilgan rasmni yangilash mumkin; rasm o‘zgarishi mavjud egalarga ham ko‘rinadi.'
+            'Yangi yutuqlarni to‘xtatish uchun Do‘kon → Kartalar bo‘limida kartani faolsizlantiring. Avvalgi egalari uni saqlaydi. Yashirilgan karta to‘plamda nol ehtimol bilan qoladi. To‘plamni faolsizlantirish tarixi va kartalarini saqlaydi. Olingan yoki to‘plamga qo‘shilgan kartani o‘chirib bo‘lmaydi.',
+            'Karta olingach, uning nomi, qahramoni, asari va darajasi qulflanadi. Yangi variant uchun alohida karta yarating. Mavjudlik holati va tekshirilgan rasmni yangilash mumkin; rasm o‘zgarishi mavjud egalarga ham ko‘rinadi.',
+            'To‘plam o‘zgarishlari birgalikda versiya bilan saqlanadi. Boshqa admin oldin o‘zgartirsa, qoralamangiz saqlanib, ziddiyat xabari chiqadi. Qayta saqlashdan oldin ro‘yxatni yangilab, eng so‘nggi versiyani tekshiring.'
         ],
         'check_title': 'Saqlashdan oldin',
-        'check': 'Qahramon va asar nomi, daraja, narx, vertikal ko‘rinish va animatsiyani tekshiring. Do‘konda harakatsiz ko‘rinish ishlatiladi. Sichqoncha yoki klaviatura fokusi va Ijro tugmasi animatsiyani boshlaydi; Pauza uni to‘xtatadi. Kamaytirilgan harakat sozlamasi avtomatik ijroni o‘chiradi.',
+        'check': 'Qahramon va asar nomi, daraja, vertikal ko‘rinish va animatsiyani tekshiring. Faollashtirishdan oldin to‘plam narxi, karta mavjudligi va haqiqiy ehtimollarni tekshiring. Karta avval harakatsiz ko‘rinadi; Ijro va Pauza tugmalari mavjud. Kamaytirilgan harakat ruletka harakatini o‘tkazib, server tanlagan natijani ko‘rsatadi. Animatsiya yutuqni o‘zgartirmaydi.',
     },
     'ru': {
         'language': 'Русский', 'title': 'Карточки персонажей для администраторов',
-        'intro': 'Создавайте коллекционные карточки отдельных персонажей. Читатели покупают их за молнии, хранят в коллекции и могут показать до трёх своих карточек в профиле. Карточки не влияют на чтение или игровые возможности.',
+        'intro': 'Создавайте коллекционные карточки отдельных персонажей. Читатели получают их только через гачу карточек персонажей, хранят в коллекции и могут показать до трёх своих карточек в профиле. У карточек нет цены в магазине, они не влияют на чтение или игру. Рамки и фоны покупаются отдельно; колесо удачи выдаёт только молнии.',
         'create_title': 'Создание карточки',
         'steps': [
             'Войдите в административную панель и откройте Магазин. Для создания карточек нужно разрешение на управление магазином.',
             'Нажмите Новая карточка или выберите тип Карточка персонажа в форме предмета.',
-            'Укажите название карточки, имя персонажа, цену в молниях и редкость: Обычная, Редкая, Эпическая или Легендарная. При необходимости добавьте название произведения или свяжите существующее произведение.',
+            'Укажите название карточки, имя персонажа и редкость: Обычная, Редкая, Эпическая или Легендарная. При необходимости добавьте произведение или связь с ним. У карточек персонажей нет поля цены.',
             'Выберите JPG, JPEG, PNG, WebP или GIF. Проверьте неподвижное превью. Для анимации используйте Воспроизвести и Пауза.',
-            'Сохраните карточку. При включённой продаже она появится в магазине читателей. До первых покупок проверьте изображение, редкость, персонажа, произведение и цену.'
+            'Сохраните карточку и проверьте изображение, редкость, персонажа и произведение. Сохранение не добавляет карточку в набор гачи автоматически.',
+            'Откройте «Колесо и гача карточек», выберите «Гача карточек персонажей» и нажмите «Новый набор карточек». Укажите название, описание при необходимости и стоимость попытки в молниях.',
+            'Выберите карточки набора и задайте их относительные веса. Настройте веса обычной, редкой, эпической и легендарной редкости. Проверьте фактические проценты для каждой редкости и карточки; редкости без доступных карточек имеют нулевой шанс.',
+            'Активируйте и сохраните набор, когда в нём есть доступная карточка в редкости с положительным весом. Неактивный набор можно сохранить как черновик. Читатели увидят его на странице колеса в категории гачи карточек.'
         ],
         'media_title': 'Подготовка изображения',
         'media': [
@@ -83,16 +94,17 @@ CONTENT = {
             'Если анимация отклонена, сократите цикл, уменьшите число кадров или размеры и снова экспортируйте GIF либо анимированный WebP. В этой версии MP4, HTML и SVG не принимаются для карточек.'
         ],
         'rarity_title': 'Последовательное использование редкости',
-        'rarity': 'Редкость задаёт администратор. Она не даёт игрового преимущества и не гарантирует ограниченный тираж. Используйте последовательные правила для обычных, редких, эпических и легендарных карточек. Читатели видят число разных карточек и количество в каждой категории редкости.',
+        'rarity': 'Используйте последовательную классификацию обычных, редких, эпических и легендарных карточек. Для каждого набора сервер сначала выбирает доступную редкость по её весу, затем карточку по весу внутри редкости. Редкости без доступных карточек исключаются, остальные шансы нормализуются. Нулевой вес отключает редкость. Админ показывает фактические проценты; редкость не даёт игрового преимущества и не гарантирует ограниченный тираж.',
         'ownership_title': 'Управление существующими карточками',
         'ownership': [
-            'Читатель владеет одной копией каждой карточки. Повторная покупка запрещена. Если оба варианта изображения должны входить в коллекцию, создайте отдельную карточку для другого варианта.',
+            'Читатель владеет одной копией каждой карточки. Если гача выдаёт уже полученную карточку, полная стоимость попытки возвращается, а дубликат сохраняется в истории. Для отдельных вариантов изображения создайте отдельные карточки.',
             'Карточки входят в коллекцию без экипировки. Читатель выбирает до трёх своих карточек для профиля; публичный профиль показывает их и количество по редкости.',
-            'Скройте карточку из продажи, чтобы остановить новые покупки и сохранить существующие коллекции. Купленные предметы и предметы, используемые колесом, нельзя удалить.',
-            'После покупки название, персонаж, произведение и редкость карточки блокируются. Для новой версии создайте отдельную карточку. Цену, доступность продажи и проверенное изображение можно менять; новое изображение будет видно существующим владельцам.'
+            'Деактивируйте карточку в Магазин → Карточки, чтобы остановить новые выпадения и сохранить коллекции. Скрытая карточка остаётся в наборе с нулевым шансом. Деактивация набора останавливает попытки и сохраняет историю. Полученные карточки и карточки в наборах нельзя удалить.',
+            'После получения название, персонаж, произведение и редкость блокируются. Для новой версии создайте отдельную карточку. Доступность и проверенное изображение можно менять; новое изображение будет видно существующим владельцам.',
+            'Настройки набора сохраняются вместе с версией конфигурации. Если другой админ успел изменить набор, черновик останется с сообщением о конфликте. Обновите список и проверьте последнюю версию перед повторным сохранением.'
         ],
         'check_title': 'Перед сохранением',
-        'check': 'Проверьте написание имени персонажа и произведения, редкость, цену, вертикальное превью и анимацию. Магазин использует неподвижные превью. Наведение, фокус клавиатуры или Воспроизвести запускают анимацию; Пауза останавливает её. Настройка уменьшенного движения отключает автоматическое воспроизведение.',
+        'check': 'Проверьте имя персонажа и произведения, редкость, вертикальное превью и анимацию. Перед активацией проверьте стоимость набора, доступность карточек и реальные шансы. Превью начинается с неподвижного кадра; доступны Воспроизвести и Пауза. Уменьшенное движение пропускает движущуюся рулетку, сохраняя показ результата сервера. Анимация не меняет выигрыш.',
     }
 }
 

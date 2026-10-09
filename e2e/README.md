@@ -31,3 +31,9 @@ metadata/page rollback and creator review; independent profile/password actions
 and sign-in after password change; illustrated novel position saving; and mobile
 settings focus, horizontal fit, and tall manga navigation. It does not exercise
 production deployment, email delivery, or multi-worker database races.
+
+The character-card flow creates artwork and a card without a price in the studio,
+activates a pool with configured rarity weights, and checks the real roulette's
+centered server-selected result. It also verifies receipt replay, unique ownership,
+the direct-purchase ban, reduced-motion reveal, full duplicate refunds, and mobile
+horizontal fit. Database race checks run separately in the backend PostgreSQL suite.

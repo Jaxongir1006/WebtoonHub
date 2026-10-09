@@ -58,7 +58,7 @@ class EquipResponse(BaseModel):
 class ShopItemUpdateRequest(BaseModel):
     model_config = ConfigDict(extra='forbid')
     name: Optional[str] = Field(None, min_length=1, max_length=100)
-    price_coins: Optional[int] = Field(None, ge=1)
+    price_coins: Optional[int] = Field(None, ge=0)
     asset_url: Optional[str] = None
     is_available: Optional[bool] = None
     rarity: Optional[Literal['common', 'rare', 'epic', 'legendary']] = None

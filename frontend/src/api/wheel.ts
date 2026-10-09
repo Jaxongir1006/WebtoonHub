@@ -4,16 +4,8 @@ import { ApiResponse } from '../types';
 export interface WheelItem {
   id: number;
   wheel_id: number;
-  reward_type: 'coins' | 'shop_item';
+  reward_type: 'coins';
   reward_coins: number;
-  shop_item_id?: number | null;
-  shop_item?: {
-    id: number;
-    name: string;
-    item_type: string;
-    price_coins: number;
-    asset_url: string;
-  } | null;
   label: string;
   color: string;
   text_color: string;
@@ -50,9 +42,8 @@ export interface SpinResult {
   new_balance: number;
   is_free_spin: boolean;
   message: string;
-  outcome?: 'coins' | 'item' | 'duplicate_item';
+  outcome?: 'coins';
   reward_coins?: number;
-  reward_item_name?: string | null;
 }
 
 export interface SpinHistoryItem {
@@ -64,7 +55,6 @@ export interface SpinHistoryItem {
   reward_label: string;
   reward_type: string;
   reward_coins: number;
-  shop_item_id?: number | null;
   is_free_spin: boolean;
   cost_paid: number;
   created_at: string;

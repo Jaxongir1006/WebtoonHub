@@ -4,13 +4,12 @@ import { shopApi } from '../api/shop';
 import { useAuth } from '../context/AuthContext';
 import { useDailyBonus } from '../context/DailyBonusContext';
 import { useLanguage } from '../context/LanguageContext';
-import { ShopItem, ShopItemType, CardRarity } from '../types';
+import { ShopItem } from '../types';
 import { ShopItemCard } from '../components/shop/ShopItemCard';
 import { AvatarFrame } from '../components/common/AvatarFrame';
 import { Zap, ShoppingBag, Sparkles, Gift, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
 import { getApiErrorMessage } from '../api/client';
-import { useSearchParams } from 'react-router-dom';
-import { CARD_RARITIES, cardRarity } from '../utils/cards';
+import { Link, useSearchParams } from 'react-router-dom';
 
 export const ShopPage: React.FC = () => {
   const { user, isAuthenticated, isLoading: authLoading, refreshProfile, updateCoinsLocally, openAuthModal } = useAuth();
@@ -22,11 +21,10 @@ export const ShopPage: React.FC = () => {
   const [items, setItems] = useState<ShopItem[]>([]);
   const [searchParams, setSearchParams] = useSearchParams();
   const initialType = searchParams.get('type');
-  const [filterType, setFilterType] = useState<'all' | ShopItemType>(initialType === 'card' || initialType === 'frame' || initialType === 'background' ? initialType : 'all');
-  const [rarity, setRarity] = useState<CardRarity | 'all'>('all');
+  const [filterType, setFilterType] = useState<'all' | 'frame' | 'background'>(initialType === 'frame' || initialType === 'background' ? initialType : 'all');
   useEffect(() => {
     const type = searchParams.get('type');
-    setFilterType(type === 'card' || type === 'frame' || type === 'background' ? type : 'all');
+    setFilterType(type === 'frame' || type === 'background' ? type : 'all');
   }, [searchParams]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -47,7 +45,7 @@ export const ShopPage: React.FC = () => {
     try {
       const typeParam = filterType === 'all' ? undefined : filterType;
       const data = await shopApi.listItems(typeParam);
-      if (request === requestId.current) setItems(data || []);
+      if (request === requestId.current) setItems((data || []).filter(item => item.item_type !== 'card'));
     } catch (err) {
       console.error("Failed to load shop items", err);
       if (request === requestId.current) setLoadError(true);
@@ -65,9 +63,8 @@ export const ShopPage: React.FC = () => {
     if (actionLock.current) return false;
     const actor = actorIdentity.current;
     const offer = items.find(item => item.id === itemId);
-    if (!actor || !offer) return false;
+    if (!actor || !offer || offer.item_type === 'card') return false;
     actionLock.current = true; setActionBusy(true);
-    const isCardPurchase = items.some(item => item.id === itemId && item.item_type === 'card');
     try {
       const res = await shopApi.buyItem(itemId, offer.price_coins);
       if (actor !== actorIdentity.current) return false;
@@ -75,7 +72,7 @@ export const ShopPage: React.FC = () => {
         updateCoinsLocally(res.data.remaining_coins);
       }
       setItems(previous => previous.map(item => item.id === itemId ? { ...item, is_owned: true } : item));
-      showToast('success', `${isCardPurchase ? t('cards.collectSuccess') + ' ' : ''}${t('shop.receipt', { name: res.data.item_name, price: res.data.price_paid })}`);
+      showToast('success', t('shop.receipt', { name: res.data.item_name, price: res.data.price_paid }));
       await fetchItems();
       if (actor !== actorIdentity.current) return true;
       await refreshProfile().catch(() => undefined);
@@ -124,7 +121,7 @@ export const ShopPage: React.FC = () => {
   };
 
   if (authLoading) return <div role="status" className="py-24 text-center">{t('common.loading')}</div>;
-  const visibleItems = items.filter(item => item.item_type !== 'card' || rarity === 'all' || cardRarity(item.rarity) === rarity);
+  const visibleItems = items.filter(item => item.item_type !== 'card');
   return (
     <div className="min-h-screen pb-16">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -226,11 +223,10 @@ export const ShopPage: React.FC = () => {
             { label: t('shop.tabAll'), value: 'all' },
             { label: t('shop.tabFrames'), value: 'frame' },
             { label: t('shop.tabBackgrounds'), value: 'background' },
-            { label: t('cards.title'), value: 'card' },
           ].map((tab) => (
             <button
               key={tab.value}
-              onClick={() => { setFilterType(tab.value as 'all' | ShopItemType); setRarity('all'); const next = new URLSearchParams(searchParams); if (tab.value === 'all') next.delete('type'); else next.set('type', tab.value); setSearchParams(next, { replace: true }); }}
+              onClick={() => { setFilterType(tab.value as 'all' | 'frame' | 'background'); const next = new URLSearchParams(searchParams); if (tab.value === 'all') next.delete('type'); else next.set('type', tab.value); setSearchParams(next, { replace: true }); }}
               aria-pressed={filterType === tab.value}
               className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all ${
                 filterType === tab.value
@@ -242,7 +238,7 @@ export const ShopPage: React.FC = () => {
             </button>
           ))}
         </div>
-        {filterType === 'card' && <div className="mb-8 space-y-3"><p className="max-w-2xl text-xs leading-relaxed text-studio-300">{t('cards.description')}</p><div className="flex flex-wrap gap-2" aria-label={t('cards.all')}>{(['all', ...CARD_RARITIES] as const).map(value => <button type="button" key={value} aria-pressed={rarity === value} onClick={() => setRarity(value)} className={`min-h-11 rounded-xl border px-3 text-xs font-bold ${rarity === value ? 'border-brand-500 bg-brand-500 text-studio-950' : 'border-studio-700 text-studio-300'}`}>{t(value === 'all' ? 'cards.all' : 'cards.rarity.' + value)}</button>)}</div></div>}
+        <div className="mb-8 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-violet-400/30 bg-violet-500/10 p-4"><p className="text-sm text-violet-200">{t('gacha.exclusiveCard')}</p><Link to="/wheel?category=gacha" className="inline-flex min-h-11 items-center rounded-xl border border-violet-400/40 px-4 text-xs font-bold text-violet-200">{t('gacha.open')}</Link></div>
 
         {/* Items Grid */}
         {loading ? (
@@ -260,7 +256,7 @@ export const ShopPage: React.FC = () => {
             <ShoppingBag className="w-12 h-12 mx-auto text-studio-600 mb-3" />
             <h3 className="font-bold text-white text-base mb-1">{t('socialFix.shopEmpty')}</h3>
             <p className="text-xs text-studio-400">
-              {t(filterType === 'card' && items.length ? 'cards.emptyFilter' : 'shop.empty')}
+              {t('shop.empty')}
             </p>
           </div>
         ) : (

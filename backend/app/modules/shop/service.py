@@ -23,7 +23,7 @@ class ShopService:
         user_id: Optional[int] = None,
         item_type: Optional[str] = None
     ) -> List[ShopItemResponse]:
-        query = select(ShopItem).where(ShopItem.is_available.is_(True))
+        query = select(ShopItem).where(ShopItem.is_available.is_(True), ShopItem.item_type.in_(['frame', 'background']))
         if item_type:
             query = query.where(ShopItem.item_type == item_type)
         query = query.order_by(ShopItem.price_coins.asc())
@@ -100,6 +100,8 @@ class ShopService:
         item = res.scalar_one_or_none()
         if not item:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Do'kon buyumi topilmadi")
+        if item.item_type == 'card':
+            raise HTTPException(422, 'Character cards are obtainable only through Character Card Gacha')
         if expected_price is not None and item.price_coins != expected_price:
             raise HTTPException(409, 'Item price changed. Refresh the offer and confirm its new price.')
 
@@ -210,7 +212,7 @@ class ShopService:
         db: AsyncSession,
         name: str,
         item_type: str,
-        price_coins: int,
+        price_coins: Optional[int] = None,
         asset_file: Optional[UploadFile] = None,
         asset_url: Optional[str] = None,
         rarity: Optional[str] = None,
@@ -218,6 +220,12 @@ class ShopService:
         series_title: Optional[str] = None,
         webtoon_id: Optional[int] = None,
     ) -> ShopItem:
+        if item_type == 'card':
+            if price_coins not in (None, 0):
+                raise HTTPException(422, 'Character cards have no purchase price; add them to a gacha pool')
+            price_coins = 0
+        elif price_coins is None or price_coins < 1:
+            raise HTTPException(422, 'Frames and backgrounds require a positive purchase price')
         final_url = asset_url or ""
         derived = {}
         metadata = await ShopService.validate_card_metadata(db, item_type, rarity, character_name, series_title, webtoon_id)
@@ -287,6 +295,8 @@ class ShopService:
         series_title: Optional[str] = None, webtoon_id: Optional[int] = None,
         metadata_fields: Optional[set] = None,
     ) -> ShopItem:
+        from app.modules.gacha.locking import lock_card_pools
+        linked_pools = await lock_card_pools(db, item_id)
         stmt = select(ShopItem).where(ShopItem.id == item_id).with_for_update().execution_options(populate_existing=True)
         res = await db.execute(stmt)
         item = res.scalar_one_or_none()
@@ -295,7 +305,11 @@ class ShopService:
 
         old_asset = item.asset_url
         old_preview = item.asset_preview_url
+        old_rarity, old_available = item.rarity, item.is_available
         if item.item_type == 'card':
+            if price_coins not in (None, 0):
+                raise HTTPException(422, 'Character cards cannot have a purchase price')
+            item.price_coins = 0
             fields = metadata_fields or set()
             metadata = await ShopService.validate_card_metadata(db, 'card',
                 rarity if 'rarity' in fields else item.rarity,
@@ -312,6 +326,8 @@ class ShopService:
                     setattr(item, key, value)
         elif any(value is not None for value in [rarity, character_name, series_title, webtoon_id]):
             raise HTTPException(422, 'Character metadata applies to collectible cards only')
+        if item.item_type != 'card' and price_coins is not None and price_coins < 1:
+            raise HTTPException(422, 'Frames and backgrounds require a positive purchase price')
         if name is not None:
             item.name = name
         if price_coins is not None:
@@ -320,6 +336,9 @@ class ShopService:
             item.asset_url = asset_url.strip()
         if is_available is not None:
             item.is_available = is_available
+        if old_rarity != item.rarity or old_available != item.is_available:
+            for pool in linked_pools:
+                pool.version += 1
 
         await db.commit()
         await db.refresh(item)
@@ -332,6 +351,8 @@ class ShopService:
     @staticmethod
     @serialize_shop_catalog
     async def delete_item(db: AsyncSession, item_id: int) -> None:
+        from app.modules.gacha.locking import lock_card_pools
+        linked_pools = await lock_card_pools(db, item_id)
         stmt = select(ShopItem).where(ShopItem.id == item_id).with_for_update().execution_options(populate_existing=True)
         res = await db.execute(stmt)
         item = res.scalar_one_or_none()
@@ -339,8 +360,9 @@ class ShopService:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Do'kon buyumi topilmadi")
 
         from app.modules.wheel.models import WheelItem
-        if await db.scalar(select(UserInventory.id).where(UserInventory.item_id == item_id).limit(1)) or await db.scalar(select(WheelItem.id).where(WheelItem.shop_item_id == item_id).limit(1)):
-            raise HTTPException(409, "This item is owned or used by a wheel. Hide it from sale instead of deleting it.")
+        from app.modules.gacha.models import GachaRoll
+        if linked_pools or await db.scalar(select(GachaRoll.id).where(GachaRoll.item_id == item_id).limit(1)) or await db.scalar(select(UserInventory.id).where(UserInventory.item_id == item_id).limit(1)) or await db.scalar(select(WheelItem.id).where(WheelItem.shop_item_id == item_id).limit(1)):
+            raise HTTPException(409, "This item is owned or used by a reward pool. Make it unavailable instead of deleting it.")
         old_asset = item.asset_url
         old_preview = item.asset_preview_url
         await db.delete(item)

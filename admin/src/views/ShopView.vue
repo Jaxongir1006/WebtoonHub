@@ -112,7 +112,8 @@
               <p>{{ $t(item.asset_animated ? 'collectibleCards.animatedArt' : 'collectibleCards.staticArt') }}<span v-if="item.owned_count"> · {{ $t('collectibleCards.collected', { count: item.owned_count }) }}</span></p>
             </dl>
 
-            <div class="flex items-center justify-between pt-1">
+            <p v-if="item.item_type === 'card'" class="pt-2 text-xs font-semibold text-brand-700 dark:text-brand-300">{{ $t('gacha.exclusive') }}</p>
+            <div v-else class="flex items-center justify-between pt-1">
               <span class="text-xs text-slate-500 dark:text-studio-400">{{ $t('shop.price') }}</span>
               <span class="text-sm font-extrabold text-brand-700 dark:text-brand-400 font-mono flex items-center gap-1">
                 ⚡ {{ item.price_coins }} {{ $t('staff.s104') }} </span>

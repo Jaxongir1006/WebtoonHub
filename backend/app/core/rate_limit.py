@@ -17,6 +17,8 @@ def policy(path, method):
         return 'recovery', 10, 3600
     if '/chat/send' in path:
         return 'chat', 120, 60
+    if path.startswith('/api/v1/gacha/pools/') and path.endswith('/roll'):
+        return 'gacha_roll', 30, 60
     if '/comments' in path or '/friends/request' in path:
         return 'social', 60, 60
     if '/staff/chapter-imports/' in path and '/pages/' in path:

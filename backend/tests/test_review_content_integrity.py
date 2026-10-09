@@ -5,6 +5,7 @@ import json
 import unittest
 from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
+from urllib.parse import parse_qs, urlsplit
 
 from tests import test_audit_regressions as fixtures
 from PIL import Image
@@ -15,7 +16,7 @@ from app.modules.shop.models import ShopItem, UserInventory
 from app.modules.shop.service import ShopService
 from app.modules.rewards.models import CoinTransaction
 from app.modules.users.models import User
-from app.core.security import create_access_token
+from app.core.security import create_access_token, decode_token
 
 
 def page_bytes():
@@ -108,7 +109,31 @@ class ContentIntegrityTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(data['chapter']['status'], 'pending')
         self.assertTrue(data['status_changed_to_pending'])
         retry = await t.client.post(f'/api/v1/staff/chapters/{t.chapter.id}/images', headers=headers, data=fields, files=files)
-        self.assertEqual(retry.json()['data'], data)
+        self.assertEqual(retry.status_code, 200, retry.text)
+        replay = retry.json()['data']
+        # The durable upload result is identical; each response legitimately
+        # issues fresh staff capabilities with its own ten-minute expiry.
+        def logical_result(result):
+            return result | {'added_images': [image | {'image_url': urlsplit(image['image_url']).path}
+                for image in result['added_images']]}
+        self.assertEqual(logical_result(replay), logical_result(data))
+        for result in [data, replay]:
+            for image in result['added_images']:
+                url = urlsplit(image['image_url'])
+                self.assertFalse(url.scheme or url.netloc)
+                self.assertTrue(url.path.startswith(f'/content/{t.work.id}/{t.chapter.id}/'))
+                query = parse_qs(url.query)
+                self.assertEqual(set(query), {'media_token'})
+                self.assertEqual(len(query['media_token']), 1)
+                claims = decode_token(query['media_token'][0])
+                self.assertIsNotNone(claims)
+                self.assertEqual(claims['type'], 'media')
+                self.assertEqual(claims['path'], url.path)
+                self.assertEqual(claims['sub'], str(t.creator.id))
+                self.assertEqual(claims['session_id'], str(t.creator_session.id))
+                self.assertLessEqual(claims['exp'], int(datetime.now(timezone.utc).timestamp()) + 600)
+                self.assertEqual((await t.client.get(image['image_url'])).status_code, 200)
+                self.assertEqual((await t.client.get(url.path)).status_code, 403)
         async with t.sessions() as db:
             self.assertEqual(await db.scalar(select(func.count(ChapterImage.id)).where(ChapterImage.chapter_id == t.chapter.id)), 2)
 

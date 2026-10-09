@@ -10,9 +10,12 @@ from app.modules.shop.schemas import ShopItemUpdateRequest
 from app.modules.webtoons.schemas import ChapterUpdateRequest
 from app.modules.staff.schemas import ReaderUpdateRequest
 from app.core.economy import EconomyUpdate
+from app.modules.gacha.schemas import PoolCreateRequest, PoolUpdateRequest
+from app.modules.wheel.schemas import WheelItemCreateRequest, WheelItemUpdateRequest
 
 schemas = {model.__name__: model.model_json_schema() for model in (
-    ShopItemUpdateRequest, ChapterUpdateRequest, ReaderUpdateRequest, EconomyUpdate
+    ShopItemUpdateRequest, ChapterUpdateRequest, ReaderUpdateRequest, EconomyUpdate,
+    PoolCreateRequest, PoolUpdateRequest, WheelItemCreateRequest, WheelItemUpdateRequest
 )}
 target = Path(__file__).resolve().parent / "fixtures" / "staff-contracts.json"
 parser = argparse.ArgumentParser()

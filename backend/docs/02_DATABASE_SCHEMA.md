@@ -176,8 +176,8 @@ Ushbu hujjat PostgreSQL uchun mo‘ljallangan barcha relying jadvallar, ularning
 | :--- | :--- | :--- | :--- |
 | `id` | `SERIAL` | PRIMARY KEY | Buyum ID |
 | `name` | `VARCHAR(100)`| NOT NULL | Buyum nomi (masalan: "Oltin Chaqmoq Ramkasi") |
-| `item_type` | `VARCHAR(20)` | NOT NULL, INDEX | `frame` (avatar ramkasi) yoki `background` (profil foni) |
-| `price_coins` | `INTEGER` | NOT NULL | Chaqmoqdagi narxi |
+| `item_type` | `VARCHAR(20)` | NOT NULL, INDEX | `frame`, `background`, yoki `card` |
+| `price_coins` | `INTEGER` | NOT NULL; card uchun 0 | Frame/background Chaqmoq narxi; card faqat gacha orqali olinadi |
 | `asset_url` | `VARCHAR(500)`| NOT NULL | MinIO dagi rasm / aktiv manzili |
 | `is_available` | `BOOLEAN` | NOT NULL, DEFAULT TRUE | Sotuvda bormi |
 | `created_at` | `TIMESTAMPTZ` | NOT NULL, DEFAULT NOW() | Qo'shilgan sana |
@@ -191,6 +191,24 @@ Ushbu hujjat PostgreSQL uchun mo‘ljallangan barcha relying jadvallar, ularning
 | `is_active` | `BOOLEAN` | NOT NULL, DEFAULT FALSE | Profilga taqilganmi |
 | `purchased_at` | `TIMESTAMPTZ` | NOT NULL, DEFAULT NOW() | Xarid qilingan sana |
 | *Unique Constraint* | (`user_id`, `item_id`) | UNIQUE | Bitta buyumni faqat 1 marta sotib olish mumkin |
+
+### 6.3 Character Card Gacha
+
+Migration `b840f216da73` adds three backend-only tables. Existing card metadata and
+the inventory-backed profile showcase remain on `shop_items` and
+`user_featured_cards`. PostgreSQL enables RLS on all new tables and revokes access
+from Supabase browser roles; reader requests use the existing backend auth.
+
+| Table | Fields and invariants |
+| :--- | :--- |
+| `gacha_pools` | ID, title, description, positive `cost_coins`, active flag, positive configuration version, four `rarity_weights` in JSON, creation/update timestamps |
+| `gacha_pool_cards` | ID, pool FK, card item FK, positive per-card weight; unique `(pool_id,item_id)` |
+| `gacha_rolls` | ID, reader FK, pool FK, card item FK, pool title/version snapshot, card metadata/artwork snapshot, positive cost, duplicate flag, refund amount bounded by cost, timestamp |
+
+History prevents deleting referenced cards or pools; archive pools instead. A new
+card draw adds one inventory row; a duplicate refunds its full cost while keeping
+the unique inventory row. The draw, wallet ledger, ownership and operation receipt
+commit together. See [the complete configuration and API design](05_CHARACTER_CARD_GACHA.md).
 
 ---
 

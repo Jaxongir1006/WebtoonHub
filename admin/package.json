@@ -7,7 +7,7 @@
     "dev": "vite --port 5174",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node scripts/regression.mjs && node scripts/chapter-import-regression.mjs && node scripts/card-regression.mjs"
+    "test": "node scripts/regression.mjs && node scripts/chapter-import-regression.mjs && node scripts/card-regression.mjs && node scripts/gacha-regression.mjs"
   },
   "dependencies": {
     "@lucide/vue": "^1.48.0",

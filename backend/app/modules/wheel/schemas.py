@@ -1,6 +1,6 @@
 from datetime import datetime
-from typing import List, Optional
-from pydantic import BaseModel, Field
+from typing import List, Literal, Optional
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from app.modules.shop.schemas import CardFields
 
 
@@ -40,9 +40,10 @@ class WheelItemResponse(BaseModel):
 
 
 class WheelItemCreateRequest(BaseModel):
-    reward_type: str = Field(..., pattern=r"^(coins|shop_item)$")
-    reward_coins: Optional[int] = 0
-    shop_item_id: Optional[int] = None
+    model_config = ConfigDict(extra='forbid')
+    reward_type: Literal['coins'] = 'coins'
+    reward_coins: int = Field(0, ge=0, le=1000000)
+    shop_item_id: None = None
     label: str = Field(..., min_length=1, max_length=100)
     color: str = Field("#F59E0B", max_length=30)
     text_color: str = Field("#FFFFFF", max_length=30)
@@ -53,9 +54,10 @@ class WheelItemCreateRequest(BaseModel):
 
 
 class WheelItemUpdateRequest(BaseModel):
-    reward_type: Optional[str] = Field(None, pattern=r"^(coins|shop_item)$")
-    reward_coins: Optional[int] = None
-    shop_item_id: Optional[int] = None
+    model_config = ConfigDict(extra='forbid')
+    reward_type: Optional[Literal['coins']] = None
+    reward_coins: Optional[int] = Field(None, ge=0, le=1000000)
+    shop_item_id: None = None
     label: Optional[str] = Field(None, min_length=1, max_length=100)
     color: Optional[str] = None
     text_color: Optional[str] = None

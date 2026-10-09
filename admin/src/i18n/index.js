@@ -7,9 +7,10 @@ import workflow from './workflow'
 import chapterImport from './chapterImport'
 import collectibleCards from './collectibleCards'
 import studioFixes from './studioFixes'
+import gacha from './gacha'
 function withFixes(base, language) {
   const extra = workflow[language]
-  return { ...base, ...auditFixes[language], ...extra, ...chapterImport[language], ...collectibleCards[language], ...studioFixes[language], common: { ...base.common, ...extra.common }, nav: { ...base.nav, ...extra.nav } }
+  return { ...base, ...auditFixes[language], ...extra, ...chapterImport[language], ...collectibleCards[language], ...studioFixes[language], ...gacha[language], common: { ...base.common, ...extra.common }, nav: { ...base.nav, ...extra.nav, wheels: gacha[language].gacha.nav } }
 }
 
 const savedLocale = localStorage.getItem('webtoonhub_lang') || 'uz'
