@@ -18,9 +18,9 @@ export const translations: Record<SupportedLocale, TranslationSchema> = {
 };
 
 export const localeMeta: Record<SupportedLocale, { code: SupportedLocale; name: string; flag: string }> = {
-  uz: { code: 'uz', name: "O'zbekcha", flag: '🇺🇿' },
-  ru: { code: 'ru', name: 'Русский', flag: '🇷🇺' },
-  en: { code: 'en', name: 'English', flag: '🇬🇧' }
+  uz: { code: 'uz', name: "O'zbekcha", flag: `${import.meta.env.BASE_URL}flags/uz.svg` },
+  ru: { code: 'ru', name: 'Русский', flag: `${import.meta.env.BASE_URL}flags/ru.svg` },
+  en: { code: 'en', name: 'English', flag: `${import.meta.env.BASE_URL}flags/gb.svg` }
 };
 
 export const defaultLocale: SupportedLocale = 'uz';

@@ -6,10 +6,13 @@
       <div class="relative">
         <button
           class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl bg-white dark:bg-studio-850 hover:bg-slate-100 dark:hover:bg-studio-800 text-slate-700 dark:text-studio-200 border border-slate-200 dark:border-white/10 shadow-sm transition-colors"
+          :aria-label="`${$t('lang.title')}: ${currentLanguage.label}`" :title="currentLanguage.label" :aria-expanded="showLangDropdown"
           @click="showLangDropdown = !showLangDropdown; showThemeDropdown = false"
         >
-          <span>{{ currentLangFlag }}</span>
-          <span class="uppercase font-mono">{{ systemStore.currentLocale }}</span>
+          <img :src="currentLanguage.flag" alt="" aria-hidden="true" width="24" height="16" class="w-6 h-4 object-contain rounded-sm" />
+          <svg class="w-3 h-3 text-slate-600 dark:text-studio-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+          </svg>
         </button>
 
         <div
@@ -27,7 +30,10 @@
             ]"
             @click="selectLang(l.code)"
           >
-            <span>{{ l.flag }} {{ l.label }}</span>
+            <span class="flex items-center gap-2">
+              <img :src="l.flag" alt="" aria-hidden="true" width="24" height="16" class="w-6 h-4 object-contain rounded-sm" />
+              <span>{{ l.label }}</span>
+            </span>
             <span v-if="systemStore.currentLocale === l.code" class="text-brand-700 dark:text-brand-500">✓</span>
           </button>
         </div>
@@ -181,9 +187,9 @@ const showLangDropdown = ref(false)
 const showThemeDropdown = ref(false)
 
 const languages = [
-  { code: 'uz', flag: '🇺🇿', get label() { return tr('staff.s026') } },
-  { code: 'ru', flag: '🇷🇺', get label() { return tr('staff.s027') } },
-  { code: 'en', flag: '🇬🇧', get label() { return tr('staff.s028') } }
+  { code: 'uz', flag: `${import.meta.env.BASE_URL}flags/uz.svg`, get label() { return tr('staff.s026') } },
+  { code: 'ru', flag: `${import.meta.env.BASE_URL}flags/ru.svg`, get label() { return tr('staff.s027') } },
+  { code: 'en', flag: `${import.meta.env.BASE_URL}flags/gb.svg`, get label() { return tr('staff.s028') } }
 ]
 
 const themeOptions = [
@@ -192,10 +198,7 @@ const themeOptions = [
   { value: 'system', icon: '💻', labelKey: 'theme.system' }
 ]
 
-const currentLangFlag = computed(() => {
-  const match = languages.find((l) => l.code === systemStore.currentLocale)
-  return match ? match.flag : '🇺🇿'
-})
+const currentLanguage = computed(() => languages.find((l) => l.code === systemStore.currentLocale) || languages[0])
 
 function selectLang(code) {
   systemStore.setLocale(code)

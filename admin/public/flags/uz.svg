@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 150">
+  <path fill="#0099b5" d="M0 0h300v48H0z"/>
+  <path fill="#ce1126" d="M0 48h300v54H0z"/>
+  <path fill="#fff" d="M0 51h300v48H0z"/>
+  <path fill="#1eb53a" d="M0 102h300v48H0z"/>
+  <defs>
+    <mask id="crescent"><path fill="#fff" d="M0 0h300v150H0z"/><circle cx="45" cy="24" r="18" fill="#000"/></mask>
+    <path id="star" d="m0-3.6 1.06 2.91 3.43.02-2.76 2.03 1.05 3.26L0 2.7l-2.88 1.92 1.05-3.26-2.76-2.03 3.43-.02z" fill="#fff"/>
+  </defs>
+  <circle cx="39" cy="24" r="18" fill="#fff" mask="url(#crescent)"/>
+  <use href="#star" x="87" y="12"/><use href="#star" x="99" y="12"/><use href="#star" x="111" y="12"/>
+  <use href="#star" x="75" y="24"/><use href="#star" x="87" y="24"/><use href="#star" x="99" y="24"/><use href="#star" x="111" y="24"/>
+  <use href="#star" x="63" y="36"/><use href="#star" x="75" y="36"/><use href="#star" x="87" y="36"/><use href="#star" x="99" y="36"/><use href="#star" x="111" y="36"/>
+</svg>
