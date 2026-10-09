@@ -14,13 +14,15 @@ const receipt = { roll_id: 11, pool_id: 3, winning_card: card, animation_cards: 
 const source = await readFile(new URL('../src/components/cards/CharacterGachaPanel.tsx', import.meta.url), 'utf8');
 const ast = ts.createSourceFile('CharacterGachaPanel.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 let handleRoll;
+const catalogActions = {};
 function findHandler(node) {
   if (ts.isVariableDeclaration(node) && node.name.getText(ast) === 'handleRoll') handleRoll = node.initializer.getText(ast);
+  if (ts.isVariableDeclaration(node) && ['loadPools', 'loadDetail'].includes(node.name.getText(ast))) catalogActions[node.name.getText(ast)] = node.initializer.getText(ast);
   ts.forEachChild(node, findHandler);
 }
 findHandler(ast);
 
-async function fixture(t, send, reduced = true) {
+async function fixture(t, send, reduced = true, overrides = {}) {
   installBrowserGlobals(t);
   const utils = await loadUtility('src/utils/gachaIntent.ts');
   const state = { error: null, win: null, balance: 100, modal: false, strip: [], index: null, sounds: 0, phase: 'idle', stopped: 0, refreshed: 0, reloaded: 0 };
@@ -37,12 +39,70 @@ async function fixture(t, send, reduced = true) {
     loadPools: async () => { state.reloaded++; }, loadHistory: noop, refreshProfile: async () => { state.refreshed++; state.balance = 96; },
     setTargetIndex: value => { state.index = value; }, getApiErrorMessage: failure => failure.message,
     requestAnimationFrame: callback => { scheduledFrames.push(callback); return scheduledFrames.length; },
-    setTimeout: (callback, delay) => { scheduledTimers.push({ callback, delay }); return scheduledTimers.length; }
+    setTimeout: (callback, delay) => { scheduledTimers.push({ callback, delay }); return scheduledTimers.length; },
+    ...overrides
   };
   const output = ts.transpileModule('const action = ' + handleRoll, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText;
   const handler = new Function(...Object.keys(bindings), output + ';return action;')(...Object.values(bindings));
   return { handler, state, refs, bindings, scheduledFrames, scheduledTimers, ...utils };
 }
+
+function catalogFixture(listPools, getPool = async () => ({ id: 3, cards: [card] })) {
+  const state = { error: null, loadError: null, loading: false, detailLoading: false, loadFailed: false, pools: null, pool: null };
+  const refs = { mounted: { current: true }, generation: { current: 1 }, listRequest: { current: 0 }, detailRequest: { current: 0 }, pendingRef: { current: null }, selectedRef: { current: null } };
+  const bindings = {
+    ...refs, gachaApi: { listPools, getPool }, t: key => key, getApiErrorMessage: failure => failure.message,
+    setLoading: value => { state.loading = value; }, setDetailLoading: value => { state.detailLoading = value; },
+    setLoadFailed: value => { state.loadFailed = value; }, setLoadError: value => { state.loadError = value; },
+    setError: value => { state.error = value; }, setPools: value => { state.pools = value; },
+    setPool: value => { state.pool = value; }, setSelectedId: noop
+  };
+  const compile = name => {
+    const output = ts.transpileModule('const action = ' + catalogActions[name], { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText;
+    return new Function(...Object.keys(bindings), output + ';return action;')(...Object.values(bindings));
+  };
+  const loadDetail = compile('loadDetail'); bindings.loadDetail = loadDetail;
+  return { state, refs, loadDetail, loadPools: compile('loadPools') };
+}
+
+test('successful empty-catalog retry clears its old unavailable-page alert', async () => {
+  let calls = 0;
+  const retry = deferred();
+  const view = catalogFixture(async () => {
+    if (++calls === 1) throw new Error('This page is unavailable.');
+    return retry.promise;
+  });
+  await view.loadPools();
+  assert.equal(view.state.loadError, 'This page is unavailable.'); assert.equal(view.state.loadFailed, true);
+  assert.equal(view.state.error, null, 'catalog errors must not enter roll/action state');
+  const loading = view.loadPools();
+  assert.equal(view.state.loadError, null, 'retry removes the previous catalog alert while it loads');
+  retry.resolve([]); await loading;
+  assert.deepEqual(view.state.pools, []); assert.equal(view.state.loadError, null); assert.equal(view.state.loadFailed, false);
+});
+
+test('detail retries clear old catalog errors without erasing a roll action notice', async () => {
+  let calls = 0;
+  const view = catalogFixture(async () => [{ id: 3 }], async () => {
+    if (++calls === 1) throw new Error('Pool unavailable');
+    return { id: 3, cards: [card] };
+  });
+  view.state.error = 'gacha.changed';
+  await view.loadDetail(3); assert.equal(view.state.loadError, 'Pool unavailable');
+  await view.loadDetail(3);
+  assert.equal(view.state.loadError, null); assert.equal(view.state.pool.id, 3); assert.equal(view.state.error, 'gacha.changed');
+});
+
+test('a pricing conflict notice survives the successful catalog refresh it triggers', async t => {
+  const catalog = catalogFixture(async () => [{ id: 3 }]);
+  const view = await fixture(t, async () => {
+    throw new axios.AxiosError('Changed', 'ERR_BAD_REQUEST', {}, undefined, { status: 409, data: { error: { message: 'Pool changed' } } });
+  }, true, { loadPools: catalog.loadPools, setError: value => { catalog.state.error = value; } });
+  await view.handler();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(catalog.state.error, 'gacha.changed'); assert.equal(catalog.state.loadError, null);
+  assert.equal(catalog.state.pool.id, 3); assert.equal(view.readPendingGacha(7), null);
+});
 
 test('gacha response recovery retains one durable operation with accepted cost and odds version', async t => {
   const sent = [];

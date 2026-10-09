@@ -47,7 +47,8 @@ export const CharacterGachaPanel: React.FC<{ onBusyChange: (busy: boolean) => vo
   const selectedRef = useRef(selectedId); selectedRef.current = selectedId;
   const [pool, setPool] = useState<GachaPoolDetail | null>(null);
   const [loading, setLoading] = useState(true), [detailLoading, setDetailLoading] = useState(false);
-  const [loadFailed, setLoadFailed] = useState(false), [error, setError] = useState<string | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false), [loadError, setLoadError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<PendingGacha | null>(null);
   const [phase, setPhase] = useState<'idle' | 'requesting' | 'rolling'>('idle');
   const [strip, setStrip] = useState<ShopItem[]>([]), [targetIndex, setTargetIndex] = useState(0);
@@ -103,30 +104,31 @@ export const CharacterGachaPanel: React.FC<{ onBusyChange: (busy: boolean) => vo
   };
   const loadDetail = async (id: number) => {
     const request = ++detailRequest.current, epoch = generation.current;
-    setDetailLoading(true); setPool(null);
+    setDetailLoading(true); setPool(null); setLoadError(null);
     try {
       const detail = await gachaApi.getPool(id);
-      if (mounted.current && epoch === generation.current && request === detailRequest.current) setPool(detail);
+      if (mounted.current && epoch === generation.current && request === detailRequest.current) { setPool(detail); setLoadError(null); }
     } catch (failure) {
-      if (mounted.current && epoch === generation.current && request === detailRequest.current) setError(getApiErrorMessage(failure, t('gacha.loadError')));
+      if (mounted.current && epoch === generation.current && request === detailRequest.current) setLoadError(getApiErrorMessage(failure, t('gacha.loadError')));
     } finally {
       if (mounted.current && epoch === generation.current && request === detailRequest.current) setDetailLoading(false);
     }
   };
   const loadPools = async () => {
     const request = ++listRequest.current, epoch = generation.current;
-    setLoading(true); setLoadFailed(false);
+    detailRequest.current++;
+    setLoading(true); setLoadFailed(false); setLoadError(null);
     try {
       const rows = await gachaApi.listPools();
       if (!mounted.current || epoch !== generation.current || request !== listRequest.current) return;
-      setPools(rows);
+      setPools(rows); setLoadError(null);
       const remembered = pendingRef.current?.pool_id ?? selectedRef.current;
       const id = rows.some(value => value.id === remembered) ? remembered! : rows[0]?.id;
       if (id) { setSelectedId(id); await loadDetail(id); }
       else { detailRequest.current++; setSelectedId(null); setPool(null); setDetailLoading(false); }
     } catch (failure) {
       if (mounted.current && epoch === generation.current && request === listRequest.current) {
-        setLoadFailed(true); setError(getApiErrorMessage(failure, t('gacha.loadError')));
+        setLoadFailed(true); setLoadError(getApiErrorMessage(failure, t('gacha.loadError')));
       }
     } finally {
       if (mounted.current && epoch === generation.current && request === listRequest.current) setLoading(false);
@@ -139,7 +141,7 @@ export const CharacterGachaPanel: React.FC<{ onBusyChange: (busy: boolean) => vo
     const remembered = user ? readPendingGacha(user.id) : null;
     pendingRef.current = remembered; setPending(remembered);
     setPhase('idle'); setPool(null); setPools([]); setStrip([]); setResult(null); setShowResult(false); setRunning(false);
-    setHistory([]); setError(null); setHistoryError(false);
+    setHistory([]); setError(null); setLoadError(null); setHistoryError(false);
     if (!authLoading) { void loadPools(); void loadHistory(); }
     return () => {
       mounted.current = false; generation.current++; listRequest.current++; detailRequest.current++; historyRequest.current++;
@@ -231,6 +233,7 @@ export const CharacterGachaPanel: React.FC<{ onBusyChange: (busy: boolean) => vo
   return <section className="mx-auto max-w-6xl space-y-7 px-4 py-8 sm:px-6 lg:px-8">
     <header className="mx-auto max-w-2xl space-y-3 text-center"><Gem className="mx-auto h-8 w-8 text-violet-300" aria-hidden="true" /><h1 className="text-3xl font-black tracking-tight text-white sm:text-4xl">{t('gacha.title')}</h1><p className="text-sm leading-relaxed text-studio-300">{t('gacha.subtitle')}</p><p className="text-xs leading-relaxed text-studio-400">{t('gacha.rules')}</p></header>
     {error && <div role="alert" className="flex gap-3 rounded-2xl border border-rose-500/30 bg-rose-500/10 p-4 text-sm text-rose-300"><AlertCircle className="h-5 w-5 shrink-0" aria-hidden="true" /><p>{error}</p></div>}
+    {loadError && <div role="alert" className="flex gap-3 rounded-2xl border border-rose-500/30 bg-rose-500/10 p-4 text-sm text-rose-300"><AlertCircle className="h-5 w-5 shrink-0" aria-hidden="true" /><p>{loadError}</p></div>}
     {pending && !busy && <div role="status" className="space-y-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-200"><p>{t('gacha.pending')}</p><button type="button" onClick={handleRoll} className="min-h-11 rounded-xl bg-brand-500 px-4 font-bold text-studio-950">{t('gacha.retry')}</button></div>}
     {loading || authLoading ? <p role="status" className="flex items-center justify-center gap-2 py-16"><Loader2 className="h-5 w-5 animate-spin" />{t('common.loading')}</p> : loadFailed ? <div className="py-12 text-center"><button type="button" onClick={loadPools} className="min-h-11 rounded-xl bg-brand-500 px-5 font-bold text-studio-950">{t('common.retry')}</button></div> : !pools.length ? <div className="space-y-3 rounded-3xl border border-dashed border-studio-700 p-10 text-center"><h2 className="text-lg font-bold text-white">{t('gacha.noPools')}</h2><p className="text-sm text-studio-400">{t('gacha.noPoolsDetail')}</p><button type="button" onClick={loadPools} className="min-h-11 rounded-xl border border-studio-700 px-4 text-sm">{t('common.retry')}</button></div> : <>
       <div className="flex flex-wrap justify-center gap-3" aria-label={t('gacha.selectPool')}>{pools.map(value => <button key={value.id} type="button" aria-pressed={value.id === selectedId} disabled={busy || !!pending} onClick={() => { setSelectedId(value.id); setStrip([]); setRunning(false); setError(null); void loadDetail(value.id); }} className={`min-h-12 rounded-2xl border px-5 text-sm font-bold disabled:opacity-60 ${value.id === selectedId ? 'border-violet-400 bg-violet-500/20 text-violet-200' : 'border-studio-700 bg-studio-900 text-studio-300'}`}>{value.title}<span className="ml-3 text-xs font-normal">{value.cost_coins} ⚡</span></button>)}</div>
