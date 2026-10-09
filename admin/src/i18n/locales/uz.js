@@ -179,6 +179,9 @@ export default {
     field_price: 'Narxi (⚡ Chaqmoq) *',
     field_style: 'Vizual Effekt / Uslub',
     field_live_sim: 'Jonli Simulyatsiya',
+    frame_art_help: 'Shaffof PNG/WebP yoki SVG formatidagi kvadrat ramkadan foydalaning. Tavsiya: 512 × 512 px, markazida diametri taxminan 372 px bo‘lgan shaffof doira. Bezaklar shu doira atrofida bo‘lsin.',
+    frame_art_warning: 'Oddiy surat, skrinshot yoki JPEG avatarni berkitadi. Oq markaz shaffof degani emas. Faylni shaffoflik bilan eksport qiling va ko‘rinishda avatar ochiq qolganini tekshiring.',
+    frame_template: 'Tayyor ramka namunasini yuklab olish (SVG)',
     field_asset: 'MinIO Asset Manzili / Fayl',
     btn_submit: 'Buyumni Qo\'shish'
   },

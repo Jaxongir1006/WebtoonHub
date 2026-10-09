@@ -55,7 +55,9 @@ def validated_media(data, object_name, bucket):
             source.load()
             if source.format not in {'JPEG','PNG','WEBP','GIF'} or source.width * source.height > 40_000_000:
                 raise HTTPException(422, 'Unsupported image')
-            image = ImageOps.exif_transpose(source).convert('RGBA' if 'A' in source.getbands() else 'RGB')
+            # PNG/GIF may store transparency in palette/key metadata without an alpha band.
+            has_transparency = 'A' in source.getbands() or 'transparency' in source.info
+            image = ImageOps.exif_transpose(source).convert('RGBA' if has_transparency else 'RGB')
             if bucket == settings.MINIO_BUCKET_CHAPTERS and image.width > 1200:
                 image = image.resize((1200, round(image.height * 1200 / image.width)), Image.Resampling.LANCZOS)
             output = io.BytesIO()

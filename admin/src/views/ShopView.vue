@@ -63,8 +63,8 @@
           <!-- Live Preview Simulator Box -->
           <div class="rounded-xl overflow-hidden mb-4 border border-slate-200 dark:border-white/10 bg-slate-900 dark:bg-studio-950 p-4 flex items-center justify-center min-h-[140px] relative">
             <!-- If Frame: Circular Avatar with Glow -->
-            <div v-if="item.item_type === 'frame'" class="relative flex items-center justify-center w-24 h-24">
-              <div class="w-16 h-16 rounded-full bg-slate-100 dark:bg-studio-800 border-2 border-slate-200 dark:border-white/20 overflow-hidden relative z-0 shadow-inner">
+            <div v-if="item.item_type === 'frame'" class="relative flex items-center justify-center w-16 h-16">
+              <div class="w-full h-full rounded-full bg-slate-100 dark:bg-studio-800 border-2 border-slate-200 dark:border-white/20 overflow-hidden relative z-0 shadow-inner">
                 <img
                   src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80"
                   class="w-full h-full object-cover"
@@ -73,7 +73,7 @@
               <img
                 v-if="item.asset_url"
                 :src="item.asset_url"
-                class="absolute inset-0 w-full h-full scale-135 pointer-events-none z-10 object-contain drop-shadow"
+                class="absolute -inset-3 h-[calc(100%+1.5rem)] w-[calc(100%+1.5rem)] max-w-none pointer-events-none z-10 object-contain drop-shadow"
               />
             </div>
 

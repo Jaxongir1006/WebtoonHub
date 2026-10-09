@@ -179,6 +179,9 @@ export default {
     field_price: 'Price (⚡ Lightning) *',
     field_style: 'Visual Preset / Style',
     field_live_sim: 'Live Avatar Simulator',
+    frame_art_help: 'Use square PNG/WebP artwork with transparency, or SVG. Recommended: 512 × 512 px, with a centered transparent circular opening about 372 px wide. Keep decorations around the opening.',
+    frame_art_warning: 'A photo, screenshot, or JPEG will cover the avatar. A white center is not transparent. Export with transparency and check that the avatar stays visible in the preview.',
+    frame_template: 'Download a ready-to-use frame template (SVG)',
     field_asset: 'MinIO Asset URL / File',
     btn_submit: 'Add Item'
   },

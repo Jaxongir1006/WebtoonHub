@@ -85,6 +85,11 @@
 
       <!-- Asset File Upload (No manual URL needed) -->
       <div>
+        <div v-if="form.item_type === 'frame'" class="mb-3 space-y-2 rounded-xl border border-brand-500/20 bg-brand-500/5 p-3">
+          <p class="text-xs leading-relaxed text-slate-700 dark:text-studio-200">{{ $t('shop.frame_art_help') }}</p>
+          <p class="text-xs leading-relaxed text-slate-600 dark:text-studio-300">{{ $t('shop.frame_art_warning') }}</p>
+          <a :href="frameTemplateUrl" download="avatar-frame-template.svg" class="inline-block text-xs font-semibold text-brand-700 underline dark:text-brand-400">{{ $t('shop.frame_template') }} ↓</a>
+        </div>
         <label for="ShopItemModal-label-4123" class="block text-xs font-semibold text-slate-700 dark:text-studio-300 uppercase tracking-wider mb-1.5 flex items-center justify-between">
           <span>{{ isCard ? $t('collectibleCards.artwork') : form.item_type === 'frame' ? $t('staff.s085') : $t('staff.s086') }}</span>
           <span v-if="selectedFileName" class="text-[11px] font-mono text-brand-700 dark:text-brand-500 font-normal truncate max-w-xs">
@@ -101,7 +106,7 @@
           <input id="ShopItemModal-label-4123"
             ref="assetFileInput"
             type="file"
-            :accept="isCard ? '.png,.jpg,.jpeg,.webp,.gif' : '.svg,.png,.jpg,.jpeg,.webp'"
+            :accept="isCard ? '.png,.jpg,.jpeg,.webp,.gif' : form.item_type === 'frame' ? '.svg,.png,.webp' : '.svg,.png,.jpg,.jpeg,.webp'"
             class="hidden"
             @change="handleAssetFile"
           />
@@ -184,6 +189,7 @@ const isEdit = computed(() => !!props.item)
 const isCard = computed(() => form.item_type === 'card')
 const identityLocked = computed(() => isCard.value && Boolean(props.item?.identity_locked || props.item?.owned_count > 0))
 const cardGuideUrl = computed(() => import.meta.env.BASE_URL + 'guides/character-cards-guide.html#' + i18n.global.locale.value)
+const frameTemplateUrl = import.meta.env.BASE_URL + 'templates/avatar-frame-template.svg'
 
 const form = reactive({
   name: '',

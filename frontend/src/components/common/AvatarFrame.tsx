@@ -26,27 +26,22 @@ export const AvatarFrame: React.FC<AvatarFrameProps> = ({
     xs: {
       container: 'w-8 h-8',
       fontSize: 'text-[10px]',
-      frameScale: 'scale-[1.25]',
     },
     sm: {
       container: 'w-10 h-10',
       fontSize: 'text-xs',
-      frameScale: 'scale-[1.25]',
     },
     md: {
       container: 'w-14 h-14',
       fontSize: 'text-sm',
-      frameScale: 'scale-[1.28]',
     },
     lg: {
       container: 'w-20 h-20',
       fontSize: 'text-base',
-      frameScale: 'scale-[1.3]',
     },
     xl: {
       container: 'w-32 h-32',
       fontSize: 'text-2xl',
-      frameScale: 'scale-[1.32]',
     },
   }[size];
 
@@ -69,12 +64,12 @@ export const AvatarFrame: React.FC<AvatarFrameProps> = ({
     <div
       className={`relative flex items-center justify-center shrink-0 ${sizeDimensions.container} ${className}`}
     >
-      {/* Base Avatar Circle - sits perfectly inside frame hole when frame is active */}
+      {/* Keep the avatar size stable when a frame is equipped. */}
       <div
-        className={`rounded-full flex items-center justify-center font-bold text-white shadow-inner overflow-hidden bg-gradient-to-br ${gradient} ${
+        className={`w-full h-full rounded-full flex items-center justify-center font-bold text-white shadow-inner overflow-hidden bg-gradient-to-br ${gradient} ${
           hasActiveFrame
-            ? 'w-[72%] h-[72%] shadow-md ring-1 ring-white/10'
-            : 'w-full h-full ring-2 ring-studio-700/60'
+            ? 'shadow-md ring-1 ring-white/10'
+            : 'ring-2 ring-studio-700/60'
         } ${sizeDimensions.fontSize}`}
       >
         {avatarUrl ? (
@@ -94,7 +89,7 @@ export const AvatarFrame: React.FC<AvatarFrameProps> = ({
         <img
           src={frameUrl!}
           alt="Avatar Frame"
-          className={`absolute inset-0 pointer-events-none select-none w-full h-full object-contain ${sizeDimensions.frameScale} drop-shadow-lg z-10`}
+          className="absolute inset-0 pointer-events-none select-none w-full h-full object-contain scale-[1.375] drop-shadow-lg z-10"
           onError={() => setFrameError(true)}
         />
       ) : frameUrl && frameError ? (
