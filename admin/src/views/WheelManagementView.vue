@@ -305,7 +305,7 @@
                             :style="{ width: `${item.probability_percent}%` }"
                           />
                         </div>
-                        <span class="font-bold text-slate-700 dark:text-slate-200">{{ item.probability_percent }}%</span>
+                        <span class="font-bold text-slate-700 dark:text-slate-200">{{ formatPercent(item.probability_percent) }}%</span>
                         <span class="text-[10px] text-slate-600 dark:text-studio-400">({{ item.weight }})</span>
                       </div>
                     </td>
@@ -687,6 +687,13 @@ const computedWheelSlices = computed(() => {
 function truncateLabel(text) {
   if (!text) return ''
   return text.length> 12 ? text.substring(0, 10) + '..' : text
+}
+
+function formatPercent(value) {
+  const val = Number(value || 0)
+  if (val <= 0) return '0'
+  if (val < 0.1) return val.toLocaleString(i18n.global.locale.value, { maximumFractionDigits: 2 })
+  return val.toLocaleString(i18n.global.locale.value, { maximumFractionDigits: 1 })
 }
 
 function formatDate(iso) {

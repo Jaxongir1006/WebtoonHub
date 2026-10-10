@@ -87,8 +87,11 @@ const draftRates = computed(() => previewGachaRates(form.value.rarity_weights, f
 const memberFor = id => form.value.cards.find(card => card.item_id === id)
 const percentage = value => {
   const probability = Number(value || 0)
-  const format = number => number.toLocaleString(locale.value, { maximumFractionDigits: 6 })
-  return probability > 0 && probability < 0.000001 ? '<' + format(0.000001) : format(probability)
+  if (probability <= 0) return '0'
+  const format = (number, digits = 1) => number.toLocaleString(locale.value, { maximumFractionDigits: digits })
+  if (probability < 0.000001) return '<' + format(0.000001, 6)
+  if (probability < 0.1) return format(probability, 2)
+  return format(probability, 1)
 }
 const tierRate = (pool, rarity) => pool.rarity_rates?.find(tier => tier.rarity === rarity)?.probability_percent || 0
 const poolReady = pool => (pool.rarity_rates || []).some(tier => tier.probability_percent > 0)

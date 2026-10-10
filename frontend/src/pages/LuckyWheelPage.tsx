@@ -720,7 +720,7 @@ const LightningWheel: React.FC<{ onBusyChange: (busy: boolean) => void }> = ({ o
                         )}
                       </div>
                       <div className="font-mono font-bold text-brand-400">
-                        {it.probability_percent}%
+                        {(Number(it.probability_percent) || 0).toLocaleString(language === 'uz' ? 'uz-UZ' : language === 'ru' ? 'ru-RU' : 'en-US', { maximumFractionDigits: 1 })}%
                       </div>
                     </div>
                   ))}
