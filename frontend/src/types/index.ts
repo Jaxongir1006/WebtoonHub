@@ -12,6 +12,8 @@ export interface ActiveAsset {
   id: number;
   name: string;
   asset_url: string;
+  asset_preview_url?: string | null;
+  asset_animated?: boolean;
 }
 
 export interface UserProfile {

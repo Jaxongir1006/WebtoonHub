@@ -6,6 +6,7 @@ import { authApi } from '../api/auth';
 import { shopApi } from '../api/shop';
 import { UserSession, InventoryItem } from '../types';
 import { AvatarFrame } from '../components/common/AvatarFrame';
+import { ProfileWallpaper } from '../components/common/ProfileWallpaper';
 import { formatDate, formatRelativeTime } from '../utils/date';
 import { clearReaderSession, getApiErrorMessage } from '../api/client';
 import {
@@ -355,21 +356,10 @@ export const ProfilePage: React.FC = () => {
   });
 
   return (
-    <div className="min-h-screen pb-20">
+    <ProfileWallpaper key={user.id} background={user.active_background}>
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-        {/* Profile Card Banner */}
-        <div className="relative rounded-3xl bg-studio-900 border border-studio-800 p-6 sm:p-8 overflow-hidden shadow-2xl min-h-[220px]">
-          {/* Active Equipped Profile Background Banner */}
-          {user.active_background?.asset_url && (
-            <div
-              className="absolute inset-0 bg-cover bg-center transition-all duration-700 pointer-events-none"
-              style={{ backgroundImage: `url(${user.active_background.asset_url})` }}
-            >
-              <div className="absolute inset-0 bg-gradient-to-r from-studio-950/95 via-studio-950/80 to-studio-950/65" />
-              <div className="absolute inset-0 bg-gradient-to-t from-studio-950 via-transparent to-transparent" />
-            </div>
-          )}
-
+        {/* Profile Header */}
+        <div className="profile-panel relative rounded-3xl bg-studio-900 border border-studio-800 p-6 sm:p-8 overflow-hidden shadow-2xl min-h-[220px]">
           <div className="absolute top-0 right-0 w-80 h-80 bg-brand-500/10 rounded-full blur-3xl pointer-events-none" />
 
           <div className="relative z-10 flex flex-col sm:flex-row items-center sm:items-start gap-6 text-center sm:text-left">
@@ -497,10 +487,10 @@ export const ProfilePage: React.FC = () => {
           </div>
         </div>
 
-        <CardCollectionPanel key={user.id} ownerId={user.id} summary={user.card_collection} onSaved={refreshProfile} />
+        <CardCollectionPanel className="profile-panel" key={user.id} ownerId={user.id} summary={user.card_collection} onSaved={refreshProfile} />
 
         {/* My Decorations & Inventory Section */}
-        <div id="inventory" className="bg-studio-900 border border-studio-800 rounded-3xl p-6 sm:p-8 shadow-xl space-y-6">
+        <div id="inventory" className="profile-panel bg-studio-900 border border-studio-800 rounded-3xl p-6 sm:p-8 shadow-xl space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-studio-800">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-2xl bg-brand-500/10 border border-brand-500/20 flex items-center justify-center text-brand-400 shrink-0 shadow-glow-brand">
@@ -656,7 +646,7 @@ export const ProfilePage: React.FC = () => {
                       ) : (
                         <div className="w-full h-full rounded-lg overflow-hidden relative">
                           <img
-                            src={item.asset_url}
+                            src={item.asset_preview_url || item.asset_url}
                             alt={item.name}
                             className="w-full h-full object-cover"
                           />
@@ -704,7 +694,7 @@ export const ProfilePage: React.FC = () => {
         </div>
 
         {/* Edit Profile Section */}
-        <div className="bg-studio-900 border border-studio-800 rounded-3xl p-6 sm:p-8 shadow-xl">
+        <div className="profile-panel bg-studio-900 border border-studio-800 rounded-3xl p-6 sm:p-8 shadow-xl">
           <div className="flex items-center gap-2 pb-4 border-b border-studio-800 mb-6">
             <KeyRound className="w-5 h-5 text-brand-400" />
             <h2 className="text-lg font-bold text-white">{t('profile.accountSettings')}</h2>
@@ -816,7 +806,7 @@ export const ProfilePage: React.FC = () => {
         </div>
 
         {/* Active Sessions Management */}
-        <div className="bg-studio-900 border border-studio-800 rounded-3xl p-6 sm:p-8 shadow-xl">
+        <div className="profile-panel bg-studio-900 border border-studio-800 rounded-3xl p-6 sm:p-8 shadow-xl">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-studio-800 mb-6">
             <div className="flex items-center gap-2">
               <Shield className="w-5 h-5 text-brand-400" />
@@ -1028,6 +1018,6 @@ export const ProfilePage: React.FC = () => {
           </div>
         </Modal>
       )}
-    </div>
+    </ProfileWallpaper>
   );
 };

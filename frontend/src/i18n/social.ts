@@ -100,6 +100,9 @@ const rows: Record<string, [string, string, string]> = {
   photoSize: ['Choose a PNG, JPG or WebP image up to 5 MB.', 'Выберите PNG, JPG или WebP до 5 МБ.', '5 MB gacha PNG, JPG yoki WebP rasm tanlang.'],
   equippedFrame: ['Equipped avatar frame', 'Активная рамка аватара', 'O‘rnatilgan avatar ramkasi'],
   equippedBackground: ['Equipped profile background', 'Активный фон профиля', 'O‘rnatilgan profil foni'],
+  pauseBackground: ['Pause background', 'Приостановить фон', 'Fon animatsiyasini to‘xtatish'],
+  playBackground: ['Play background', 'Воспроизвести фон', 'Fon animatsiyasini o‘ynatish'],
+  backgroundAnimationUnavailable: ['Background animation unavailable', 'Анимация фона недоступна', 'Fon animatsiyasi mavjud emas'],
   noFrame: ['No frame selected', 'Рамка не выбрана', 'Ramka tanlanmagan'],
   noBackground: ['No background selected', 'Фон не выбран', 'Fon tanlanmagan'],
 };

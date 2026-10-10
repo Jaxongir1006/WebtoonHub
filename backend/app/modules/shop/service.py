@@ -12,6 +12,7 @@ from app.core.media_cleanup import delete_unreferenced_media
 from app.modules.shop.models import ShopItem, UserInventory
 from app.modules.shop.schemas import EquipResponse, InventoryItemResponse, ShopBuyResponse, ShopItemResponse, card_fields
 from app.core.card_media import MAX_CARD_BYTES, save_card_async, inspect_saved_card_async
+from app.core.background_media import save_background_async, inspect_saved_background_async
 from app.modules.shop.locking import serialize_shop_catalog
 from app.modules.users.models import User
 
@@ -233,6 +234,9 @@ class ShopService:
             if item_type == 'card':
                 derived = await save_card_async(await asset_file.read(MAX_CARD_BYTES + 1))
                 final_url = derived['asset_url']
+            elif item_type == 'background':
+                derived = await save_background_async(await asset_file.read(20 * 1024 * 1024 + 1), asset_file.filename)
+                final_url = derived['asset_url']
             else:
                 file_ext = asset_file.filename.split(".")[-1].lower() if asset_file.filename else "png"
                 folder = "frames" if item_type == "frame" else "backgrounds"
@@ -242,6 +246,8 @@ class ShopService:
                     object_name=object_name, data=content, content_type=asset_file.content_type or "image/png")
         if item_type == 'card' and not derived:
             derived = await inspect_saved_card_async(final_url)
+        elif item_type == 'background' and not derived:
+            derived = await inspect_saved_background_async(final_url)
 
         item = ShopItem(
             name=name,
@@ -328,6 +334,9 @@ class ShopService:
             raise HTTPException(422, 'Character metadata applies to collectible cards only')
         if item.item_type != 'card' and price_coins is not None and price_coins < 1:
             raise HTTPException(422, 'Frames and backgrounds require a positive purchase price')
+        if item.item_type == 'background' and asset_url is not None and asset_url.strip():
+            for key, value in (await inspect_saved_background_async(asset_url.strip())).items():
+                setattr(item, key, value)
         if name is not None:
             item.name = name
         if price_coins is not None:

@@ -11,6 +11,7 @@ from app.modules.auth.dependencies import get_current_user, get_optional_user
 from app.modules.shop.schemas import ShopItemUpdateRequest, ShopBuyRequest, FeaturedCardsRequest, card_fields
 from app.modules.shop.collection import collection_summary, feature_cards
 from app.core.card_media import MAX_CARD_BYTES, save_card_async
+from app.core.background_media import save_background_async
 from app.modules.shop.service import ShopService
 from app.modules.staff.dependencies import require_permission, require_any_permission
 from app.modules.staff.models import StaffUser
@@ -206,6 +207,9 @@ async def upload_shop_asset(
     if item_type == 'card':
         data = await save_card_async(await file.read(MAX_CARD_BYTES + 1))
         return {'success': True, 'data': data, 'message': 'Card artwork uploaded'}
+    if item_type == 'background':
+        data = await save_background_async(await file.read(20 * 1024 * 1024 + 1), file.filename or 'background.png')
+        return {'success': True, 'data': data, 'message': 'Background artwork uploaded'}
     ext = os.path.splitext(file.filename or "")[1].lower() or ".png"
     folder = "frames" if item_type == "frame" else "backgrounds"
     object_name = f"{folder}/asset_{uuid.uuid4().hex[:10]}{ext}"

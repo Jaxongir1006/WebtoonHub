@@ -186,7 +186,7 @@ export const InventoryPage: React.FC = () => {
           {user.active_background?.asset_url && (
             <div
               className="absolute inset-0 bg-cover bg-center transition-all duration-700 pointer-events-none"
-              style={{ backgroundImage: `url(${user.active_background.asset_url})` }}
+              style={{ backgroundImage: `url(${user.active_background.asset_preview_url || user.active_background.asset_url})` }}
             >
               <div className="absolute inset-0 bg-gradient-to-r from-studio-950/95 via-studio-950/80 to-studio-950/65" />
               <div className="absolute inset-0 bg-gradient-to-t from-studio-950 via-transparent to-transparent" />
@@ -389,7 +389,7 @@ export const InventoryPage: React.FC = () => {
                     ) : (
                       <div className="w-full h-full rounded-xl overflow-hidden relative">
                         <img
-                          src={item.asset_url}
+                          src={item.asset_preview_url || item.asset_url}
                           alt={item.name}
                           className="w-full h-full object-cover"
                         />

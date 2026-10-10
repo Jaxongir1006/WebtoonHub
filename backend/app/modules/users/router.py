@@ -157,6 +157,8 @@ async def get_public_profile(
                 "id": inv.item.id,
                 "name": inv.item.name,
                 "asset_url": inv.item.asset_url,
+                "asset_preview_url": inv.item.asset_preview_url or inv.item.asset_url,
+                "asset_animated": inv.item.asset_animated,
             }
 
     # 2. Clan membership

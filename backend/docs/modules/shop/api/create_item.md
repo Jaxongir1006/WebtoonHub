@@ -23,12 +23,17 @@ Content-Type: multipart/form-data
 | `name` | `string` | Majburiy (2-100 belgi) | Buyum nomi |
 | `item_type` | `string` | `frame`, `background` yoki `card` | Buyum turi |
 | `price_coins` | `integer` | Frame/background: kamida 1; card: yuborilmaydi yoki 0 | Chaqmoq narxi |
-| `asset_file` | `file` | Majburiy (PNG / WebP) | Bezak rasmi |
+| `asset_file` | `file` | Fayl yoki `asset_url`: PNG, JPEG, WebP, GIF; frame/background uchun sanitizatsiyalangan SVG | Bezak rasmi |
 
 Character cards additionally require `rarity` and `character_name`; omit the
 purchase price and assign the created card to a staff gacha pool. A nonzero card
 price is rejected with HTTP 422. A validated `asset_url` can be used instead of
 uploading `asset_file`. See [character cards](../character_cards.md).
+
+Background GIF and animated WebP uploads retain their animation and produce a
+first-frame poster. Response fields `asset_animated` and `asset_preview_url` are
+derived by the server. See [profile backgrounds](../profile_backgrounds.md) for
+limits and the edit-upload flow.
 
 ---
 

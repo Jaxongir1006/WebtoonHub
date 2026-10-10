@@ -36,7 +36,9 @@ async def _get_user_assets(db: AsyncSession, user_id: int):
         if inv.item.item_type == "frame":
             frame = {"id": inv.item.id, "name": inv.item.name, "asset_url": inv.item.asset_url}
         elif inv.item.item_type == "background":
-            bg = {"id": inv.item.id, "name": inv.item.name, "asset_url": inv.item.asset_url}
+            bg = {"id": inv.item.id, "name": inv.item.name, "asset_url": inv.item.asset_url,
+                  "asset_preview_url": inv.item.asset_preview_url or inv.item.asset_url,
+                  "asset_animated": inv.item.asset_animated}
     return frame, bg
 
 
@@ -411,7 +413,9 @@ async def _batch_public_data(db, user_ids):
         item = inventory.item
         value = {'id': item.id, 'name': item.name, 'asset_url': item.asset_url}
         if item.item_type == 'frame': frame = value
-        if item.item_type == 'background': background = value
+        if item.item_type == 'background':
+            background = value | {'asset_preview_url': item.asset_preview_url or item.asset_url,
+                                  'asset_animated': item.asset_animated}
         result[inventory.user_id] = frame, background
     db.info['public_assets'] = result
     members = (await db.execute(select(ClanMember).options(selectinload(ClanMember.clan)).where(ClanMember.user_id.in_(user_ids)))).scalars().all()

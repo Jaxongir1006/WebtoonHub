@@ -37,3 +37,8 @@ activates a pool with configured rarity weights, and checks the real roulette's
 centered server-selected result. It also verifies receipt replay, unique ownership,
 the direct-purchase ban, reduced-motion reveal, full duplicate refunds, and mobile
 horizontal fit. Database race checks run separately in the backend PostgreSQL suite.
+
+The background flow uploads an animated GIF through the studio, purchases and
+equips the saved animated WebP, and verifies its still preview and animation
+metadata. It checks complete self/public profile wallpaper coverage, scrolling
+on desktop and mobile, pause/play controls, and the reduced-motion default.

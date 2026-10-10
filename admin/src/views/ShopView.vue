@@ -79,16 +79,7 @@
 
             <CardArtPreview v-else-if="item.item_type === 'card'" :item="item" />
 
-            <!-- If Background: Wide Banner -->
-            <div
-              v-else
-              class="w-full h-28 rounded-lg overflow-hidden bg-cover bg-center flex items-center justify-center p-3 relative"
-              :class="item.border_style || ''"
-              :style="item.asset_url ? { backgroundImage: `url(${item.asset_url})` } : {}"
-            >
-              <div class="absolute inset-0 bg-black/30 backdrop-blur-[1px]" />
-              <span class="relative z-10 text-xs font-bold text-slate-900 dark:text-white drop-shadow font-mono"> {{ $t('staff.s469') }} </span>
-            </div>
+            <BackgroundPreviewSim v-else :item="item" />
           </div>
 
           <!-- Metadata -->
@@ -180,6 +171,7 @@ import Badge from '../components/common/Badge.vue'
 import Button from '../components/common/Button.vue'
 import ShopItemModal from '../components/shop/ShopItemModal.vue'
 import CardArtPreview from '../components/shop/CardArtPreview.vue'
+import BackgroundPreviewSim from '../components/shop/BackgroundPreviewSim.vue'
 
 const { t } = useI18n()
 const authStore = useAuthStore()

@@ -4,6 +4,9 @@
 
 .reader-surface { background-color: rgba(127, 127, 127, .12); }
 .reader-surface:hover { background-color: rgba(127, 127, 127, .2); }
+.profile-page[data-has-background="true"] .profile-panel {
+  background-color: rgba(15, 17, 26, .8);
+}
 :focus-visible { outline: 2px solid #fbbf24; outline-offset: 3px; }
 button, select, input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="hidden"]) { min-height: 44px; }
 button { min-width: 44px; }

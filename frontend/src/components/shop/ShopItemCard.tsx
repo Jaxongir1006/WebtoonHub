@@ -93,7 +93,7 @@ export const ShopItemCard: React.FC<ShopItemCardProps> = ({
           </div>
         ) : (
           <div className="w-full h-full rounded-xl overflow-hidden relative">
-            <img src={item.asset_url} alt={item.name} className="w-full h-full object-cover" />
+            <img src={item.asset_preview_url || item.asset_url} alt={item.name} className="w-full h-full object-cover" />
             <div className="absolute inset-0 bg-studio-950/40" />
             <div className="absolute inset-0 flex items-center justify-center font-bold text-xs text-white">
               {t('shop.preview')}

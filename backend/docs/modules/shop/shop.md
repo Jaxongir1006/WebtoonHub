@@ -7,6 +7,10 @@ Character cards use this catalog and inventory, but have no purchase price and
 can only be obtained through [Character Card Gacha](../../05_CHARACTER_CARD_GACHA.md).
 Frames and backgrounds are purchase-only; Lucky Wheel grants Lightning only.
 
+Profile backgrounds support full-profile artwork and animated GIF/WebP uploads
+with first-frame posters for reduced-motion and pause controls. See
+[profile backgrounds](profile_backgrounds.md).
+
 ---
 
 ## 2. Biznes Qoidalari

@@ -6,6 +6,7 @@ import { usersApi } from '../api/users';
 import { friendsApi } from '../api/friends';
 import { PublicProfileData } from '../types';
 import { AvatarFrame } from '../components/common/AvatarFrame';
+import { ProfileWallpaper } from '../components/common/ProfileWallpaper';
 import { getApiErrorMessage } from '../api/client';
 import { CardCollectionPanel } from '../components/cards/CardCollectionPanel';
 import {
@@ -186,24 +187,10 @@ export const PublicProfilePage: React.FC = () => {
   const isPendingReceived = profile.friendship.status === 'pending_received';
 
   return (
-    <div className="min-h-screen bg-studio-950 pb-20">
-      {/* Background Banner */}
-      <div className="relative w-full h-64 sm:h-80 overflow-hidden bg-gradient-to-r from-studio-900 via-studio-850 to-studio-900 border-b border-studio-800">
-        {profile.active_background ? (
-          <img
-            src={profile.active_background.asset_url}
-            alt={profile.active_background.name}
-            className="w-full h-full object-cover object-center filter brightness-75 transition-all duration-700"
-          />
-        ) : (
-          <div className="w-full h-full bg-gradient-to-tr from-purple-900/40 via-studio-900 to-brand-950/40" />
-        )}
-        <div className="absolute inset-0 bg-gradient-to-t from-studio-950 via-transparent to-black/30" />
-      </div>
-
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 -mt-24 sm:-mt-28 relative z-20">
+    <ProfileWallpaper key={profile.id} background={profile.active_background}>
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Profile Card Header */}
-        <div className="bg-studio-900/90 backdrop-blur-xl border border-studio-800 rounded-3xl p-6 sm:p-8 shadow-2xl">
+        <div className="profile-panel bg-studio-900 border border-studio-800 rounded-3xl p-6 sm:p-8 shadow-2xl">
           <div className="flex flex-col sm:flex-row items-center sm:items-start justify-between gap-6">
             <div className="flex flex-col sm:flex-row items-center sm:items-center gap-6 text-center sm:text-left">
               {/* Avatar with Equipped Animated Frame */}
@@ -353,12 +340,12 @@ export const PublicProfilePage: React.FC = () => {
           </div>
         </div>
 
-        {profile.card_collection && <div className="mt-8"><CardCollectionPanel key={profile.id} summary={profile.card_collection} /></div>}
+        {profile.card_collection && <div className="mt-8"><CardCollectionPanel className="profile-panel" key={profile.id} summary={profile.card_collection} /></div>}
 
         {/* Equipped Assets Showcase */}
         <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Active Frame */}
-          <div className="bg-studio-900 border border-studio-800 rounded-3xl p-6">
+          <div className="profile-panel bg-studio-900 border border-studio-800 rounded-3xl p-6">
             <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2">
               <Award className="w-5 h-5 text-brand-400" />
               <span>{t('socialFix.equippedFrame')}</span>
@@ -386,7 +373,7 @@ export const PublicProfilePage: React.FC = () => {
           </div>
 
           {/* Active Background */}
-          <div className="bg-studio-900 border border-studio-800 rounded-3xl p-6">
+          <div className="profile-panel bg-studio-900 border border-studio-800 rounded-3xl p-6">
             <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2">
               <Shield className="w-5 h-5 text-indigo-400" />
               <span>{t('socialFix.equippedBackground')}</span>
@@ -394,7 +381,7 @@ export const PublicProfilePage: React.FC = () => {
             {profile.active_background ? (
               <div className="relative rounded-2xl overflow-hidden h-28 border border-studio-800">
                 <img
-                  src={profile.active_background.asset_url}
+                  src={profile.active_background.asset_preview_url || profile.active_background.asset_url}
                   alt={profile.active_background.name}
                   className="w-full h-full object-cover"
                 />
@@ -410,6 +397,6 @@ export const PublicProfilePage: React.FC = () => {
           </div>
         </div>
       </div>
-    </div>
+    </ProfileWallpaper>
   );
 };

@@ -241,7 +241,9 @@ class AuthService:
                 active_background = ActiveAsset(
                     id=inv.item.id,
                     name=inv.item.name,
-                    asset_url=inv.item.asset_url
+                    asset_url=inv.item.asset_url,
+                    asset_preview_url=inv.item.asset_preview_url or inv.item.asset_url,
+                    asset_animated=inv.item.asset_animated
                 )
 
         # Check clan membership

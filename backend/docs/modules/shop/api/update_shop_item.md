@@ -12,6 +12,14 @@ rarity and availability affect every linked gacha pool's version. Once collected
 card identity is locked; artwork and availability can still be updated. A stale
 draw confirmation then receives HTTP 409 before charging.
 
+To replace background artwork, upload multipart `file` and `item_type=background`
+to `/api/v1/staff/shop/items/upload-asset`, then send its `asset_url` in this PATCH.
+The backend derives animation/poster metadata from the saved artwork; client
+`asset_animated` or `asset_preview_url` overrides are rejected. Replacing an
+animated background with static artwork clears its animation flag and removes
+unreferenced old artwork/posters. Legacy static cosmetic URLs remain compatible.
+See [profile backgrounds](../profile_backgrounds.md).
+
 ---
 
 ## So'rov Parametrlari (Request)

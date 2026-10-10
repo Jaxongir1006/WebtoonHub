@@ -92,7 +92,7 @@ class CharacterCardTests(unittest.IsolatedAsyncioTestCase):
             asset = response.json()['data']
             self.assertFalse(asset['asset_animated'])
             self.assertEqual(asset['asset_url'], asset['asset_preview_url'])
-        legacy = await self.upload(item_type='background')
+        legacy = await self.upload(item_type='frame')
         self.assertEqual(legacy.status_code, 200, legacy.text)
         with Image.open(safe_path(legacy.json()['data']['asset_url'].removeprefix('/content/'))) as image:
             self.assertEqual(getattr(image, 'n_frames', 1), 1)

@@ -12,9 +12,10 @@ interface CardCollectionPanelProps {
   summary?: CardCollectionSummary;
   ownerId?: number;
   onSaved?: () => Promise<unknown>;
+  className?: string;
 }
 
-export const CardCollectionPanel: React.FC<CardCollectionPanelProps> = ({ summary, ownerId, onSaved }) => {
+export const CardCollectionPanel: React.FC<CardCollectionPanelProps> = ({ summary, ownerId, onSaved, className = '' }) => {
   const { t } = useLanguage();
   const [collection, setCollection] = useState<CardCollection | null>(null);
   const [loading, setLoading] = useState(!!ownerId);
@@ -75,7 +76,7 @@ export const CardCollectionPanel: React.FC<CardCollectionPanelProps> = ({ summar
     else { setSelected(next); setMessage(null); }
   };
 
-  return <section aria-label={t('cards.collection')} className="space-y-5 rounded-3xl border border-studio-800 bg-studio-900 p-5 sm:p-8">
+  return <section aria-label={t('cards.collection')} className={`space-y-5 rounded-3xl border border-studio-800 bg-studio-900 p-5 sm:p-8 ${className}`}>
     <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="flex items-center gap-2 text-lg font-bold text-white"><Gem className="h-5 w-5 text-brand-400" aria-hidden="true" />{t('cards.collection')}</h2><p className="mt-2 max-w-2xl text-xs leading-relaxed text-studio-300">{t('cards.description')}</p></div>{ownerId && cards.length > 0 && !editing && <button type="button" onClick={() => { setEditing(true); setSelected(displayed?.featured_cards.map(card => card.id) || []); setMessage(null); }} className="min-h-11 rounded-xl border border-brand-500/40 px-4 text-xs font-bold text-brand-400 hover:bg-brand-500/10">{t('cards.manage')}</button>}</div>
     {displayed && <div className="grid grid-cols-2 gap-3 sm:grid-cols-5"><div className="rounded-xl border border-studio-800 bg-studio-950/50 p-3"><p className="text-xs text-studio-400">{t('cards.total')}</p><p className="mt-1 text-2xl font-black text-white">{displayed.total_cards}</p></div>{CARD_RARITIES.map(value => <div key={value} className="rounded-xl border border-studio-800 bg-studio-950/50 p-3"><RarityBadge rarity={value} /><p className="mt-2 text-xl font-bold text-white">{displayed.rarity_counts[value] || 0}</p></div>)}</div>}
     {message && <p role="status" className="rounded-xl border border-brand-500/30 bg-brand-500/10 p-3 text-sm text-brand-300">{message}</p>}

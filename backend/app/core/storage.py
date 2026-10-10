@@ -49,12 +49,20 @@ def validated_media(data, object_name, bucket):
     if Path(object_name).suffix.lower() == '.svg':
         if bucket in {settings.MINIO_BUCKET_CHAPTERS, settings.MINIO_BUCKET_COVERS}:
             raise HTTPException(422, 'Chapter pages and covers must be raster images')
-        return sanitize_svg(data), object_name
+        sanitized = sanitize_svg(data)
+        if bucket == settings.MINIO_BUCKET_SHOP and object_name.replace(chr(92), '/').startswith('backgrounds/'):
+            from app.core.background_media import static_background_svg
+            sanitized = static_background_svg(sanitized)
+        return sanitized, object_name
     try:
         with Image.open(io.BytesIO(data)) as source:
-            source.load()
             if source.format not in {'JPEG','PNG','WEBP','GIF'} or source.width * source.height > 40_000_000:
                 raise HTTPException(422, 'Unsupported image')
+            if bucket == settings.MINIO_BUCKET_SHOP and object_name.replace(chr(92), '/').startswith('backgrounds/') and source.format in {'GIF', 'WEBP'} and getattr(source, 'is_animated', False):
+                from app.core.background_media import encode_animated_background
+                encoded = encode_animated_background(source, MAX_MEDIA_BYTES)
+                return encoded, str(Path(object_name).with_suffix('.webp')).replace(chr(92), '/')
+            source.load()
             # PNG/GIF may store transparency in palette/key metadata without an alpha band.
             has_transparency = 'A' in source.getbands() or 'transparency' in source.info
             image = ImageOps.exif_transpose(source).convert('RGBA' if has_transparency else 'RGB')

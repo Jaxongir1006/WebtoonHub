@@ -45,6 +45,8 @@ class ActiveAsset(BaseModel):
     id: int
     name: str
     asset_url: str
+    asset_preview_url: Optional[str] = None
+    asset_animated: bool = False
 
 
 class UserProfileResponse(BaseModel):

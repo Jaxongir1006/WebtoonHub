@@ -77,9 +77,9 @@
           {{ isCard ? $t('collectibleCards.preview') : $t('shop.field_live_sim') }}
         </label>
         <CardArtPreview v-if="isCard" :item="previewCard" />
+        <BackgroundPreviewSim v-else-if="form.item_type === 'background'" :item="previewCard" />
         <FramePreviewSim v-else
           :frame-url="form.item_type === 'frame' ? form.asset_url : ''"
-          :background-url="form.item_type === 'background' ? form.asset_url : ''"
         />
       </div>
 
@@ -90,6 +90,7 @@
           <p class="text-xs leading-relaxed text-slate-600 dark:text-studio-300">{{ $t('shop.frame_art_warning') }}</p>
           <a :href="frameTemplateUrl" download="avatar-frame-template.svg" class="inline-block text-xs font-semibold text-brand-700 underline dark:text-brand-400">{{ $t('shop.frame_template') }} ↓</a>
         </div>
+        <p v-if="form.item_type === 'background'" class="mb-3 rounded-xl border border-brand-500/20 bg-brand-500/5 p-3 text-xs leading-relaxed text-slate-700 dark:text-studio-200">{{ $t('backgroundArt.help') }}</p>
         <label for="ShopItemModal-label-4123" class="block text-xs font-semibold text-slate-700 dark:text-studio-300 uppercase tracking-wider mb-1.5 flex items-center justify-between">
           <span>{{ isCard ? $t('collectibleCards.artwork') : form.item_type === 'frame' ? $t('staff.s085') : $t('staff.s086') }}</span>
           <span v-if="selectedFileName" class="text-[11px] font-mono text-brand-700 dark:text-brand-500 font-normal truncate max-w-xs">
@@ -106,7 +107,7 @@
           <input id="ShopItemModal-label-4123"
             ref="assetFileInput"
             type="file"
-            :accept="isCard ? '.png,.jpg,.jpeg,.webp,.gif' : form.item_type === 'frame' ? '.svg,.png,.webp' : '.svg,.png,.jpg,.jpeg,.webp'"
+            :accept="isCard ? '.png,.jpg,.jpeg,.webp,.gif' : form.item_type === 'frame' ? '.svg,.png,.webp' : '.svg,.png,.jpg,.jpeg,.webp,.gif'"
             class="hidden"
             @change="handleAssetFile"
           />
@@ -121,11 +122,12 @@
               {{ selectedFileName ? $t('staff.s087') : $t('staff.s088') }}
             </p>
             <p class="text-[11px] text-slate-600 dark:text-studio-400">
-              <template v-if="isCard">{{ $t('collectibleCards.artHint') }}</template><template v-else>{{ form.item_type === 'frame' ? $t('staff.s089') : $t('staff.s090') }} {{ $t('staff.s091') }}</template></p>
+              <template v-if="isCard">{{ $t('collectibleCards.artHint') }}</template><template v-else-if="form.item_type === 'background'">{{ $t('backgroundArt.artHint') }}</template><template v-else>{{ $t('staff.s089') }} {{ $t('staff.s091') }}</template></p>
           </div>
         </div>
         <p v-if="isCard" class="mt-2 text-xs text-slate-500 dark:text-studio-400">{{ $t('collectibleCards.animationHint') }}</p>
-        <p v-if="previewLoading" role="status" class="mt-2 text-xs text-slate-500">{{ $t('collectibleCards.preparing') }}</p>
+        <p v-if="form.item_type === 'background'" class="mt-2 text-xs text-slate-500 dark:text-studio-400">{{ $t('backgroundArt.animationHint') }}</p>
+        <p v-if="previewLoading" role="status" class="mt-2 text-xs text-slate-500">{{ $t(isCard ? 'collectibleCards.preparing' : 'backgroundArt.preparing') }}</p>
         <a v-if="isCard" :href="cardGuideUrl" target="_blank" rel="noopener" class="mt-2 inline-block text-xs font-semibold text-brand-700 underline dark:text-brand-400">{{ $t('collectibleCards.guide') }} ↗</a>
       </div>
 
@@ -158,8 +160,10 @@ import Modal from '../common/Modal.vue'
 import Button from '../common/Button.vue'
 import FramePreviewSim from './FramePreviewSim.vue'
 import CardArtPreview from './CardArtPreview.vue'
+import BackgroundPreviewSim from './BackgroundPreviewSim.vue'
 import { shopApi } from '../../api/shop'
 import { CARD_RARITIES, cardFileError, cardItemMetadata, createLocalCardMedia, releaseLocalCardMedia } from '../../utils/cardMedia'
+import { backgroundFileError, createLocalBackgroundMedia } from '../../utils/backgroundMedia'
 
 const { t } = useI18n()
 
@@ -256,6 +260,18 @@ async function handleAssetFile(e) {
     finally { if (sequence === previewSequence) previewLoading.value = false }
     return
   }
+  if (form.item_type === 'background') {
+    const error = backgroundFileError(file)
+    if (error) { submitError.value = t('backgroundArt.' + error); return }
+    previewLoading.value = true
+    try {
+      const media = await createLocalBackgroundMedia(file)
+      if (sequence !== previewSequence || !props.modelValue || form.item_type !== 'background') { releaseLocalCardMedia(media); return }
+      clearLocalMedia(); Object.assign(form, media); form.asset_file = file; selectedFileName.value = file.name
+    } catch (error) { if (sequence === previewSequence) submitError.value = t('backgroundArt.' + (error.code || 'file_decode')) }
+    finally { if (sequence === previewSequence) previewLoading.value = false }
+    return
+  }
   clearLocalMedia()
   selectedFileName.value = file.name
   form.asset_file = file
@@ -267,6 +283,7 @@ async function handleSubmit() {
   if (isCard.value && !form.character_name.trim()) { submitError.value = t('collectibleCards.requiredCharacter'); return }
   if (isCard.value && !CARD_RARITIES.includes(form.rarity)) { submitError.value = t('collectibleCards.requiredRarity'); return }
   if (isCard.value && form.asset_file && cardFileError(form.asset_file)) { submitError.value = t('collectibleCards.' + cardFileError(form.asset_file)); return }
+  if (form.item_type === 'background' && form.asset_file && backgroundFileError(form.asset_file)) { submitError.value = t('backgroundArt.' + backgroundFileError(form.asset_file)); return }
   if (!props.item && !form.asset_file) {
     submitError.value = isCard.value ? t('collectibleCards.requiredArt') : tr('staff.s099')
     return

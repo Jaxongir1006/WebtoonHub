@@ -15,7 +15,7 @@ from app.modules.users.models import User
 from app.modules.webtoons.models import Webtoon, Chapter, ChapterImage
 from app.modules.shop.models import ShopItem
 from sqlalchemy import update
-from PIL import Image
+from PIL import Image, ImageDraw
 import uvicorn
 
 
@@ -29,6 +29,19 @@ async def main():
         avatar = fixture.media / 'avatars' / 'fixture.webp'
         avatar.parent.mkdir(parents=True, exist_ok=True)
         Image.new('RGB', (80, 80), '#0e7490').save(avatar, 'WEBP')
+        background = fixture.media / 'backgrounds' / 'fixture-source.gif'
+        background.parent.mkdir(parents=True, exist_ok=True)
+        background_frames = []
+        for sky, hills in [('#244c6a', '#357c7b'), ('#324a78', '#566e91')]:
+            image = Image.new('RGB', (640, 360), sky)
+            draw = ImageDraw.Draw(image)
+            draw.ellipse((440, 40, 510, 110), fill='#f1d59a')
+            draw.polygon([(0, 360), (0, 230), (160, 120), (350, 300), (480, 160), (640, 260), (640, 360)], fill=hills)
+            background_frames.append(image)
+        background_frames[0].save(background, 'GIF', save_all=True, append_images=background_frames[1:],
+                                  duration=[400, 600], loop=0)
+        for image in background_frames:
+            image.close()
         async with fixture.sessions() as db:
             await db.execute(update(User).values(avatar_url='/content/avatars/fixture.webp'))
             await db.execute(update(Webtoon).where(Webtoon.id == fixture.work.id).values(

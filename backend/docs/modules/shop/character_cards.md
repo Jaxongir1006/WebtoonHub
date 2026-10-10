@@ -4,7 +4,7 @@ Cards are shop items with `item_type=card`, a required `rarity` (`common`, `rare
 
 ## Artwork
 
-Staff with `shop:manage` upload multipart `file` and `item_type=card` to `POST /api/v1/staff/shop/items/upload-asset`. The server decodes and re-encodes JPEG, PNG, static WebP, GIF and animated WebP. Animation remains animated; static artwork remains static. Cards cannot contain SVG, HTML or MP4. Frame/background processing retains its existing behavior.
+Staff with `shop:manage` upload multipart `file` and `item_type=card` to `POST /api/v1/staff/shop/items/upload-asset`. The server decodes and re-encodes JPEG, PNG, static WebP, GIF and animated WebP. Animation remains animated; static artwork remains static. Cards cannot contain SVG, HTML or MP4. Profile backgrounds have their own [bounded animation support](profile_backgrounds.md); frame processing remains unchanged.
 
 Processing limits:
 
