@@ -7,6 +7,10 @@
 * **Talab etiladigan ruxsat:** `shop:manage`
 * **Tavsif:** Barcha buyumlar (faol va nofaol bo'lganlar ham) ro'yxatini boshqaruv uchun qaytaradi.
 
+`owned_count` includes both personal and clan inventory purchases. Clan purchases
+prevent deletion in the same way as personal ownership; make an item unavailable
+to stop new purchases while preserving existing inventories.
+
 ---
 
 ## So'rov Parametrlari (Request)

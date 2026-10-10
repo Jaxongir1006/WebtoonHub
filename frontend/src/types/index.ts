@@ -48,6 +48,8 @@ export interface ClanSummary {
   avatar_url?: string | null;
   frame_url?: string | null;
   banner_url?: string | null;
+  active_frame?: ActiveAsset | null;
+  active_background?: ActiveAsset | null;
   level: number;
   xp: number;
   member_count: number;
@@ -66,6 +68,8 @@ export interface ClanDetail {
   avatar_url?: string | null;
   frame_url?: string | null;
   banner_url?: string | null;
+  active_frame?: ActiveAsset | null;
+  active_background?: ActiveAsset | null;
   leader_id: number;
   leader_username: string;
   level: number;

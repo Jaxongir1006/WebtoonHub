@@ -15,6 +15,7 @@ from sqlalchemy.orm import selectinload
 from app.core.database import get_db
 from app.modules.auth.dependencies import get_current_user, get_optional_user
 from app.modules.clans.models import ClanMember
+from app.modules.clans.cosmetics import batch_active_cosmetics
 from app.modules.comments.models import Comment
 from app.modules.friends.models import Friendship
 from app.modules.library.models import Bookmark
@@ -172,12 +173,13 @@ async def get_public_profile(
     clan_contribution = 0
     if clan_member and clan_member.clan:
         clan_contribution = clan_member.contribution_points
+        appearance = (await batch_active_cosmetics(db, [clan_member.clan.id]))[clan_member.clan.id]
         clan_info = {
             "id": clan_member.clan.id,
             "name": clan_member.clan.name,
             "tag": clan_member.clan.tag,
             "avatar_url": clan_member.clan.avatar_url,
-            "banner_url": clan_member.clan.banner_url,
+            **appearance,
             "level": clan_member.clan.level,
             "role": clan_member.role,
         }

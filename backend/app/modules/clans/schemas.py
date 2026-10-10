@@ -1,23 +1,22 @@
 from datetime import datetime
 from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
+from app.modules.auth.schemas import ActiveAsset
 
 
 class ClanCreatePayload(BaseModel):
+    model_config = ConfigDict(extra='forbid')
     expected_cost: int = Field(ge=0)
     name: str = Field(..., min_length=3, max_length=50)
     tag: str = Field(..., min_length=2, max_length=8)
     description: Optional[str] = Field(None, max_length=500)
     avatar_url: Optional[str] = Field(None, max_length=500)
-    frame_url: Optional[str] = Field(None, max_length=500)
-    banner_url: Optional[str] = Field(None, max_length=500)
 
 
 class ClanUpdatePayload(BaseModel):
+    model_config = ConfigDict(extra='forbid')
     description: Optional[str] = Field(None, max_length=500)
     avatar_url: Optional[str] = Field(None, max_length=500)
-    frame_url: Optional[str] = Field(None, max_length=500)
-    banner_url: Optional[str] = Field(None, max_length=500)
     is_recruiting: Optional[bool] = None
 
 
@@ -40,6 +39,8 @@ class ClanDetailResponse(BaseModel):
     avatar_url: Optional[str] = None
     frame_url: Optional[str] = None
     banner_url: Optional[str] = None
+    active_frame: Optional[ActiveAsset] = None
+    active_background: Optional[ActiveAsset] = None
     leader_id: int
     leader_username: str
     level: int
@@ -65,6 +66,8 @@ class ClanSummaryItem(BaseModel):
     avatar_url: Optional[str] = None
     frame_url: Optional[str] = None
     banner_url: Optional[str] = None
+    active_frame: Optional[ActiveAsset] = None
+    active_background: Optional[ActiveAsset] = None
     level: int
     xp: int
     member_count: int

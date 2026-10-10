@@ -23,6 +23,7 @@ from app.modules.auth.schemas import (
 from app.modules.shop.models import ShopItem, UserInventory
 from app.modules.users.models import User, UserSession
 from app.modules.clans.models import ClanMember
+from app.modules.clans.cosmetics import batch_active_cosmetics
 
 
 def _hash_refresh_token(token: str) -> str:
@@ -255,11 +256,13 @@ class AuthService:
         clan_member = (await db.execute(clan_stmt)).scalar_one_or_none()
         clan_info = None
         if clan_member and clan_member.clan:
+            appearance = (await batch_active_cosmetics(db, [clan_member.clan.id]))[clan_member.clan.id]
             clan_info = {
                 "id": clan_member.clan.id,
                 "name": clan_member.clan.name,
                 "tag": clan_member.clan.tag,
                 "avatar_url": clan_member.clan.avatar_url,
+                **appearance,
                 "level": clan_member.clan.level,
                 "role": clan_member.role,
                 "contribution_points": clan_member.contribution_points

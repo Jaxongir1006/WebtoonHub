@@ -366,7 +366,7 @@ class RewardService:
         earned_stmt = select(func.coalesce(func.sum(CoinTransaction.amount), 0)).where(CoinTransaction.amount > 0)
         total_earned = (await db.execute(earned_stmt)).scalar() or 0
 
-        spent_stmt = select(func.coalesce(func.sum(func.abs(CoinTransaction.amount)), 0)).where(CoinTransaction.transaction_type == "shop_purchase")
+        spent_stmt = select(func.coalesce(func.sum(func.abs(CoinTransaction.amount)), 0)).where(CoinTransaction.transaction_type.in_(["shop_purchase", "clan_shop_purchase"]))
         total_spent = (await db.execute(spent_stmt)).scalar() or 0
 
         return CoinsSummaryResponse(

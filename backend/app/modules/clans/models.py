@@ -1,4 +1,4 @@
-from sqlalchemy import BigInteger, Boolean, Column, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func
+from sqlalchemy import BigInteger, Boolean, CheckConstraint, Column, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func, false
 from sqlalchemy.orm import relationship
 from app.core.database import Base, BigIntId
 from app.modules.users.models import User
@@ -25,6 +25,28 @@ class Clan(Base):
     leader = relationship("User", foreign_keys=[leader_id])
     members = relationship("ClanMember", back_populates="clan", cascade="all, delete-orphan")
     messages = relationship("ClanMessage", back_populates="clan", cascade="all, delete-orphan")
+    inventory = relationship("ClanInventory", back_populates="clan", cascade="all, delete-orphan")
+
+
+class ClanInventory(Base):
+    """Purchased assets belong to the clan, independently of its members."""
+    __tablename__ = "clan_inventory"
+
+    id = Column(BigIntId, primary_key=True, index=True, autoincrement=True)
+    clan_id = Column(BigInteger, ForeignKey("clans.id", ondelete="CASCADE"), nullable=False, index=True)
+    item_id = Column(Integer, ForeignKey("shop_items.id", ondelete="RESTRICT"), nullable=False, index=True)
+    purchased_by_user_id = Column(BigInteger, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    price_paid = Column(Integer, nullable=False)
+    is_active = Column(Boolean, default=False, server_default=false(), nullable=False)
+    purchased_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    __table_args__ = (
+        UniqueConstraint("clan_id", "item_id", name="uq_clan_shop_item"),
+        CheckConstraint("price_paid >= 0", name="ck_clan_inventory_price_paid"),
+    )
+
+    clan = relationship("Clan", back_populates="inventory")
+    item = relationship("ShopItem")
+    purchased_by = relationship("User")
 
 
 class ClanMember(Base):

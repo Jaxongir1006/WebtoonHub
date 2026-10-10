@@ -7,6 +7,8 @@ from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
 from app.core.media_cleanup import delete_unreferenced_media
+from app.core.transactions import serialize_clan
+from app.modules.clans.cosmetics import batch_active_cosmetics, lock_clan
 from app.modules.clans.models import Clan, ClanLevelConfig, ClanMember
 from app.modules.clans.schemas import ClanLevelConfigItem
 from app.modules.staff.dependencies import require_any_permission
@@ -138,6 +140,7 @@ async def list_all_clans_admin(
         .order_by(Clan.level.desc(), Clan.created_at.desc())
     )
     clans = (await db.execute(stmt)).scalars().all()
+    appearances = await batch_active_cosmetics(db, [clan.id for clan in clans])
 
     items = []
     for c in clans:
@@ -147,7 +150,7 @@ async def list_all_clans_admin(
             "tag": c.tag,
             "description": c.description,
             "avatar_url": c.avatar_url,
-            "banner_url": c.banner_url,
+            **appearances[c.id],
             "level": c.level,
             "xp": c.xp,
             "max_members": c.max_members,
@@ -162,16 +165,15 @@ async def list_all_clans_admin(
 
 
 @staff_router.delete("/{clan_id}", status_code=status.HTTP_200_OK)
+@serialize_clan
 async def delete_clan_admin(
     clan_id: int,
     _staff: StaffUser = Depends(clan_permission),
     db: AsyncSession = Depends(get_db),
 ):
-    clan = await db.get(Clan, clan_id)
-    if not clan:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Klan topilmadi")
+    clan = await lock_clan(db, clan_id)
 
-    old_assets = [clan.avatar_url, clan.frame_url, clan.banner_url]
+    old_assets = [clan.avatar_url]
     await db.delete(clan)
     await db.commit()
     for url in old_assets:

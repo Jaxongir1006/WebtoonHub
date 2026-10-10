@@ -8,6 +8,7 @@ from app.core.database import get_db
 from app.core.transactions import entity_lock
 from app.modules.auth.dependencies import get_current_user
 from app.modules.clans.models import ClanMember
+from app.modules.clans.cosmetics import batch_active_cosmetics
 from app.modules.friends.models import Friendship
 from app.modules.friends.schemas import (
     FriendRequestItem,
@@ -52,11 +53,13 @@ async def _get_user_clan(db: AsyncSession, user_id: int):
     )
     cm = (await db.execute(clan_stmt)).scalar_one_or_none()
     if cm and cm.clan:
+        appearance = (await batch_active_cosmetics(db, [cm.clan.id]))[cm.clan.id]
         return {
             "id": cm.clan.id,
             "name": cm.clan.name,
             "tag": cm.clan.tag,
             "avatar_url": cm.clan.avatar_url,
+            **appearance,
             "level": cm.clan.level,
             "role": cm.role,
         }
@@ -419,5 +422,7 @@ async def _batch_public_data(db, user_ids):
         result[inventory.user_id] = frame, background
     db.info['public_assets'] = result
     members = (await db.execute(select(ClanMember).options(selectinload(ClanMember.clan)).where(ClanMember.user_id.in_(user_ids)))).scalars().all()
+    appearances = await batch_active_cosmetics(db, [member.clan.id for member in members if member.clan])
     db.info['public_clans'] = {member.user_id: {'id': member.clan.id, 'name': member.clan.name, 'tag': member.clan.tag,
-             'avatar_url': member.clan.avatar_url, 'level': member.clan.level, 'role': member.role} for member in members if member.clan}
+             'avatar_url': member.clan.avatar_url, 'level': member.clan.level, 'role': member.role,
+             **appearances[member.clan.id]} for member in members if member.clan}

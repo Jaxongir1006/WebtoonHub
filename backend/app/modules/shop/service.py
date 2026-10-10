@@ -267,8 +267,11 @@ class ShopService:
         res = await db.execute(stmt)
         items = res.scalars().all()
         owned = dict((await db.execute(select(UserInventory.item_id, func.count(UserInventory.id)).group_by(UserInventory.item_id))).all())
+        from app.modules.clans.models import ClanInventory
+        clan_owned = dict((await db.execute(select(ClanInventory.item_id, func.count(ClanInventory.id)).group_by(ClanInventory.item_id))).all())
         return [{column.name: getattr(item, column.name) for column in ShopItem.__table__.columns} | {
-            'owned_count': owned.get(item.id, 0), 'identity_locked': item.item_type == 'card' and owned.get(item.id, 0) > 0} for item in items]
+            'owned_count': owned.get(item.id, 0) + clan_owned.get(item.id, 0),
+            'identity_locked': item.item_type == 'card' and owned.get(item.id, 0) > 0} for item in items]
 
     @staticmethod
     async def validate_card_metadata(db, item_type, rarity, character_name, series_title, webtoon_id):
@@ -370,7 +373,8 @@ class ShopService:
 
         from app.modules.wheel.models import WheelItem
         from app.modules.gacha.models import GachaRoll
-        if linked_pools or await db.scalar(select(GachaRoll.id).where(GachaRoll.item_id == item_id).limit(1)) or await db.scalar(select(UserInventory.id).where(UserInventory.item_id == item_id).limit(1)) or await db.scalar(select(WheelItem.id).where(WheelItem.shop_item_id == item_id).limit(1)):
+        from app.modules.clans.models import ClanInventory
+        if linked_pools or await db.scalar(select(GachaRoll.id).where(GachaRoll.item_id == item_id).limit(1)) or await db.scalar(select(UserInventory.id).where(UserInventory.item_id == item_id).limit(1)) or await db.scalar(select(ClanInventory.id).where(ClanInventory.item_id == item_id).limit(1)) or await db.scalar(select(WheelItem.id).where(WheelItem.shop_item_id == item_id).limit(1)):
             raise HTTPException(409, "This item is owned or used by a reward pool. Make it unavailable instead of deleting it.")
         old_asset = item.asset_url
         old_preview = item.asset_preview_url

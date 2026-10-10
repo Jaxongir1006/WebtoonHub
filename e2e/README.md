@@ -42,3 +42,8 @@ The background flow uploads an animated GIF through the studio, purchases and
 equips the saved animated WebP, and verifies its still preview and animation
 metadata. It checks complete self/public profile wallpaper coverage, scrolling
 on desktop and mobile, pause/play controls, and the reduced-motion default.
+
+The clan flow uploads a logo and buys a shop frame and background with the acting leader's own lightnings,
+checks that ownership is recorded in the clan inventory instead of the personal
+inventory, and equips/unequips it through the real clan shop. It verifies complete
+clan-page wallpaper coverage, mobile fit, and reduced-motion posters.

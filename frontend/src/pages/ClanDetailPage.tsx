@@ -5,13 +5,13 @@ import { useLanguage } from '../context/LanguageContext';
 import { clansApi } from '../api/clans';
 import { ClanDetail, ClanMemberItem, ClanMessageItem } from '../types';
 import { AvatarFrame } from '../components/common/AvatarFrame';
+import { ProfileWallpaper } from '../components/common/ProfileWallpaper';
+import { ClanShopPanel } from '../components/clans/ClanShopPanel';
 import { getApiErrorMessage } from '../api/client';
 import { Modal } from '../components/common/Modal';
 import {
   Shield,
   Users,
-  Award,
-  Zap,
   ArrowUpCircle,
   MessageSquare,
   Send,
@@ -25,9 +25,8 @@ import {
   Loader2,
   Sparkles,
   Info,
-  X,
-  Image,
-  Upload
+  Upload,
+  Store
 } from 'lucide-react';
 
 export const ClanDetailPage: React.FC = () => {
@@ -41,7 +40,7 @@ export const ClanDetailPage: React.FC = () => {
   const [members, setMembers] = useState<ClanMemberItem[]>([]);
   const [messages, setMessages] = useState<ClanMessageItem[]>([]);
   const messagesRef = useRef(messages); messagesRef.current = messages;
-  const [activeTab, setActiveTab] = useState<'chat' | 'members'>('chat');
+  const [activeTab, setActiveTab] = useState<'chat' | 'members' | 'shop'>('chat');
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [actionLoading, setActionLoading] = useState<boolean>(false);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -51,16 +50,12 @@ export const ClanDetailPage: React.FC = () => {
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState<boolean>(false);
   const [editDesc, setEditDesc] = useState<string>('');
   const [editAvatar, setEditAvatar] = useState<string>('');
-  const [editFrame, setEditFrame] = useState<string | null>(null);
-  const [editBanner, setEditBanner] = useState<string | null>(null);
   const [editRecruiting, setEditRecruiting] = useState<boolean>(true);
   const [savingSettings, setSavingSettings] = useState<boolean>(false);
   const [settingsError, setSettingsError] = useState<string | null>(null);
   const [settingsSuccess, setSettingsSuccess] = useState<string | null>(null);
   const [uploadingFile, setUploadingFile] = useState<boolean>(false);
   const avatarFileInputRef = useRef<HTMLInputElement>(null);
-  const bannerFileInputRef = useRef<HTMLInputElement>(null);
-  const frameFileInputRef = useRef<HTMLInputElement>(null);
 
   // Chat message input
   const [chatInput, setChatInput] = useState<string>('');
@@ -86,6 +81,7 @@ export const ClanDetailPage: React.FC = () => {
   const loadClanData = async () => {
     if (!clanId) { setIsLoading(false); return; }
     const request = ++loadRequest.current;
+    const identity = entityIdentity.current;
     if (!clan) setIsLoading(true);
     setActionError(null);
     try {
@@ -93,21 +89,26 @@ export const ClanDetailPage: React.FC = () => {
         clansApi.getClanDetail(clanId),
         clansApi.getClanMembers(clanId),
       ]);
-      if (request !== loadRequest.current) return;
+      if (request !== loadRequest.current || identity !== entityIdentity.current) return;
       setClan(clanRes.data);
       setMembers(membersRes.data || []);
     } catch (err) {
-      if (request === loadRequest.current) setActionError(getApiErrorMessage(err, t('socialFix.loadFailed')));
+      if (request === loadRequest.current && identity === entityIdentity.current) setActionError(getApiErrorMessage(err, t('socialFix.loadFailed')));
     } finally {
-      if (request === loadRequest.current) setIsLoading(false);
+      if (request === loadRequest.current && identity === entityIdentity.current) setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    setClan(null); setMembers([]); setActionSuccess(null); setIsSettingsModalOpen(false); setIsLoading(true);
+    setClan(null); setMembers([]); setActionSuccess(null); setIsSettingsModalOpen(false); setIsLoading(true); setActiveTab('chat');
+    setUploadingFile(false); setSavingSettings(false); setSettingsError(null); setSettingsSuccess(null);
     if (!authLoading) loadClanData();
     return () => { loadRequest.current++; };
   }, [clanId, currentUser?.id, authLoading]);
+
+  useEffect(() => {
+    if (!clan?.my_role) setActiveTab('chat');
+  }, [clan?.my_role]);
 
   const mergeMessages = (previous: ClanMessageItem[], incoming: ClanMessageItem[]) => {
     const unique = new Map(previous.map(message => [message.id > 0 ? String(message.id) : `${message.created_at}:${message.content}`, message]));
@@ -345,7 +346,7 @@ export const ClanDetailPage: React.FC = () => {
   const handleUploadClanAvatar = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const identity = entityIdentity.current;
     const file = e.target.files?.[0];
-    if (!file || !clan) return;
+    if (!file || !clan || uploadingFile || savingSettings) return;
     setUploadingFile(true);
     setSettingsError(null);
     try {
@@ -353,49 +354,8 @@ export const ClanDetailPage: React.FC = () => {
       if (identity !== entityIdentity.current) return;
       if (res.data?.avatar_url) {
         setEditAvatar(res.data.avatar_url);
-        if (identity === entityIdentity.current) setSettingsSuccess(t('socialFix.appearanceDraft'));
-      }
-    } catch (err) {
-      if (identity === entityIdentity.current) setSettingsError(getApiErrorMessage(err, t('common.error')));
-    } finally {
-      if (identity === entityIdentity.current) setUploadingFile(false);
-      if (e.target) e.target.value = '';
-    }
-  };
-
-  const handleUploadClanBanner = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const identity = entityIdentity.current;
-    const file = e.target.files?.[0];
-    if (!file || !clan) return;
-    setUploadingFile(true);
-    setSettingsError(null);
-    try {
-      const res = await clansApi.uploadClanBanner(clan.id, file);
-      if (identity !== entityIdentity.current) return;
-      if (res.data?.banner_url) {
-        setEditBanner(res.data.banner_url);
-        if (identity === entityIdentity.current) setSettingsSuccess(t('socialFix.appearanceDraft'));
-      }
-    } catch (err) {
-      if (identity === entityIdentity.current) setSettingsError(getApiErrorMessage(err, t('common.error')));
-    } finally {
-      if (identity === entityIdentity.current) setUploadingFile(false);
-      if (e.target) e.target.value = '';
-    }
-  };
-
-  const handleUploadClanFrame = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const identity = entityIdentity.current;
-    const file = e.target.files?.[0];
-    if (!file || !clan) return;
-    setUploadingFile(true);
-    setSettingsError(null);
-    try {
-      const res = await clansApi.uploadClanFrame(clan.id, file);
-      if (identity !== entityIdentity.current) return;
-      if (res.data?.frame_url) {
-        setEditFrame(res.data.frame_url);
-        if (identity === entityIdentity.current) setSettingsSuccess(t('socialFix.appearanceDraft'));
+        setSettingsSuccess(t('clanShop.logoUpdated'));
+        await loadClanData();
       }
     } catch (err) {
       if (identity === entityIdentity.current) setSettingsError(getApiErrorMessage(err, t('common.error')));
@@ -409,8 +369,6 @@ export const ClanDetailPage: React.FC = () => {
     if (!clan || savingSettings || uploadingFile) return;
     setEditDesc(clan.description || '');
     setEditAvatar(clan.avatar_url || '');
-    setEditFrame(clan.frame_url || null);
-    setEditBanner(clan.banner_url || null);
     setEditRecruiting(clan.is_recruiting);
     setSettingsError(null);
     setSettingsSuccess(null);
@@ -428,8 +386,6 @@ export const ClanDetailPage: React.FC = () => {
       const res = await clansApi.updateClan(clan.id, {
         description: editDesc.trim(),
         avatar_url: editAvatar || '',
-        frame_url: editFrame || '',
-        banner_url: editBanner || '',
         is_recruiting: editRecruiting,
       });
       if (identity !== entityIdentity.current) return;
@@ -474,33 +430,19 @@ export const ClanDetailPage: React.FC = () => {
   const xpPercentage = Math.min(100, Math.floor((clan.xp / (clan.required_xp || 1)) * 100));
 
   return (
-    <div className="min-h-screen bg-studio-950 pb-20">
-      {/* Banner */}
-      <div className="relative w-full h-64 sm:h-72 bg-gradient-to-r from-purple-950 via-studio-900 to-indigo-950 border-b border-studio-800 overflow-hidden">
-        {clan.banner_url ? (
-          <img
-            src={clan.banner_url}
-            alt={clan.name}
-            className="w-full h-full object-cover filter brightness-70"
-          />
-        ) : (
-          <div className="w-full h-full bg-gradient-to-tr from-purple-900/60 to-indigo-950/60" />
-        )}
-        <div className="absolute inset-0 bg-gradient-to-t from-studio-950 via-transparent to-black/40" />
-      </div>
-
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 -mt-24 relative z-20">
+    <ProfileWallpaper background={clan.active_background}>
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8 relative z-20">
         {/* Clan Card Header */}
-        <div className="bg-studio-900/95 backdrop-blur-xl border border-studio-800 rounded-3xl p-6 sm:p-8 shadow-2xl mb-8">
+        <div className="profile-panel bg-studio-900/95 backdrop-blur-xl border border-studio-800 rounded-3xl p-6 sm:p-8 shadow-2xl mb-8">
           <div className="flex flex-col md:flex-row items-center md:items-start justify-between gap-6">
             <div className="flex flex-col sm:flex-row items-center gap-6 text-center sm:text-left">
-              <AvatarFrame
+              <div data-clan-avatar className="shrink-0"><AvatarFrame
                 username={clan.name}
                 avatarUrl={clan.avatar_url || undefined}
                 frameUrl={clan.frame_url}
                 size="xl"
                 className="shrink-0 drop-shadow-2xl"
-              />
+              /></div>
 
               <div>
                 <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2.5 mb-1.5">
@@ -643,7 +585,7 @@ export const ClanDetailPage: React.FC = () => {
         </div>
 
         {/* 2 Main Tabs: Clan Chat & Clan Members */}
-        <div className="flex border-b border-studio-800 mb-6 gap-6">
+        <div className="profile-panel flex flex-wrap rounded-2xl border border-studio-800 bg-studio-900 px-4 pt-3 mb-6 gap-x-6 gap-y-2">
           <button
             aria-pressed={activeTab === 'chat'} onClick={() => setActiveTab('chat')}
             className={`pb-3 font-bold text-sm tracking-wide transition-all border-b-2 flex items-center gap-2 ${
@@ -667,11 +609,23 @@ export const ClanDetailPage: React.FC = () => {
             <Users className="w-4 h-4" />
             <span>{t('clans.membersTab')} ({members.length})</span>
           </button>
+          {clan.my_role && (
+            <button
+              type="button"
+              aria-pressed={activeTab === 'shop'}
+              onClick={() => setActiveTab('shop')}
+              className={`flex items-center gap-2 border-b-2 pb-3 text-sm font-bold tracking-wide ${activeTab === 'shop' ? 'border-brand-500 text-white' : 'border-transparent text-studio-300 hover:text-white'}`}
+            >
+              <Store className="h-4 w-4" />{t('clanShop.tab')}
+            </button>
+          )}
         </div>
+
+        {activeTab === 'shop' && clan.my_role && <ClanShopPanel clan={clan} onAppearanceChange={loadClanData} />}
 
         {/* Tab 1: Real-time Clan Chat */}
         {activeTab === 'chat' && (
-          <div className="bg-studio-900 border border-studio-800 rounded-3xl overflow-hidden shadow-2xl flex flex-col h-[min(600px,80dvh)] min-h-[300px]">
+          <div className="profile-panel bg-studio-900 border border-studio-800 rounded-3xl overflow-hidden shadow-2xl flex flex-col h-[min(600px,80dvh)] min-h-[300px]">
             {/* Chat Messages Log */}
             <div role="status" className="px-4 pt-3 text-xs text-studio-300">{clan.my_role && t(`socialFix.${connectionState}`)}</div>
             {chatError && <p role="alert" className="p-4 text-rose-400 text-sm">{chatError}</p>}
@@ -792,7 +746,7 @@ export const ClanDetailPage: React.FC = () => {
 
         {/* Tab 2: Clan Members */}
         {activeTab === 'members' && (
-          <div className="bg-studio-900 border border-studio-800 rounded-3xl p-6 shadow-xl">
+          <div className="profile-panel bg-studio-900 border border-studio-800 rounded-3xl p-6 shadow-xl">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {members.map((member) => (
                 <div
@@ -866,27 +820,23 @@ export const ClanDetailPage: React.FC = () => {
               </div>
             )}
 
-            <p className="mb-4 text-sm text-studio-300">{t('socialFix.appearanceDraft')}</p>
+            <p className="mb-4 text-sm text-studio-300">{t('clanShop.settingsDraft')}</p>
             {/* LIVE PREVIEW BOX */}
             <div className="mb-6 rounded-2xl border border-studio-800 p-4 bg-studio-950 relative overflow-hidden shadow-lg">
               <span className="text-[10px] font-bold uppercase tracking-wider text-studio-400 block mb-2">
                 {t('socialFix.preview')}
               </span>
               <div className="relative rounded-xl overflow-hidden p-4 sm:p-6 min-h-[120px] flex items-center gap-4">
-                {/* Banner backdrop preview */}
-                {editBanner && (
-                  <div
-                    className="absolute inset-0 bg-cover bg-center transition-all duration-300"
-                    style={{ backgroundImage: `url(${editBanner})` }}
-                  >
-                    <div className="absolute inset-0 bg-gradient-to-r from-studio-950/95 via-studio-950/80 to-studio-950/60" />
+                {clan.active_background && (
+                  <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${clan.active_background.asset_preview_url || (clan.active_background.asset_animated ? '' : clan.active_background.asset_url)})` }}>
+                    <div className="absolute inset-0 bg-studio-950/70" />
                   </div>
                 )}
                 <div className="relative z-10 flex items-center gap-4">
                   <AvatarFrame
                     username={clan.name}
                     avatarUrl={editAvatar || undefined}
-                    frameUrl={editFrame}
+                    frameUrl={clan.frame_url}
                     size="lg"
                   />
                   <div>
@@ -905,58 +855,11 @@ export const ClanDetailPage: React.FC = () => {
             </div>
 
             <form onSubmit={handleSaveSettings} className="space-y-6">
-              {/* 1. CLAN RAMKASI (AVATAR FRAME) */}
-              <div>
-                <p className="block text-xs font-bold text-studio-300 uppercase tracking-wider mb-2">
-                  {t('socialFix.equippedFrame')}
-                </p>
-                <div className="mt-3 flex flex-wrap items-center gap-3">
-                  <input
-                    type="file"
-                    ref={frameFileInputRef}
-                    onChange={handleUploadClanFrame}
-                    accept=".svg,.png,.webp"
-                    className="hidden"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => frameFileInputRef.current?.click()}
-                    disabled={uploadingFile}
-                    className="px-3.5 py-2 rounded-xl bg-studio-800 hover:bg-studio-700 text-xs font-bold text-studio-200 border border-studio-700 hover:border-purple-500/50 transition-all flex items-center gap-2 cursor-pointer"
-                  >
-                    <Upload className="w-3.5 h-3.5 text-purple-400" />
-                    <span>{t('socialFix.uploadFrame')}</span>
-                  </button>
-                  {editFrame && <button type="button" onClick={() => setEditFrame(null)} className="text-xs text-studio-400 hover:text-white">{t('socialFix.remove')}</button>}
-                  {uploadingFile && <span className="text-xs text-purple-400 animate-pulse">{t('common.loading')}</span>}
-                </div>
-              </div>
-
-              {/* 2. CLAN BACKGROUND (FON / BANNER) */}
-              <div>
-                <p className="block text-xs font-bold text-studio-300 uppercase tracking-wider mb-2">
-                  {t('socialFix.equippedBackground')}
-                </p>
-                <div className="mt-3 flex flex-wrap items-center gap-3">
-                  <input
-                    type="file"
-                    ref={bannerFileInputRef}
-                    onChange={handleUploadClanBanner}
-                    accept="image/png,image/jpeg,image/webp"
-                    className="hidden"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => bannerFileInputRef.current?.click()}
-                    disabled={uploadingFile}
-                    className="px-3.5 py-2 rounded-xl bg-studio-800 hover:bg-studio-700 text-xs font-bold text-studio-200 border border-studio-700 hover:border-purple-500/50 transition-all flex items-center gap-2 cursor-pointer"
-                  >
-                    <Upload className="w-3.5 h-3.5 text-purple-400" />
-                    <span>{t('socialFix.uploadBanner')}</span>
-                  </button>
-                  {editBanner && <button type="button" onClick={() => setEditBanner(null)} className="text-xs text-studio-400 hover:text-white">{t('socialFix.remove')}</button>}
-                  {uploadingFile && <span className="text-xs text-purple-400 animate-pulse">{t('common.loading')}</span>}
-                </div>
+              <div className="rounded-2xl border border-brand-400/30 bg-studio-950 p-4">
+                <p className="mb-3 text-sm text-studio-200">{t('clanShop.settingsHint')}</p>
+                <button type="button" disabled={savingSettings || uploadingFile} onClick={() => { setIsSettingsModalOpen(false); setActiveTab('shop'); }} className="flex items-center gap-2 rounded-xl border border-brand-400/40 px-4 text-sm font-bold text-brand-300">
+                  <Store className="h-4 w-4" />{t('clanShop.open')}
+                </button>
               </div>
 
               {/* 3. CLAN AVATAR (LOGO) */}
@@ -1048,6 +951,6 @@ export const ClanDetailPage: React.FC = () => {
           </div>
         </Modal>
       )}
-    </div>
+    </ProfileWallpaper>
   );
 };

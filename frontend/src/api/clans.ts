@@ -1,5 +1,5 @@
 import { apiClient } from './client';
-import { ApiResponse, ClanDetail, ClanMemberItem, ClanMessageItem, ClanSummary } from '../types';
+import { ApiResponse, ClanDetail, ClanMemberItem, ClanMessageItem, ClanSummary, ShopItem, InventoryItem } from '../types';
 
 type ClanListResponse = ApiResponse<ClanSummary[]> & { pagination?: { offset: number; limit: number; total: number; has_more: boolean } };
 
@@ -33,8 +33,6 @@ export const clansApi = {
     tag: string;
     description?: string;
     avatar_url?: string;
-    frame_url?: string;
-    banner_url?: string;
     expected_cost: number;
   }): Promise<ApiResponse<{ id: number; name: string; tag: string; remaining_coins?: number }>> => {
     const response = await apiClient.post<ApiResponse<{ id: number; name: string; tag: string; remaining_coins?: number }>>('/clans', data);
@@ -43,7 +41,7 @@ export const clansApi = {
 
   updateClan: async (
     clanId: number,
-    data: { description?: string; avatar_url?: string; frame_url?: string; banner_url?: string; is_recruiting?: boolean }
+    data: { description?: string; avatar_url?: string; is_recruiting?: boolean }
   ): Promise<ApiResponse<any>> => {
     const response = await apiClient.patch<ApiResponse<any>>(`/clans/${clanId}`, data);
     return response.data;
@@ -96,27 +94,30 @@ export const clansApi = {
   uploadClanAvatar: async (clanId: number, file: File): Promise<ApiResponse<{ avatar_url: string }>> => {
     const formData = new FormData();
     formData.append('file', file);
-    const response = await apiClient.post<ApiResponse<{ avatar_url: string }>>('/clans/uploads/avatar', formData, {
+    const response = await apiClient.post<ApiResponse<{ avatar_url: string }>>(`/clans/${clanId}/upload-avatar`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
     return response.data;
   },
 
-  uploadClanBanner: async (clanId: number, file: File): Promise<ApiResponse<{ banner_url: string }>> => {
-    const formData = new FormData();
-    formData.append('file', file);
-    const response = await apiClient.post<ApiResponse<{ banner_url: string }>>('/clans/uploads/banner', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
+  getShop: async (clanId: number): Promise<ApiResponse<ShopItem[]>> => {
+    const response = await apiClient.get<ApiResponse<ShopItem[]>>(`/clans/${clanId}/shop`);
     return response.data;
   },
-
-  uploadClanFrame: async (clanId: number, file: File): Promise<ApiResponse<{ frame_url: string }>> => {
-    const formData = new FormData();
-    formData.append('file', file);
-    const response = await apiClient.post<ApiResponse<{ frame_url: string }>>('/clans/uploads/frame', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
+  getInventory: async (clanId: number): Promise<ApiResponse<InventoryItem[]>> => {
+    const response = await apiClient.get<ApiResponse<InventoryItem[]>>(`/clans/${clanId}/inventory`);
+    return response.data;
+  },
+  buyDecoration: async (clanId: number, itemId: number, expectedPrice: number): Promise<ApiResponse<{ item_id: number; item_name: string; price_paid: number; new_balance: number }>> => {
+    const response = await apiClient.post(`/clans/${clanId}/shop/buy/${itemId}`, { expected_price: expectedPrice });
+    return response.data;
+  },
+  equipDecoration: async (clanId: number, itemId: number): Promise<ApiResponse<unknown>> => {
+    const response = await apiClient.post(`/clans/${clanId}/shop/equip/${itemId}`);
+    return response.data;
+  },
+  unequipDecoration: async (clanId: number, itemId: number): Promise<ApiResponse<unknown>> => {
+    const response = await apiClient.post(`/clans/${clanId}/shop/unequip/${itemId}`);
     return response.data;
   },
 };

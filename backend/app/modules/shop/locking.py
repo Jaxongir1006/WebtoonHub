@@ -2,14 +2,20 @@
 import inspect
 from functools import wraps
 from sqlalchemy import text
-from app.core.transactions import entity_lock
+from app.core.transactions import entity_lock, lock_user
 
 
 def serialize_shop_catalog(function):
     signature = inspect.signature(function)
     @wraps(function)
     async def wrapper(*args, **kwargs):
-        db = signature.bind(*args, **kwargs).arguments['db']
+        arguments = signature.bind(*args, **kwargs).arguments
+        db = arguments['db']
+        # Acquisitions must lock their wallet before the catalog advisory lock.
+        # Clan acquisition also locks its clan before entering this decorator.
+        # Staff edits have no wallet, so cannot form the reverse dependency.
+        if arguments.get('user_id') is not None:
+            await lock_user(db, arguments['user_id'])
         if db.bind.dialect.name == 'sqlite':
             async with entity_lock('shop-catalog', 0):
                 return await function(*args, **kwargs)

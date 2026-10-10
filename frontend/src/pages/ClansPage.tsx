@@ -294,9 +294,9 @@ export const ClansPage: React.FC = () => {
                 className="group bg-studio-900 border border-studio-800 hover:border-purple-500/50 rounded-3xl p-5 transition-all shadow-lg hover:shadow-2xl flex flex-col justify-between overflow-hidden relative"
               >
                 {/* Banner backdrop */}
-                {c.banner_url && (
+                {(c.active_background?.asset_preview_url || (!c.active_background?.asset_animated && c.active_background?.asset_url)) && (
                   <div className="absolute inset-0 h-20 opacity-20 group-hover:opacity-30 transition-opacity">
-                    <img src={c.banner_url} alt="" className="w-full h-full object-cover" />
+                    <img src={c.active_background?.asset_preview_url || c.active_background?.asset_url} alt="" className="w-full h-full object-cover" />
                   </div>
                 )}
 

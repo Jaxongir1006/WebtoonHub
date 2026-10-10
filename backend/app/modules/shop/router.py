@@ -181,7 +181,10 @@ async def update_shop_item(
     )
     from sqlalchemy import func, select
     from app.modules.shop.models import UserInventory
-    owned_count = await db.scalar(select(func.count()).select_from(UserInventory).where(UserInventory.item_id == item.id))
+    from app.modules.clans.models import ClanInventory
+    personal_count = await db.scalar(select(func.count()).select_from(UserInventory).where(UserInventory.item_id == item.id))
+    clan_count = await db.scalar(select(func.count()).select_from(ClanInventory).where(ClanInventory.item_id == item.id))
+    owned_count = personal_count + clan_count
     return {
         "success": True,
         "data": {
@@ -190,7 +193,7 @@ async def update_shop_item(
             "price_coins": item.price_coins,
             "asset_url": item.asset_url,
             "is_available": item.is_available, "item_type": item.item_type, **card_fields(item),
-            "owned_count": owned_count, "identity_locked": item.item_type == 'card' and owned_count > 0
+            "owned_count": owned_count, "identity_locked": item.item_type == 'card' and personal_count > 0
         },
         "message": "Buyum muvaffaqiyatli yangilandi"
     }

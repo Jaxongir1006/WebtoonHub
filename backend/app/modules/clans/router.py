@@ -20,6 +20,7 @@ from app.modules.clans.connection_manager import valid_chat_session
 from app.modules.auth.dependencies import get_current_user, get_optional_user
 from app.modules.clans.connection_manager import clan_ws_manager
 from app.modules.clans.models import Clan, ClanLevelConfig, ClanMember, ClanMessage
+from app.modules.clans.cosmetics import ClanCosmeticService, batch_active_cosmetics, lock_clan
 from app.modules.clans.schemas import (
     ClanCreatePayload,
     ClanDetailResponse,
@@ -30,6 +31,7 @@ from app.modules.clans.schemas import (
 )
 from app.modules.rewards.models import CoinTransaction
 from app.modules.shop.models import UserInventory, ShopItem
+from app.modules.shop.schemas import ShopBuyRequest
 from app.modules.staff.models import SystemSetting
 from app.modules.users.models import User
 
@@ -86,6 +88,7 @@ async def list_clans(
     total = await db.scalar(select(func.count()).select_from(stmt.order_by(None).subquery()))
     clans = (await db.execute(stmt.offset(offset).limit(limit))).scalars().all()
     counts = dict((await db.execute(select(ClanMember.clan_id, func.count(ClanMember.id)).where(ClanMember.clan_id.in_([clan.id for clan in clans])).group_by(ClanMember.clan_id))).all())
+    appearances = await batch_active_cosmetics(db, [clan.id for clan in clans])
 
     items = []
     for c in clans:
@@ -95,8 +98,7 @@ async def list_clans(
             "tag": c.tag,
             "description": c.description,
             "avatar_url": c.avatar_url,
-            "frame_url": c.frame_url,
-            "banner_url": c.banner_url,
+            **appearances[c.id],
             "level": c.level,
             "xp": c.xp,
             "member_count": counts.get(c.id, 0),
@@ -139,6 +141,7 @@ async def get_my_clan(
     up_cost = lvl_cfg.upgrade_cost_coins if lvl_cfg else 500
 
     next_lvl_cfg = await db.get(ClanLevelConfig, clan.level + 1)
+    appearance = (await batch_active_cosmetics(db, [clan.id]))[clan.id]
 
     return {
         "success": True,
@@ -148,8 +151,7 @@ async def get_my_clan(
             "tag": clan.tag,
             "description": clan.description,
             "avatar_url": clan.avatar_url,
-            "frame_url": clan.frame_url,
-            "banner_url": clan.banner_url,
+            **appearance,
             "leader_id": clan.leader_id,
             "leader_username": clan.leader.username if clan.leader else "Boshliq",
             "level": clan.level,
@@ -197,6 +199,7 @@ async def get_clan_detail(
     up_cost = lvl_cfg.upgrade_cost_coins if lvl_cfg else 500
 
     next_lvl_cfg = await db.get(ClanLevelConfig, clan.level + 1)
+    appearance = (await batch_active_cosmetics(db, [clan.id]))[clan.id]
 
     return {
         "success": True,
@@ -206,8 +209,7 @@ async def get_clan_detail(
             "tag": clan.tag,
             "description": clan.description,
             "avatar_url": clan.avatar_url,
-            "frame_url": clan.frame_url,
-            "banner_url": clan.banner_url,
+            **appearance,
             "leader_id": clan.leader_id,
             "leader_username": clan.leader.username if clan.leader else "Boshliq",
             "level": clan.level,
@@ -292,8 +294,6 @@ async def create_clan(
         tag=clean_tag,
         description=payload.description or "Yangi klan",
         avatar_url=payload.avatar_url or current_user.avatar_url,
-        frame_url=payload.frame_url,
-        banner_url=payload.banner_url,
         leader_id=current_user.id,
         level=1,
         xp=0,
@@ -336,15 +336,14 @@ async def create_clan(
 
 
 @router.patch("/{clan_id}", status_code=status.HTTP_200_OK)
+@serialize_clan
 async def update_clan(
     clan_id: int,
     payload: ClanUpdatePayload,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    clan = await db.get(Clan, clan_id)
-    if not clan:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Klan topilmadi")
+    clan = await lock_clan(db, clan_id)
 
     # Check leadership
     cm = (await db.execute(
@@ -354,15 +353,11 @@ async def update_clan(
     if not cm or cm.role not in ["leader", "co_leader"]:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Faqat klan yetakchilari tahrirlashi mumkin")
 
-    old_assets = [clan.avatar_url, clan.frame_url, clan.banner_url]
+    old_assets = [clan.avatar_url]
     if payload.description is not None:
         clan.description = payload.description
     if payload.avatar_url is not None:
         clan.avatar_url = payload.avatar_url
-    if payload.frame_url is not None:
-        clan.frame_url = payload.frame_url if payload.frame_url.strip() else None
-    if payload.banner_url is not None:
-        clan.banner_url = payload.banner_url
     if payload.is_recruiting is not None:
         clan.is_recruiting = payload.is_recruiting
 
@@ -373,15 +368,14 @@ async def update_clan(
 
 
 @router.post("/{clan_id}/upload-avatar", status_code=status.HTTP_200_OK)
+@serialize_clan
 async def upload_clan_avatar(
     clan_id: int,
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    clan = await db.get(Clan, clan_id)
-    if not clan:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Klan topilmadi")
+    clan = await lock_clan(db, clan_id)
 
     cm = (await db.execute(
         select(ClanMember).where(ClanMember.clan_id == clan_id, ClanMember.user_id == current_user.id)
@@ -409,87 +403,49 @@ async def upload_clan_avatar(
     clan.avatar_url = avatar_url
     await db.commit()
     await delete_unreferenced_media(db, old_asset)
-    return {"success": True, "avatar_url": avatar_url, "message": "Klan logosi muvaffaqiyatli yangilandi"}
+    return {"success": True, "data": {"avatar_url": avatar_url}, "message": "Klan logosi muvaffaqiyatli yangilandi"}
 
 
 @router.post("/{clan_id}/upload-banner", status_code=status.HTTP_200_OK)
-async def upload_clan_banner(
-    clan_id: int,
-    file: UploadFile = File(...),
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    clan = await db.get(Clan, clan_id)
-    if not clan:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Klan topilmadi")
-
-    cm = (await db.execute(
-        select(ClanMember).where(ClanMember.clan_id == clan_id, ClanMember.user_id == current_user.id)
-    )).scalar_one_or_none()
-    if not cm or cm.role not in ["leader", "co_leader"]:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Faqat klan yetakchilari fon yuklashi mumkin")
-
-    ext = os.path.splitext(file.filename or "")[1].lower()
-    if ext not in [".png", ".jpg", ".jpeg", ".webp", ".svg"]:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Rasm fayli formati noto'g'ri (.png, .jpg, .webp, .svg)")
-
-    content = await file.read(10*1024*1024+1)
-    if len(content) > 10 * 1024 * 1024:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Fayl hajmi 10MB dan oshmasligi kerak")
-
-    filename = f"clan_banner_{clan_id}_{int(time.time())}{ext}"
-    banner_url = await StorageService.upload_file_async(
-        bucket_name="clans",
-        object_name=f"backgrounds/{filename}",
-        data=content,
-        content_type=file.content_type or "image/jpeg"
-    )
-
-    old_asset = clan.banner_url
-    clan.banner_url = banner_url
-    await db.commit()
-    await delete_unreferenced_media(db, old_asset)
-    return {"success": True, "banner_url": banner_url, "message": "Klan foni muvaffaqiyatli yangilandi"}
-
-
 @router.post("/{clan_id}/upload-frame", status_code=status.HTTP_200_OK)
-async def upload_clan_frame(
+async def reject_clan_cosmetic_upload(
     clan_id: int,
-    file: UploadFile = File(...),
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
 ):
-    clan = await db.get(Clan, clan_id)
-    if not clan:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Klan topilmadi")
+    raise HTTPException(422, 'Clan avatar frames and backgrounds must be purchased and equipped from the clan shop')
 
-    cm = (await db.execute(
-        select(ClanMember).where(ClanMember.clan_id == clan_id, ClanMember.user_id == current_user.id)
-    )).scalar_one_or_none()
-    if not cm or cm.role not in ["leader", "co_leader"]:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Faqat klan yetakchilari ramka yuklashi mumkin")
 
-    ext = os.path.splitext(file.filename or "")[1].lower()
-    if ext not in [".png", ".svg", ".webp"]:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Ramka formati SVG yoki PNG bo'lishi kerak")
+@router.get("/{clan_id}/shop")
+async def clan_shop(clan_id: int, current_user: User = Depends(get_current_user), db=Depends(get_db)):
+    items = await ClanCosmeticService.list_shop(db, clan_id, current_user.id)
+    return {'success': True, 'data': [item.model_dump() for item in items]}
 
-    content = await file.read(10*1024*1024+1)
-    if len(content) > 5 * 1024 * 1024:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Fayl hajmi 5MB dan oshmasligi kerak")
 
-    filename = f"clan_frame_{clan_id}_{int(time.time())}{ext}"
-    frame_url = await StorageService.upload_file_async(
-        bucket_name="clans",
-        object_name=f"frames/{filename}",
-        data=content,
-        content_type="image/svg+xml" if ext == ".svg" else (file.content_type or "image/png")
-    )
+@router.get("/{clan_id}/inventory")
+async def clan_inventory(clan_id: int, current_user: User = Depends(get_current_user), db=Depends(get_db)):
+    items = await ClanCosmeticService.list_inventory(db, clan_id, current_user.id)
+    return {'success': True, 'data': [item.model_dump() for item in items]}
 
-    old_asset = clan.frame_url
-    clan.frame_url = frame_url
-    await db.commit()
-    await delete_unreferenced_media(db, old_asset)
-    return {"success": True, "frame_url": frame_url, "message": "Klan ramkasi muvaffaqiyatli yangilandi"}
+
+@router.post("/{clan_id}/shop/buy/{item_id}")
+async def buy_clan_cosmetic(clan_id: int, item_id: int, payload: ShopBuyRequest,
+    current_user: User = Depends(get_current_user), db=Depends(get_db)):
+    result = await ClanCosmeticService.buy_item(db, clan_id, current_user.id, item_id, payload.expected_price)
+    return {'success': True, 'data': result}
+
+
+@router.post("/{clan_id}/shop/equip/{item_id}")
+async def equip_clan_cosmetic(clan_id: int, item_id: int,
+    current_user: User = Depends(get_current_user), db=Depends(get_db)):
+    result = await ClanCosmeticService.equip_item(db, clan_id, current_user.id, item_id)
+    return {'success': True, 'data': result}
+
+
+@router.post("/{clan_id}/shop/unequip/{item_id}")
+async def unequip_clan_cosmetic(clan_id: int, item_id: int,
+    current_user: User = Depends(get_current_user), db=Depends(get_db)):
+    result = await ClanCosmeticService.unequip_item(db, clan_id, current_user.id, item_id)
+    return {'success': True, 'data': result}
 
 
 @router.post("/{clan_id}/join", status_code=status.HTTP_200_OK)
@@ -560,11 +516,13 @@ async def join_clan(
 
 
 @router.post("/{clan_id}/leave", status_code=status.HTTP_200_OK)
+@serialize_clan
 async def leave_clan(
     clan_id: int,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    clan = await lock_clan(db, clan_id)
     cm = (await db.execute(
         select(ClanMember).where(ClanMember.clan_id == clan_id, ClanMember.user_id == current_user.id)
     )).scalar_one_or_none()
@@ -584,8 +542,7 @@ async def leave_clan(
             )
         else:
             # Last member, delete whole clan
-            clan = await db.get(Clan, clan_id)
-            old_assets = [clan.avatar_url, clan.frame_url, clan.banner_url] if clan else []
+            old_assets = [clan.avatar_url] if clan else []
             if clan:
                 await db.delete(clan)
             await db.commit()
@@ -624,12 +581,14 @@ async def leave_clan(
 
 
 @router.post("/{clan_id}/kick/{target_user_id}", status_code=status.HTTP_200_OK)
+@serialize_clan
 async def kick_clan_member(
     clan_id: int,
     target_user_id: int,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    await lock_clan(db, clan_id)
     my_cm = (await db.execute(
         select(ClanMember).where(ClanMember.clan_id == clan_id, ClanMember.user_id == current_user.id)
     )).scalar_one_or_none()
@@ -695,22 +654,14 @@ async def upgrade_clan_level(
        If clan.xp < level_config.required_xp, strictly prohibit upgrading!
     2. Clan leader / co-leader must pay the required Chaqmoq coins configured for this level.
     """
+    current_user = await lock_user(db, current_user.id)
+    clan = await lock_clan(db, clan_id)
     cm = (await db.execute(
         select(ClanMember).where(ClanMember.clan_id == clan_id, ClanMember.user_id == current_user.id)
+        .execution_options(populate_existing=True)
     )).scalar_one_or_none()
-
     if not cm or cm.role not in ["leader", "co_leader"]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Faqat klan yetakchisi yoki o'rinbosari klan darajasini oshirishi mumkin",
-        )
-
-    clan = await db.get(Clan, clan_id)
-    if not clan:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Klan topilmadi")
-
-    current_user = await lock_user(db, current_user.id)
-    clan = await db.scalar(select(Clan).where(Clan.id == clan_id).with_for_update().execution_options(populate_existing=True))
+        raise HTTPException(403, "Faqat klan yetakchisi yoki o'rinbosari klan darajasini oshirishi mumkin")
     # Fetch configuration for current clan level
     lvl_cfg = await db.get(ClanLevelConfig, clan.level)
     if not lvl_cfg or not await db.get(ClanLevelConfig, clan.level + 1):
@@ -994,7 +945,9 @@ async def clan_settings(db=Depends(get_db)):
 
 @router.post('/uploads/{kind}')
 async def draft_clan_upload(kind: str, file: UploadFile = File(...), current_user: User = Depends(get_current_user)):
-    if kind not in {'avatar','banner','frame'}:
+    if kind in {'banner', 'frame', 'background'}:
+        raise HTTPException(422, 'Clan avatar frames and backgrounds must be purchased and equipped from the clan shop')
+    if kind != 'avatar':
         raise HTTPException(404, 'Unknown clan image kind')
     extension = 'svg' if (file.filename or '').lower().endswith('.svg') and kind == 'frame' else 'webp'
     content = await file.read(5*1024*1024+1)
@@ -1005,11 +958,17 @@ async def draft_clan_upload(kind: str, file: UploadFile = File(...), current_use
     return {'success': True, 'data': {'url': url, f'{kind}_url': url}}
 
 @router.patch('/{clan_id}/members/{user_id}/role')
+@serialize_user
 async def change_member_role(clan_id: int, user_id: int, payload: RoleChangePayload, current_user: User = Depends(get_current_user), db=Depends(get_db)):
+    # Changing leader_id checks the target user's FK with a key-share lock.
+    # Lock that user before the clan so a simultaneous purchase/upgrade by the
+    # new leader cannot form user -> clan -> user dependencies across workers.
+    if await lock_user(db, user_id) is None:
+        raise HTTPException(404, 'Clan member not found')
     async with entity_lock('clan', clan_id):
-        clan = await db.scalar(select(Clan).where(Clan.id == clan_id).with_for_update())
-        actor = await db.scalar(select(ClanMember).where(ClanMember.clan_id == clan_id, ClanMember.user_id == current_user.id))
-        member = await db.scalar(select(ClanMember).where(ClanMember.clan_id == clan_id, ClanMember.user_id == user_id))
+        clan = await db.scalar(select(Clan).where(Clan.id == clan_id).with_for_update().execution_options(populate_existing=True))
+        actor = await db.scalar(select(ClanMember).where(ClanMember.clan_id == clan_id, ClanMember.user_id == current_user.id).execution_options(populate_existing=True))
+        member = await db.scalar(select(ClanMember).where(ClanMember.clan_id == clan_id, ClanMember.user_id == user_id).execution_options(populate_existing=True))
         if not clan or not member:
             raise HTTPException(404, 'Clan member not found')
         if not actor or actor.role != 'leader' or actor.user_id == user_id:

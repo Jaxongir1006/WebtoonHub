@@ -7,7 +7,7 @@
 * **Talab etiladigan ruxsat:** `shop:manage`
 * **Tavsif:** Do'kondagi buyumni butunlay o'chirish.
 
-Owned items and cards referenced by a gacha pool or historical draw cannot be
+Items owned by users or clans, and cards referenced by a gacha pool or historical draw, cannot be
 deleted (HTTP 409). Set `is_available=false` instead. Unreferenced artwork cleanup
 also retains assets recorded in durable draw snapshots.
 

@@ -10,7 +10,7 @@ from app.modules.library.models import Bookmark
 from app.modules.wheel.models import Wheel, WheelItem, WheelSpin
 from app.modules.gacha.models import GachaPool, GachaPoolCard, GachaRoll
 from app.modules.friends.models import Friendship
-from app.modules.clans.models import Clan, ClanMember, ClanLevelConfig, ClanMessage
+from app.modules.clans.models import Clan, ClanMember, ClanLevelConfig, ClanMessage, ClanInventory
 from app.core.idempotency import OperationReceipt
 
 __all__ = [
@@ -50,6 +50,7 @@ __all__ = [
     "ClanMember",
     "ClanLevelConfig",
     "ClanMessage",
+    "ClanInventory",
     "OperationReceipt",
 ]
 

@@ -76,18 +76,25 @@ async def main():
                 db.add(ChapterImage(chapter_id=manga.id, image_url=f'/content/{comic.id}/{manga.id}/page{index}.webp', order_index=index, width=700, height=2800))
             frame = fixture.media / 'frames' / 'fixture.webp'
             frame.parent.mkdir(parents=True, exist_ok=True)
-            Image.new('RGBA', (200, 200), '#f59e0b80').save(frame, 'WEBP')
+            frame_art = Image.new('RGBA', (200, 200), (0, 0, 0, 0))
+            ImageDraw.Draw(frame_art).ellipse((8, 8, 191, 191), outline='#f59e0b', width=12)
+            frame_art.save(frame, 'WEBP', lossless=True)
+            frame_art.close()
             item = ShopItem(name='Fixture frame', item_type='frame', price_coins=100, asset_url='/content/frames/fixture.webp')
             db.add(item)
             gacha_reader = User(username='fixture_gacha_reader', email='fixture-gacha@example.com',
                 hashed_password=fixture.reader.hashed_password, lightning_coins=1000, is_active=True)
             db.add(gacha_reader)
+            clan_reader = User(username='fixture_clan_reader', email='fixture-clan@example.com',
+                hashed_password=fixture.reader.hashed_password, lightning_coins=1000, is_active=True)
+            db.add(clan_reader)
             await db.commit()
             data = {'novel_work_id': fixture.work.id, 'novel_chapter_id': fixture.chapter.id,
                 'comic_work_id': comic.id, 'comic_chapter_id': chapter.id, 'manga_chapter_id': manga.id, 'shop_item_id': item.id,
                 'reader_email': fixture.reader.email, 'admin_email': fixture.admin.email,
                 'creator_email': fixture.creator.email, 'profile_reader_email': fixture.third.email,
                 'gacha_reader_email': gacha_reader.email,
+                'clan_reader_email': clan_reader.email,
                 'password': 'regression-password-long'}
 
         @app.get('/__e2e__/fixtures')
