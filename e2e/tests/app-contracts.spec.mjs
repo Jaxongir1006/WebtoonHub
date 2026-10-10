@@ -425,13 +425,24 @@ test('clan leaders buy and equip clan-owned cosmetics and the wallpaper covers t
   await owned.getByRole('button', { name: 'Equip', exact: true }).click();
   expect((await equipped).status()).toBe(200);
   const wallpaper = page.locator('[data-profile-background]');
+  const expectClanWallpaperCoverage = async () => {
+    const viewportHeight = page.viewportSize().height;
+    const clanBounds = await page.locator('[data-profile-wallpaper]').boundingBox();
+    const bounds = await wallpaper.boundingBox();
+    const visibleTop = Math.max(0, clanBounds.y);
+    const visibleBottom = Math.min(viewportHeight, clanBounds.y + clanBounds.height);
+    expect(clanBounds.height).toBeGreaterThan(viewportHeight);
+    expect(visibleBottom).toBeGreaterThan(visibleTop);
+    expect(bounds.height).toBeGreaterThanOrEqual(viewportHeight - 1);
+    expect(bounds.y).toBeLessThanOrEqual(visibleTop + 1);
+    // Sticky artwork ends at the clan boundary, before the shared site footer.
+    expect(bounds.y + bounds.height).toBeGreaterThanOrEqual(visibleBottom - 1);
+  };
   await expect(wallpaper.locator('img')).toHaveAttribute('src', background.asset_url);
   await expect(page.getByRole('button', { name: 'Pause background', exact: true })).toBeVisible();
   await expect.poll(() => wallpaper.locator('img').evaluate(image => image.complete && image.naturalWidth > 0)).toBe(true);
   await offer.scrollIntoViewIfNeeded();
-  const bounds = await wallpaper.boundingBox();
-  expect(bounds.y).toBeLessThanOrEqual(1);
-  expect(bounds.y + bounds.height).toBeGreaterThanOrEqual(899);
+  await expectClanWallpaperCoverage();
   await testInfo.attach('clan-full-background-desktop', { body: await page.screenshot(), contentType: 'image/png' });
 
   await page.setViewportSize({ width: 360, height: 740 });
@@ -448,9 +459,7 @@ test('clan leaders buy and equip clan-owned cosmetics and the wallpaper covers t
   expect(detail.frame_url).toBe(frame.asset_url);
   await page.getByRole('button', { name: 'Clan Shop', exact: true }).click();
   await offer.scrollIntoViewIfNeeded();
-  const mobileBounds = await wallpaper.boundingBox();
-  expect(mobileBounds.y).toBeLessThanOrEqual(1);
-  expect(mobileBounds.y + mobileBounds.height).toBeGreaterThanOrEqual(739);
+  await expectClanWallpaperCoverage();
   await testInfo.attach('clan-full-background-mobile', { body: await page.screenshot(), contentType: 'image/png' });
   const unequipped = page.waitForResponse(response => response.request().method() === 'POST' && response.url().endsWith(`/clans/${clan.id}/shop/unequip/${background.id}`));
   await owned.getByRole('button', { name: 'Unequip', exact: true }).click();
