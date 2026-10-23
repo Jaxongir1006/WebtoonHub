@@ -4,11 +4,13 @@ import hashlib
 import io
 import json
 import logging
+import tempfile
 import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from app.core.pdf_chapters import MAX_PDF_BYTES, convert_pdf
 from PIL import Image
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import func, select
@@ -238,6 +240,61 @@ async def create_import(data: ImportRequest, staff: StaffUser = Depends(require_
                 raise HTTPException(401, 'Staff account is unavailable')
             session = await _owned(db, session.id, staff)
         return await _response(db, session)
+
+
+@router.post('/pdf', status_code=201)
+async def upload_pdf_chapter(
+    webtoon_id: int = Form(..., gt=0),
+    chapter_number: float = Form(..., gt=0, allow_inf_nan=False),
+    idempotency_key: str = Form(..., min_length=1, max_length=128, pattern=r'^\S+$'),
+    title: str | None = Form(None, max_length=255),
+    reward_coins: int | None = Form(None, ge=0, le=1000000),
+    publish: bool = Form(False),
+    pdf: UploadFile = File(...),
+    staff: StaffUser = Depends(require_permission('chapters:create')),
+    db: AsyncSession = Depends(get_db),
+):
+    work = await WebtoonService.authorize_work(db, webtoon_id, staff)
+    if work.type not in {'manga', 'manhwa'}:
+        raise HTTPException(422, 'PDF chapters support manga and manhwa. Use the text editor for novels.')
+    if publish and not can_approve_chapters(staff):
+        raise HTTPException(403, 'Publishing requires chapters:approve permission; submit for review instead')
+    if not (pdf.filename or '').lower().endswith('.pdf'):
+        raise HTTPException(422, 'Select one PDF file for this chapter.')
+    if pdf.size is not None and pdf.size > MAX_PDF_BYTES:
+        raise HTTPException(413, 'Each PDF must be at most 20 MB.')
+    # Serialize conversion to protect the small hosting instance's memory budget.
+    # Durable imports keep retries safe even after a lost finalization response.
+    async with entity_lock('chapter-pdf', 0):
+        content = await pdf.read(MAX_PDF_BYTES + 1)
+        if len(content) > MAX_PDF_BYTES:
+            raise HTTPException(413, 'Each PDF must be at most 20 MB.')
+        if b'%PDF-' not in content[:1024]:
+            raise HTTPException(422, 'The file is not a readable PDF.')
+        with tempfile.TemporaryDirectory(prefix='chapter-pdf-') as directory:
+            source = Path(directory) / 'source.pdf'
+            await asyncio.to_thread(source.write_bytes, content)
+            del content
+            pages = await convert_pdf(source, directory)
+            response = await create_import(ImportRequest(
+                webtoon_id=webtoon_id, chapter_number=chapter_number, title=title,
+                reward_coins=reward_coins, idempotency_key=idempotency_key, pages=pages,
+            ), staff, db)
+            session = response['data']
+            if session['status'] != 'finalized':
+                uploaded = {page['index'] for page in session['uploaded_pages']}
+                for index, page in enumerate(pages):
+                    if index in uploaded:
+                        continue
+                    with (Path(directory) / page['name']).open('rb') as file:
+                        await upload_page(session['id'], index, UploadFile(file=file, filename=page['name']), staff, db)
+                response = await finalize_import(session['id'], FinalizeRequest(publish=publish), staff, db)
+            chapter = await db.get(Chapter, response['data']['chapter_id'])
+            return {'success': True, 'data': {
+                'id': chapter.id, 'webtoon_id': chapter.webtoon_id,
+                'chapter_number': chapter.chapter_number, 'title': chapter.title,
+                'status': chapter.status, 'images_count': response['data']['page_count'],
+            }}
 
 
 @router.get('/{import_id}')

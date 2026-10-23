@@ -17,6 +17,7 @@
 
       <div class="flex flex-wrap items-center gap-3">
         <Button v-if="authStore.hasPermission('chapters:create')" variant="secondary" size="md" @click="showChapterImport = true">{{ $t('chapterImport.title') }}</Button>
+        <Button v-if="authStore.hasPermission('chapters:create')" variant="secondary" size="md" @click="showPdfUpload = true">{{ $t('pdfUpload.title') }}</Button>
         <Button
           v-if="authStore.hasPermission('genres:manage')"
           variant="ghost"
@@ -317,6 +318,7 @@
       v-model="showGenreModal" @changed="loadData"
     />
     <ChapterImportWorkspace v-model="showChapterImport" :webtoons="webtoons" @updated="loadData" />
+    <PdfChapterUploadModal v-model="showPdfUpload" :webtoons="webtoons" @updated="loadData" />
     <Pagination v-model:page="page" :limit="limit" :total="totalItems" :loading="isLoading" />
   </div>
 </template>
@@ -338,6 +340,7 @@ import SearchInput from '../components/common/SearchInput.vue'
 import WebtoonFormModal from '../components/webtoons/WebtoonFormModal.vue'
 import ChapterUploadModal from '../components/webtoons/ChapterUploadModal.vue'
 import ChapterImportWorkspace from '../components/webtoons/ChapterImportWorkspace.vue'
+import PdfChapterUploadModal from '../components/webtoons/PdfChapterUploadModal.vue'
 import GenreManageModal from '../components/webtoons/GenreManageModal.vue'
 
 const authStore = useAuthStore()
@@ -352,6 +355,7 @@ const selectedGenre = ref('all')
 const showCreateModal = ref(false)
 const showChapterUpload = ref(false)
 const showChapterImport = ref(false)
+const showPdfUpload = ref(false)
 const showGenreModal = ref(false)
 const selectedWebtoon = ref(null)
 

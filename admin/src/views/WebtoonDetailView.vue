@@ -15,6 +15,7 @@
 
       <div class="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
         <Button v-if="webtoon.type !== 'novel' && authStore.hasPermission('chapters:create')" variant="secondary" size="sm" @click="showChapterImport = true">{{ $t('chapterImport.title') }}</Button>
+        <Button v-if="webtoon.type !== 'novel' && authStore.hasPermission('chapters:create')" variant="secondary" size="sm" @click="showPdfUpload = true">{{ $t('pdfUpload.title') }}</Button>
         <Button
           v-if="authStore.hasPermission('webtoons:edit')"
           variant="secondary"
@@ -198,6 +199,7 @@
 
     <!-- Chapter Edit Modal -->
     <ChapterImportWorkspace v-model="showChapterImport" :preselected-webtoon-id="webtoon.id" :webtoons="[webtoon]" @updated="loadWebtoon" />
+    <PdfChapterUploadModal v-model="showPdfUpload" :preselected-webtoon-id="webtoon.id" :webtoons="[webtoon]" @updated="loadWebtoon" />
 
     <ChapterEditModal
       v-model="showChapterEditModal"
@@ -231,6 +233,7 @@ import Button from '../components/common/Button.vue'
 import Modal from '../components/common/Modal.vue'
 import ChapterUploadModal from '../components/webtoons/ChapterUploadModal.vue'
 import ChapterImportWorkspace from '../components/webtoons/ChapterImportWorkspace.vue'
+import PdfChapterUploadModal from '../components/webtoons/PdfChapterUploadModal.vue'
 import ChapterEditModal from '../components/webtoons/ChapterEditModal.vue'
 import WebtoonFormModal from '../components/webtoons/WebtoonFormModal.vue'
 
@@ -270,6 +273,7 @@ onUnmounted(() => { loadSequence++; window.removeEventListener('chapter-import-c
 
 const showChapterUpload = ref(false)
 const showChapterImport = ref(false)
+const showPdfUpload = ref(false)
 const showChapterEditModal = ref(false)
 const showWebtoonEditModal = ref(false)
 const selectedChapter = ref(null)

@@ -47,3 +47,8 @@ The clan flow uploads a logo and buys a shop frame and background with the actin
 checks that ownership is recorded in the clan inventory instead of the personal
 inventory, and equips/unequips it through the real clan shop. It verifies complete
 clan-page wallpaper coverage, mobile fit, and reduced-motion posters.
+
+The PDF flow uses the dedicated PDF Upload button next to Import chapters,
+uploads one two-page PDF, publishes one chapter, and checks page order and
+portrait/landscape dimensions in the existing mobile reader. All files and
+content are synthetic and temporary.

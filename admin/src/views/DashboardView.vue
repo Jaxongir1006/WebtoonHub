@@ -23,6 +23,7 @@
         <!-- Quick Launch Action Buttons -->
         <div class="flex flex-wrap items-center gap-3">
           <Button v-if="authStore.hasPermission('chapters:create')" variant="primary" size="md" @click="showChapterImport = true">{{ $t('chapterImport.title') }}</Button>
+          <Button v-if="authStore.hasPermission('chapters:create')" variant="secondary" size="md" @click="showPdfUpload = true">{{ $t('pdfUpload.title') }}</Button>
           <Button
             v-if="authStore.hasPermission('chapters:create')"
             variant="secondary"
@@ -207,6 +208,7 @@
       :on-upload="onChapterUploaded"
     />
     <ChapterImportWorkspace v-model="showChapterImport" @updated="loadStats" />
+    <PdfChapterUploadModal v-model="showPdfUpload" @updated="loadStats" />
   </div>
 </template>
 
@@ -226,6 +228,7 @@ import Button from '../components/common/Button.vue'
 import WebtoonFormModal from '../components/webtoons/WebtoonFormModal.vue'
 import ChapterUploadModal from '../components/webtoons/ChapterUploadModal.vue'
 import ChapterImportWorkspace from '../components/webtoons/ChapterImportWorkspace.vue'
+import PdfChapterUploadModal from '../components/webtoons/PdfChapterUploadModal.vue'
 
 const authStore = useAuthStore()
 const systemStore = useSystemStore()
@@ -233,6 +236,7 @@ const systemStore = useSystemStore()
 const showWebtoonModal = ref(false)
 const showChapterUpload = ref(false)
 const showChapterImport = ref(false)
+const showPdfUpload = ref(false)
 
 const currentTime = ref(
   new Intl.DateTimeFormat(i18n.global.locale.value, {

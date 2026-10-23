@@ -71,6 +71,20 @@ export const webtoonsApi = {
     return res.data
   },
 
+  async uploadPdfChapter(data, onProgress, config = {}) {
+    const body = new FormData()
+    for (const key of ['webtoon_id', 'chapter_number', 'title', 'reward_coins', 'publish', 'idempotency_key', 'pdf']) {
+      if (data[key] !== undefined && data[key] !== null) body.append(key, data[key])
+    }
+    const res = await apiClient.post('/chapter-imports/pdf', body, {
+      timeout: 240000,
+      headers: { 'Content-Type': 'multipart/form-data' },
+      onUploadProgress: event => onProgress?.(event.total ? Math.round(event.loaded / event.total * 100) : null),
+      ...config,
+    })
+    return res.data
+  },
+
   async deleteChapter(id) {
     const res = await apiClient.delete(`/chapters/${id}`)
     return res.data

@@ -185,6 +185,46 @@ try {
   assert.equal(requests.filter(request=>request.url==='/chapters/3').length,0,'One atomic request must own metadata and images')
   checks+=10
 
+  const pdfEvents = []
+  const pdf = await mount('/src/components/webtoons/PdfChapterUploadModal.vue', {
+    modelValue: false, preselectedWebtoonId: 9, webtoons: [{ id: 9, title: 'PDF series', type: 'manga' }],
+    onUpdated: () => pdfEvents.push('updated'), 'onUpdate:modelValue': value => pdfEvents.push(value)
+  })
+  const pdfSelection = files => ({ target: { files, value: 'selected' } })
+  pdf.state.selectFile(pdfSelection([{ name: 'wrong.png', size: 20 }]))
+  assert.equal(pdf.state.pdfFile.value, null)
+  pdf.state.selectFile(pdfSelection([{ name: 'large.pdf', size: 20 * 1024 * 1024 + 1 }]))
+  assert.equal(pdf.state.pdfFile.value, null)
+  const pdfFile = new File(['%PDF-fixture'], 'chapter.pdf', { type: 'application/pdf' })
+  pdf.state.selectFile(pdfSelection([pdfFile]))
+  const originalPdfUpload = webtoonsApi.uploadPdfChapter, pdfAttempts = []
+  let finishPdf
+  webtoonsApi.uploadPdfChapter = async data => {
+    pdfAttempts.push(data)
+    if (pdfAttempts.length === 1) throw new Error('Retry this PDF')
+    return new Promise(resolve => { finishPdf = resolve })
+  }
+  try {
+    await pdf.state.submit()
+    assert.equal(pdf.state.pdfFile.value, pdfFile, 'A failed PDF upload retains the selected file')
+    assert.equal(pdf.state.error.value, 'Retry this PDF')
+    const retryPdf = pdf.state.submit()
+    await pdf.state.submit()
+    assert.equal(pdfAttempts.length, 2, 'Double submit must send only one PDF request')
+    assert.equal(pdfAttempts[0].idempotency_key, pdfAttempts[1].idempotency_key, 'Retry must reuse its durable chapter upload key')
+    finishPdf({ success: true, data: { id: 91 } }); await retryPdf
+    assert.deepEqual(pdfEvents, ['updated', false])
+    checks += 7
+  } finally { webtoonsApi.uploadPdfChapter = originalPdfUpload }
+
+  await webtoonsApi.uploadPdfChapter({ webtoon_id: 9, chapter_number: 2, reward_coins: 0, publish: false, pdf: pdfFile, idempotency_key: 'pdf-fixture-key' })
+  const pdfRequest = requests.find(request => request.url === '/chapter-imports/pdf')
+  assert(pdfRequest.data instanceof FormData, 'PDF uploads must remain multipart rather than JSON')
+  assert.equal(pdfRequest.data.get('reward_coins'), '0')
+  assert.equal(pdfRequest.data.get('publish'), 'false')
+  assert.equal(pdfRequest.data.get('pdf').name, 'chapter.pdf')
+  checks += 4
+
   const dialogEvents=[]
   const modal=await mount('/src/components/common/Modal.vue',{modelValue:true,title:'Draft',busy:true,'onUpdate:modelValue':value=>dialogEvents.push(value)})
   modal.state.close();assert.deepEqual(dialogEvents,[]);checks++

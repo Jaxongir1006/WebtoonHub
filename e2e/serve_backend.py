@@ -17,6 +17,7 @@ from app.modules.shop.models import ShopItem
 from sqlalchemy import update
 from PIL import Image, ImageDraw
 import uvicorn
+from fastapi.responses import Response
 
 
 async def main():
@@ -42,6 +43,11 @@ async def main():
                                   duration=[400, 600], loop=0)
         for image in background_frames:
             image.close()
+        pdf_path = fixture.media.parent / 'chapter-fixture.pdf'
+        with Image.new('RGB', (400, 600), '#d02020') as first, Image.new('RGB', (600, 400), '#2040d0') as second:
+            ImageDraw.Draw(first).text((40, 50), 'PDF CHAPTER - PAGE 1', fill='white')
+            ImageDraw.Draw(second).text((40, 50), 'PDF CHAPTER - PAGE 2', fill='white')
+            first.save(pdf_path, 'PDF', save_all=True, append_images=[second], resolution=72)
         async with fixture.sessions() as db:
             await db.execute(update(User).values(avatar_url='/content/avatars/fixture.webp'))
             await db.execute(update(Webtoon).where(Webtoon.id == fixture.work.id).values(
@@ -88,6 +94,9 @@ async def main():
             clan_reader = User(username='fixture_clan_reader', email='fixture-clan@example.com',
                 hashed_password=fixture.reader.hashed_password, lightning_coins=1000, is_active=True)
             db.add(clan_reader)
+            pdf_work = Webtoon(title='Fixture PDF manhwa', slug='fixture-pdf-manhwa', type='manhwa',
+                cover_image_url='/content/covers/fixture.webp', uploader_staff_id=fixture.admin.id)
+            db.add(pdf_work)
             await db.commit()
             data = {'novel_work_id': fixture.work.id, 'novel_chapter_id': fixture.chapter.id,
                 'comic_work_id': comic.id, 'comic_chapter_id': chapter.id, 'manga_chapter_id': manga.id, 'shop_item_id': item.id,
@@ -95,11 +104,16 @@ async def main():
                 'creator_email': fixture.creator.email, 'profile_reader_email': fixture.third.email,
                 'gacha_reader_email': gacha_reader.email,
                 'clan_reader_email': clan_reader.email,
+                'pdf_work_id': pdf_work.id,
                 'password': 'regression-password-long'}
 
         @app.get('/__e2e__/fixtures')
         async def fixture_ids():
             return data
+
+        @app.get('/__e2e__/chapter-pdf')
+        async def fixture_pdf():
+            return Response(pdf_path.read_bytes(), media_type='application/pdf')
 
         # Disable the application's development lifespan: fixture owns every DB/media
         # dependency, and no server startup should touch the normal content directory.

@@ -13,6 +13,14 @@ export function localizeApiError(error) {
   if (status === 401 && isStaffLoginRequest(error.config)) {
     return i18n.global.t('apiErrors.invalid_credentials')
   }
+  if (/chapter-imports\/pdf(?:[?#]|$)/.test(String(error.config?.url || ''))) {
+    const pdfError = /password-protected/i.test(detail || '') ? 'passwordError'
+      : /readable PDF/i.test(detail || '') ? 'unreadableError'
+      : /between 1 and 100 pages/i.test(detail || '') ? 'pageLimitError'
+      : /at most 20 MB/i.test(detail || '') ? 'invalidFile'
+      : /could not be converted|takes too long|unsupported page size|converted chapter exceeds/i.test(detail || '') ? 'conversionError' : null
+    if (pdfError) return i18n.global.t('pdfUpload.' + pdfError)
+  }
   if (locale === 'uz' && detail) return detail
   const text = String(detail || '').toLowerCase()
   const known = [
