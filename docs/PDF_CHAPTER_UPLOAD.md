@@ -16,6 +16,17 @@ PDFs may contain 1–100 pages and be at most 20 MB. Password-protected files ar
 rejected with an explanation. Conversion is limited to 50 MB of output, with
 bounded page resolution and processing time for the free hosting instance.
 
+Translation annotations and form text are included in the rendered page. PDF
+pages use lossless WebP, at up to 288 DPI and 2400 pixels wide, without the normal
+chapter upload's extra resize/compression. Long vertical pages are divided into
+ordered sections to retain readable text; there may be at most 100 sections per
+chapter. Output that exceeds the limits is rejected instead of silently reducing
+its quality.
+
+Chapters uploaded before this rendering fix must be reprocessed from their
+original PDFs to restore missing translation overlays and lost detail. Existing
+images cannot recover content that was omitted during their original conversion.
+
 If a request fails, the form retains the PDF and retry key. Retrying the same
 unchanged form resumes the saved import and does not create a second chapter.
 The original PDF is temporary and is removed after processing.

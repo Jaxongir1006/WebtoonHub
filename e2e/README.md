@@ -49,8 +49,10 @@ inventory, and equips/unequips it through the real clan shop. It verifies comple
 clan-page wallpaper coverage, mobile fit, and reduced-motion posters.
 
 The PDF flow uses the dedicated PDF Upload button next to Import chapters,
-uploads one two-page PDF, publishes one chapter, and checks page order and
-portrait/landscape dimensions in the existing mobile reader. All files and
+uploads a two-page PDF with Uzbek translation annotation overlays, publishes one
+chapter, and checks high-resolution portrait/landscape dimensions in the existing
+mobile reader. Backend tests compare stored pixels against fully rendered
+translation/form appearances and verify tall-page sections have no seams. All files and
 content are synthetic and temporary.
 
 CI pins the browser job to Ubuntu 24.04, which is supported by the installed

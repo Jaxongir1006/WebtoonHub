@@ -11,7 +11,11 @@ from fastapi import HTTPException
 MAX_PDF_BYTES = 20 * 1024 * 1024
 MAX_PDF_PAGES = 100
 MAX_OUTPUT_BYTES = 50 * 1024 * 1024
-RENDER_TIMEOUT = 75
+RENDER_TIMEOUT = 150
+PDF_RENDER_SCALE = 4  # 288 DPI for PDF text and vector artwork.
+PDF_MAX_WIDTH = 2400
+PDF_TILE_PIXELS = 8_000_000
+MAX_RENDERED_PAGES = 100
 
 
 def render_pages(source, directory):
@@ -23,6 +27,8 @@ def render_pages(source, directory):
     except pdfium.PdfiumError as exc:
         return {'error': 'password' if exc.err_code == 4 else 'invalid'}
     with document:
+        # Translation editors often save text as annotations or form widgets.
+        document.init_forms()
         if not 1 <= len(document) <= MAX_PDF_PAGES:
             return {'error': 'pages'}
         for index in range(len(document)):
@@ -31,20 +37,33 @@ def render_pages(source, directory):
                 width, height = page.get_size()
                 if not all(math.isfinite(value) and 0 < value <= 100000 for value in (width, height)):
                     return {'error': 'dimensions'}
-                scale = min(2, 2048 / width, 12000 / height, math.sqrt(8_000_000 / (width * height)))
-                bitmap = page.render(scale=scale, fill_color=(255, 255, 255, 255), draw_annots=False)
-                try:
-                    with bitmap.to_pil() as image:
-                        name = f'{index + 1:03d}.webp'
-                        path = Path(directory) / name
-                        image.save(path, 'WEBP', quality=85, method=4)
-                        size = path.stat().st_size
-                        total_bytes += size
-                        if total_bytes > MAX_OUTPUT_BYTES:
-                            return {'error': 'output'}
-                        pages.append({'name': name, 'size': size, 'sha256': hashlib.sha256(path.read_bytes()).hexdigest()})
-                finally:
-                    bitmap.close()
+                scale = min(PDF_RENDER_SCALE, PDF_MAX_WIDTH / width)
+                pixel_width, pixel_height = math.ceil(width * scale), math.ceil(height * scale)
+                tile_height = min(4096, PDF_TILE_PIXELS // pixel_width)
+                for top in range(0, pixel_height, tile_height):
+                    if len(pages) >= MAX_RENDERED_PAGES:
+                        return {'error': 'sections'}
+                    bottom = min(pixel_height, top + tile_height)
+                    # Render tall strips at full reading width instead of shrinking
+                    # an entire vertical chapter until its text becomes unreadable.
+                    # PDFium rounds crop pixels up; avoid floating-point seams.
+                    crop_top = max(0, top - 0.001) / scale
+                    crop_bottom = max(0, pixel_height - bottom - 0.001) / scale
+                    bitmap = page.render(scale=scale, crop=(0, crop_bottom, 0, crop_top),
+                        fill_color=(255, 255, 255, 255), draw_annots=True,
+                        may_draw_forms=True, limit_image_cache=True)
+                    try:
+                        with bitmap.to_pil() as image:
+                            name = f'{index + 1:03d}_{top // tile_height + 1:03d}.webp'
+                            path = Path(directory) / name
+                            image.save(path, 'WEBP', lossless=True, method=4)
+                            size = path.stat().st_size
+                            total_bytes += size
+                            if total_bytes > MAX_OUTPUT_BYTES:
+                                return {'error': 'output'}
+                            pages.append({'name': name, 'size': size, 'sha256': hashlib.sha256(path.read_bytes()).hexdigest()})
+                    finally:
+                        bitmap.close()
             finally:
                 page.close()
     return {'pages': pages}
@@ -73,6 +92,7 @@ async def convert_pdf(source, directory):
         'password': 'Password-protected PDFs are not supported. Upload an unlocked PDF.',
         'invalid': 'The file is not a readable PDF.',
         'pages': 'Each PDF must contain between 1 and 100 pages.',
+        'sections': 'This PDF requires more than 100 readable image sections. Use a shorter chapter PDF.',
         'dimensions': 'This PDF contains an unsupported page size.',
         'output': 'The converted chapter exceeds 50 MB. Use a smaller PDF.',
     }
@@ -85,7 +105,7 @@ if __name__ == '__main__':
     if sys.platform != 'win32':
         import resource
         resource.setrlimit(resource.RLIMIT_AS, (384 * 1024 * 1024, 384 * 1024 * 1024))
-        resource.setrlimit(resource.RLIMIT_CPU, (60, 65))
+        resource.setrlimit(resource.RLIMIT_CPU, (120, 125))
     try:
         result = render_pages(sys.argv[1], sys.argv[2])
     except Exception:

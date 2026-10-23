@@ -43,7 +43,7 @@ def sanitize_svg(data):
                 del parent.attrib[key]
     return ET.tostring(root, encoding='utf-8')
 
-def validated_media(data, object_name, bucket):
+def validated_media(data, object_name, bucket, *, preserve_quality=False):
     if not data or len(data) > MAX_MEDIA_BYTES:
         raise HTTPException(413, 'Image must be nonempty and at most 20 MB')
     if Path(object_name).suffix.lower() == '.svg':
@@ -63,6 +63,12 @@ def validated_media(data, object_name, bucket):
                 encoded = encode_animated_background(source, MAX_MEDIA_BYTES)
                 return encoded, str(Path(object_name).with_suffix('.webp')).replace(chr(92), '/')
             source.load()
+            # Only the server's PDF renderer uses this path. Its WebP pages have
+            # already been bounded and encoded; validate without another lossy pass.
+            if preserve_quality and bucket == settings.MINIO_BUCKET_CHAPTERS and source.format == 'WEBP':
+                if getattr(source, 'is_animated', False):
+                    raise HTTPException(422, 'PDF chapter pages must be static images')
+                return data, str(Path(object_name).with_suffix('.webp')).replace(chr(92), '/')
             # PNG/GIF may store transparency in palette/key metadata without an alpha band.
             has_transparency = 'A' in source.getbands() or 'transparency' in source.info
             image = ImageOps.exif_transpose(source).convert('RGBA' if has_transparency else 'RGB')

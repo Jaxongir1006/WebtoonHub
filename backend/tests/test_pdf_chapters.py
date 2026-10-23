@@ -4,7 +4,7 @@ import unittest
 import uuid
 from unittest.mock import patch
 
-from PIL import Image
+from PIL import Image, ImageChops
 from sqlalchemy import select, func
 import test_chapter_imports as imports
 from app.modules.webtoons.models import Chapter, ChapterImage
@@ -47,7 +47,7 @@ class PdfChapterTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(chapter.reward_coins, 0)
             pages = list(await db.scalars(select(ChapterImage).where(ChapterImage.chapter_id == data['id']).order_by(ChapterImage.order_index)))
             self.assertEqual([page.order_index for page in pages], [1, 2])
-            self.assertEqual([(page.width, page.height) for page in pages], [(800, 1200), (1200, 800)])
+            self.assertEqual([(page.width, page.height) for page in pages], [(1600, 2400), (2400, 1600)])
             for page, channel in zip(pages, [0, 2]):
                 with Image.open(self.media / page.image_url.removeprefix('/content/')) as image:
                     pixel = image.convert('RGB').getpixel((image.width // 2, image.height // 2))
@@ -123,3 +123,55 @@ class PdfChapterTests(unittest.IsolatedAsyncioTestCase):
         retry = await self.upload(key=key, content=content)
         self.assertEqual(retry.status_code, 201, retry.text)
         self.assertEqual(retry.json()['data']['images_count'], 2)
+
+    async def test_translation_annotations_and_form_widgets_preserve_visible_text_exactly(self):
+        import pypdfium2 as pdfium
+        from pdf_fixtures import translated_pdf
+        for number, widget in enumerate([False, True], 1):
+            content = translated_pdf(widget=widget)
+            response = await self.upload(content=content, number=number)
+            self.assertEqual(response.status_code, 201, response.text)
+            async with self.sessions() as db:
+                page = await db.scalar(select(ChapterImage).where(ChapterImage.chapter_id == response.json()['data']['id']))
+            with pdfium.PdfDocument(content) as document:
+                document.init_forms()
+                source = document[0]
+                bitmap = source.render(scale=4, draw_annots=True, may_draw_forms=True, fill_color=(255, 255, 255, 255))
+                try:
+                    with bitmap.to_pil() as reference, Image.open(self.media / page.image_url.removeprefix('/content/')) as actual:
+                        expected = reference.convert('RGB')
+                        saved = actual.convert('RGB')
+                        self.assertIsNone(ImageChops.difference(saved, expected).getbbox(),
+                            'The stored page must retain every rendered pixel, including translation overlays')
+                        # White translation bubble replaces the grey English base.
+                        self.assertEqual(saved.getpixel((100, 1000)), (255, 255, 255))
+                        translated_ink = sum(1 for red, green, blue in saved.crop((120, 1080, 1400, 1360)).getdata()
+                            if blue > red + 50 and blue > green + 30)
+                        self.assertGreater(translated_ink, 1000)
+                finally:
+                    bitmap.close(); source.close()
+
+    async def test_tall_pages_keep_reading_width_and_tiles_join_without_missing_text_or_seams(self):
+        import pypdfium2 as pdfium
+        from pdf_fixtures import tall_pdf
+        content = tall_pdf()
+        response = await self.upload(content=content)
+        self.assertEqual(response.status_code, 201, response.text)
+        self.assertEqual(response.json()['data']['images_count'], 2)
+        async with self.sessions() as db:
+            pages = list(await db.scalars(select(ChapterImage).where(ChapterImage.chapter_id == response.json()['data']['id']).order_by(ChapterImage.order_index)))
+        self.assertEqual([page.width for page in pages], [1600, 1600])
+        self.assertEqual(sum(page.height for page in pages), 7200)
+        with Image.new('RGB', (1600, 7200)) as joined:
+            top = 0
+            for page in pages:
+                with Image.open(self.media / page.image_url.removeprefix('/content/')) as image:
+                    joined.paste(image, (0, top)); top += image.height
+            with pdfium.PdfDocument(content) as document:
+                document.init_forms(); source = document[0]
+                bitmap = source.render(scale=4, draw_annots=True, may_draw_forms=True, fill_color=(255, 255, 255, 255))
+                try:
+                    with bitmap.to_pil() as reference:
+                        self.assertIsNone(ImageChops.difference(joined, reference.convert('RGB')).getbbox())
+                finally:
+                    bitmap.close(); source.close()

@@ -17,8 +17,10 @@ export function localizeApiError(error) {
     const pdfError = /password-protected/i.test(detail || '') ? 'passwordError'
       : /readable PDF/i.test(detail || '') ? 'unreadableError'
       : /between 1 and 100 pages/i.test(detail || '') ? 'pageLimitError'
+      : /more than 100 readable image sections/i.test(detail || '') ? 'sectionsError'
+      : /converted chapter exceeds/i.test(detail || '') ? 'outputLimitError'
       : /at most 20 MB/i.test(detail || '') ? 'invalidFile'
-      : /could not be converted|takes too long|unsupported page size|converted chapter exceeds/i.test(detail || '') ? 'conversionError' : null
+      : /could not be converted|takes too long|unsupported page size/i.test(detail || '') ? 'conversionError' : null
     if (pdfError) return i18n.global.t('pdfUpload.' + pdfError)
   }
   if (locale === 'uz' && detail) return detail

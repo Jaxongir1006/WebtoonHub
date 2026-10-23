@@ -10,6 +10,7 @@ os.environ.pop('AUDIT_TEST_DATABASE_URL', None)
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'backend'))
 
 from tests.test_audit_regressions import AuditRegressionTests
+from tests.pdf_fixtures import translated_pdf
 from app.main import app
 from app.modules.users.models import User
 from app.modules.webtoons.models import Webtoon, Chapter, ChapterImage
@@ -44,10 +45,7 @@ async def main():
         for image in background_frames:
             image.close()
         pdf_path = fixture.media.parent / 'chapter-fixture.pdf'
-        with Image.new('RGB', (400, 600), '#d02020') as first, Image.new('RGB', (600, 400), '#2040d0') as second:
-            ImageDraw.Draw(first).text((40, 50), 'PDF CHAPTER - PAGE 1', fill='white')
-            ImageDraw.Draw(second).text((40, 50), 'PDF CHAPTER - PAGE 2', fill='white')
-            first.save(pdf_path, 'PDF', save_all=True, append_images=[second], resolution=72)
+        pdf_path.write_bytes(translated_pdf(two_pages=True))
         async with fixture.sessions() as db:
             await db.execute(update(User).values(avatar_url='/content/avatars/fixture.webp'))
             await db.execute(update(Webtoon).where(Webtoon.id == fixture.work.id).values(

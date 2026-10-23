@@ -503,11 +503,11 @@ test('PDF Upload imports one ordered chapter and opens it in the existing mobile
   const first = page.getByRole('img', { name: 'Page 1', exact: true });
   await expect(first).toBeVisible();
   await expect.poll(() => first.evaluate(image => image.complete && image.naturalWidth > 0)).toBe(true);
-  expect(await first.evaluate(image => [image.naturalWidth, image.naturalHeight])).toEqual([800, 1200]);
+  expect(await first.evaluate(image => [image.naturalWidth, image.naturalHeight])).toEqual([1600, 2400]);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
   await testInfo.attach('pdf-chapter-mobile-reader', { body: await page.screenshot(), contentType: 'image/png' });
   const second = page.getByRole('img', { name: 'Page 2', exact: true });
   await second.scrollIntoViewIfNeeded();
   await expect.poll(() => second.evaluate(image => image.complete && image.naturalWidth > 0)).toBe(true);
-  expect(await second.evaluate(image => [image.naturalWidth, image.naturalHeight])).toEqual([1200, 800]);
+  expect(await second.evaluate(image => [image.naturalWidth, image.naturalHeight])).toEqual([2400, 1600]);
 });

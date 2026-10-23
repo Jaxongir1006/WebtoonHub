@@ -287,7 +287,7 @@ async def upload_pdf_chapter(
                     if index in uploaded:
                         continue
                     with (Path(directory) / page['name']).open('rb') as file:
-                        await upload_page(session['id'], index, UploadFile(file=file, filename=page['name']), staff, db)
+                        await _upload_page(session['id'], index, UploadFile(file=file, filename=page['name']), staff, db, preserve_quality=True)
                 response = await finalize_import(session['id'], FinalizeRequest(publish=publish), staff, db)
             chapter = await db.get(Chapter, response['data']['chapter_id'])
             return {'success': True, 'data': {
@@ -307,6 +307,10 @@ async def get_import(import_id: str, staff: StaffUser = Depends(require_permissi
 async def upload_page(import_id: str, index: int, image: UploadFile = File(...),
                       staff: StaffUser = Depends(require_permission('chapters:create')),
                       db: AsyncSession = Depends(get_db)):
+    return await _upload_page(import_id, index, image, staff, db)
+
+
+async def _upload_page(import_id, index, image, staff, db, *, preserve_quality=False):
     async with entity_lock('chapter-import', import_id):
         session = await _owned(db, import_id, staff, lock=True)
         manifest = json.loads(session.manifest_json)
@@ -329,7 +333,8 @@ async def upload_page(import_id: str, index: int, image: UploadFile = File(...),
             return await _response(db, session)
         if session.status != 'uploading':
             raise HTTPException(409, 'This import is already finalized')
-        content, _ = await asyncio.to_thread(validated_media, data, 'page.webp', settings.MINIO_BUCKET_CHAPTERS)
+        content, _ = await asyncio.to_thread(validated_media, data, 'page.webp', settings.MINIO_BUCKET_CHAPTERS,
+            preserve_quality=preserve_quality)
         with Image.open(io.BytesIO(content)) as decoded:
             width, height = decoded.size
         name = f'{index:03d}_{uuid.uuid4().hex}.webp'

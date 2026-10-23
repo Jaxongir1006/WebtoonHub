@@ -10,6 +10,8 @@ const rows = {
   passwordError: ['Upload an unlocked PDF. Password-protected files are not supported.', 'Загрузите PDF без пароля. Защищённые файлы не поддерживаются.', 'Parolsiz PDF yuklang. Parol bilan himoyalangan fayllar qo‘llanmaydi.'],
   unreadableError: ['This file is not a readable PDF. Export it again and retry.', 'Не удалось прочитать PDF. Экспортируйте его заново и повторите попытку.', 'PDF faylni o‘qib bo‘lmadi. Uni qayta eksport qilib, yana urinib ko‘ring.'],
   pageLimitError: ['One PDF must contain between 1 and 100 pages.', 'Один PDF должен содержать от 1 до 100 страниц.', 'Bitta PDF 1 dan 100 tagacha sahifadan iborat bo‘lishi kerak.'],
+  sectionsError: ['This chapter needs more than 100 readable image sections. Use a shorter chapter PDF.', 'Глава требует более 100 изображений для читаемого текста. Используйте PDF с более короткой главой.', 'Bobni aniq ko‘rsatish uchun 100 tadan ko‘p rasm kerak. Qisqaroq bob PDF faylidan foydalaning.'],
+  outputLimitError: ['The high-quality chapter exceeds 50 MB. Reduce the PDF page count or source resolution.', 'Глава в высоком качестве превышает 50 МБ. Уменьшите число страниц или исходное разрешение PDF.', 'Yuqori sifatli bob 50 MB dan oshdi. PDF sahifalari sonini yoki dastlabki aniqligini kamaytiring.'],
   conversionError: ['This PDF could not be converted. Try a smaller or simpler PDF.', 'Не удалось преобразовать PDF. Попробуйте файл меньшего размера или сложности.', 'PDF faylni aylantirib bo‘lmadi. Kichikroq yoki soddaroq PDF bilan urinib ko‘ring.'],
 }
 export default Object.fromEntries(['en', 'ru', 'uz'].map((locale, index) => [locale, { pdfUpload: Object.fromEntries(Object.entries(rows).map(([key, values]) => [key, values[index]])) }]))
