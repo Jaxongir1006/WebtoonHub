@@ -52,3 +52,6 @@ The PDF flow uses the dedicated PDF Upload button next to Import chapters,
 uploads one two-page PDF, publishes one chapter, and checks page order and
 portrait/landscape dimensions in the existing mobile reader. All files and
 content are synthetic and temporary.
+
+CI pins the browser job to Ubuntu 24.04, which is supported by the installed
+Playwright version, rather than following changes to `ubuntu-latest`.

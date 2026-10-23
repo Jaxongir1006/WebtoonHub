@@ -101,7 +101,8 @@ jobs:
       - run: python -m unittest discover -s tests
 
   browser_integration:
-    runs-on: ubuntu-latest
+    # Playwright 1.58 supports Ubuntu 24.04; keep runner/browser dependencies aligned.
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
